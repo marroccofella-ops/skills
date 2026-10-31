@@ -14,7 +14,10 @@ import { fileURLToPath } from "node:url";
 import { JPEG, MP4 } from './media-fixtures.mjs';
 
 const results = {}, failures = [];
+const selectedCase=process.argv.length===4&&process.argv[2]==='--case'?process.argv[3]:null;
+if(process.argv.length>2&&!selectedCase)throw Error('Use --case <exact test name> or no arguments');
 async function test(name, fn) {
+  if(selectedCase&&name!==selectedCase)return;
   try { await fn(); results[name] = true; }
   catch (e) { results[name] = false; failures.push({ name, error: e }); }
 }
@@ -726,20 +729,24 @@ try {
   // disclosure printed before it; a blocked cell is skipped with its clearing action and no exec.
   await test("generative_probes_need_consent_skip_blocked_cells_and_disclose_before_sending", async () => {
     const home = path.join(fixture, "gen-home"); fs.mkdirSync(home, { recursive: true });
+    // The fake exec is immediate. Give its request and generated-file timestamps
+    // one controlled clock instead of depending on wall/filesystem clock coupling.
+    const requestTime=Math.floor(Date.now()/1000)*1000,probeNow=()=>requestTime;
+    const writeGenerated=(file,bytes)=>{fs.writeFileSync(file,bytes);fs.utimesSync(file,requestTime/1000,requestTime/1000);};
     const routes = { codex: { input: { image: { level: "verified" } }, output: { image_gen: { level: "documented", harvest: "~/.codex/generated_images/**/*.png", mime: "image/png" } } } };
     const listed = generativeCells("codex", routes.codex);
     assert.equal(listed.length, 1); assert.equal(listed[0].blocked, false); assert.match(listed[0].disclosure, /quota is spent/); assert.match(listed[0].disclosure, /\.codex\/generated_images/); assert.ok(listed[0].disclosure.includes(listed[0].prompt), "the exact prompt is disclosed");
     const refused = fakeRegistry(routes);
     const noConsent = modalityExec({ replies: { png: () => ok("Red") } });
-    const r0 = await runModalityProbes("codex", mopts({ home, registry: refused, exec: noConsent.exec, command: "codex", colour: "red" }));
+    const r0 = await runModalityProbes("codex", mopts({ home, registry: refused, exec: noConsent.exec, command: "codex", colour: "red",now:probeNow }));
     assert.equal(cellOf(r0, "image_gen").status, "skipped"); assert.match(cellOf(r0, "image_gen").reason, /consent_required/); assert.equal(cellOf(r0, "image_gen").disclosure, listed[0].disclosure);
     assert.equal(noConsent.calls.length, 2, "version + image; no generation request without consent"); assert.equal(refused.entries.length, 1);
     // With consent: the fake writes the file where the registry glob looks, so harvest finds and hashes it.
     const log = [];
     const reg = fakeRegistry(routes);
     const generated = path.join(home, ".codex", "generated_images", "sess-1", "exec-abc.png");
-    const f = modalityExec({ log, replies: { png: () => ok("Red") }, generate: ({ args, options }) => { assert.ok(/image generation tool/.test(options.input) && args.includes("workspace-write")); fs.mkdirSync(path.dirname(generated), { recursive: true }); fs.writeFileSync(generated, syntheticPng("blue")); return ok(`Wrote ${generated}`); } });
-    const r = await runModalityProbes("codex", mopts({ home, registry: reg, exec: f.exec, command: "codex", consent: true, colour: "red", now: Date.now, disclose: text => log.push(["disclose", text]) }));
+    const f = modalityExec({ log, replies: { png: () => ok("Red") }, generate: ({ args, options }) => { assert.ok(/image generation tool/.test(options.input) && args.includes("workspace-write")); fs.mkdirSync(path.dirname(generated), { recursive: true }); writeGenerated(generated, syntheticPng("blue")); return ok(`Wrote ${generated}`); } });
+    const r = await runModalityProbes("codex", mopts({ home, registry: reg, exec: f.exec, command: "codex", consent: true, colour: "red", now: probeNow, disclose: text => log.push(["disclose", text]) }));
     const gen = cellOf(r, "image_gen");
     assert.equal(gen.status, "verified", gen.reason); assert.equal(gen.harvested.length, 1); assert.equal(gen.harvested[0].path, generated); assert.equal(gen.harvested[0].sha256, sha256(syntheticPng("blue")));
     const disclosed = log.findIndex(e => e[0] === "disclose"), sent = log.findIndex((e, i) => e[0] === "exec" && i > disclosed);
@@ -755,8 +762,8 @@ try {
     assert.equal(routeDisclosure(cells).includes("image_gen"), false); assert.ok(routeDisclosure(cells).includes("video_gen"));
     const breg = fakeRegistry(blockedRoutes);
     const sentArgs = [];
-    const b = modalityExec({ generate: ({ args }) => { sentArgs.push(args.join(" ")); const dir = path.join(home, ".grok", "sessions", "s", "videos"); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, "1.mp4"), MP4); return ok(envelope("grok", "done")); } });
-    const br = await runModalityProbes("grok", mopts({ home, registry: breg, exec: b.exec, command: "grok", consent: true, now: Date.now, disclose: () => {} }));
+    const b = modalityExec({ generate: ({ args }) => { sentArgs.push(args.join(" ")); const dir = path.join(home, ".grok", "sessions", "s", "videos"); fs.mkdirSync(dir, { recursive: true }); writeGenerated(path.join(dir, "1.mp4"), MP4); return ok(envelope("grok", "done")); } });
+    const br = await runModalityProbes("grok", mopts({ home, registry: breg, exec: b.exec, command: "grok", consent: true, now: probeNow, disclose: () => {} }));
     assert.equal(cellOf(br, "image_gen").status, "skipped"); assert.equal(cellOf(br, "image_gen").blocker, "zdr"); assert.match(cellOf(br, "image_gen").reason, /not sent/); assert.match(cellOf(br, "image_gen").clearing_action, /privacy/);
     assert.equal(sentArgs.length, 1, "exactly one request, for the unblocked cell"); assert.match(sentArgs[0], /image_to_video/); assert.equal(sentArgs.some(a => /image_gen tool/.test(a)), false);
     assert.equal(cellOf(br, "video_gen").status, "verified", cellOf(br, "video_gen").reason);
@@ -764,7 +771,7 @@ try {
     // Consent but no file harvested → probe_failed, level kept.
     const dry = fakeRegistry(routes);
     const d = modalityExec({ replies: { png: () => ok("Red") }, generate: () => ok("I could not generate anything.") });
-    const dr = await runModalityProbes("codex", mopts({ home: path.join(fixture, "empty-home"), registry: dry, exec: d.exec, command: "codex", consent: true, colour: "red", now: Date.now, disclose: () => {} }));
+    const dr = await runModalityProbes("codex", mopts({ home: path.join(fixture, "empty-home"), registry: dry, exec: d.exec, command: "codex", consent: true, colour: "red", now: probeNow, disclose: () => {} }));
     assert.equal(cellOf(dr, "image_gen").status, "probe_failed"); assert.match(cellOf(dr, "image_gen").reason, /no hashed file matched/);
     assert.equal(dry.entries.find(e => e.entry.modality === "image_gen").entry.level, "documented");
   });
@@ -1053,6 +1060,7 @@ try {
     assert.equal(blockerInText("You have exceeded your monthly quota", "grok"), "quota", "provider-neutral gates still apply to every route");
   });
 
+  if(selectedCase&&!Object.hasOwn(results,selectedCase))throw Error('No test matched the requested exact case');
   if (failures.length) {
     for (const { name, error } of failures) process.stderr.write(`FAIL ${name}\n  ${String(error?.stack || error).split("\n").slice(0, 6).join("\n  ")}\n`);
     process.stdout.write(JSON.stringify({ passed: false, tests: results }, null, 2) + "\n");
