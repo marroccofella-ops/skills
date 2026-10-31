@@ -7,6 +7,8 @@ let touched=0;const options=new Proxy({},{get(){touched++;throw Error('Blocked n
 const result=await runNativeBumbleStage(options);
 assert.equal(result.status,'policy_required');assert.equal(result.dispatched,0);assert.equal(result.quorum_votes,0);assert.equal(result.completion,false);assert.equal(touched,0);
 assert.equal(nativeBumbleReadiness().credentials_read,false);
+assert.equal(nativeBumbleReadiness().policy_scope,'default_native_entry');
+assert.equal(Object.hasOwn(await import('./bumble-native.mjs'),'runBumblePeerShadow'),false,'the unsigned shadow seam is not a native entry');
 const dispatcher=fs.readFileSync(new URL('./multi-review.mjs',import.meta.url),'utf8');
 const persisted=dispatcher.indexOf('evidence.persisted = true'),native=dispatcher.indexOf('await runNativeBumbleStage(');
 assert(persisted>=0&&native>persisted,'native stage must follow original-report persistence, not feed baseline reviewers');

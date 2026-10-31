@@ -70,5 +70,17 @@ try{
   assert.equal(again.summary().halted,true,'exhausted investigation capacity prevents more dispatch');
   assert.equal(again.summary().quorum_votes,0);assert.equal(again.summary().completion,false);
   assert.deepEqual(fs.readFileSync(path.join(options.root,'baseline.json')),baseline_bytes,'Bumble output never rewrites sealed baseline');
-  console.log(JSON.stringify({passed:true,network_calls:0,scope:'native private baseline-before-candidate ordering, reservations, scoped evidence and restart; synthetic worker qualification only'}));
+    // State, baseline and genesis must survive together; no silent empty restart.
+  const lostOptions={...options,root:path.join(parent,'lost-stage-control')};new BumbleStage(lostOptions);
+  for(const name of ['stage.json','baseline.json','initialisation.json']){
+    const file=path.join(lostOptions.root,name),saved=path.join(lostOptions.root,'preserved-'+name),bytes=fs.readFileSync(file);
+    fs.renameSync(file,saved);assert.throws(()=>new BumbleStage(lostOptions),/missing|reset/i);assert.equal(fs.existsSync(file),false);assert.deepEqual(fs.readFileSync(saved),bytes);
+    fs.renameSync(saved,file);new BumbleStage(lostOptions);
+  }
+  const preserved=path.join(parent,'all-stage-components');fs.mkdirSync(preserved);
+  for(const name of ['stage.json','baseline.json','initialisation.json'])fs.renameSync(path.join(lostOptions.root,name),path.join(preserved,name));
+  try{assert.throws(()=>new BumbleStage(lostOptions),/missing|reconciliation|reset/i);assert.deepEqual(fs.readdirSync(lostOptions.root),[]);}
+  finally{for(const name of ['stage.json','baseline.json','initialisation.json'])fs.renameSync(path.join(preserved,name),path.join(lostOptions.root,name));}
+  new BumbleStage(lostOptions);
+console.log(JSON.stringify({passed:true,network_calls:0,scope:'native private baseline-before-candidate ordering, reservations, scoped evidence and restart; synthetic worker qualification only'}));
 }finally{assert(path.resolve(parent).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-bumble-stage-test-'));fs.rmSync(parent,{recursive:true,force:true});}

@@ -18,6 +18,10 @@ const finiteTime=value=>Number.isSafeInteger(value)&&value>=0;
 const settledAttempt=state=>state==='terminal'||state==='admission_denied';
 const ROUTES=new Set(['codex','claude','antigravity','copilot','grok','gemini']);
 const MAX_BYTES=4_000_000;
+function publicationFault(cause,cleanup_error){const error=Object.assign(new Error('Private state publication may have completed; reconciliation required.',{cause}),{code:'MOMM_PRIVATE_STATE_RECONCILIATION_REQUIRED',publication_possible:true});if(cleanup_error)Object.defineProperty(error,'cleanup_error',{value:cleanup_error});return error;}
+function syncPrivateDirectory(root){if(process.platform==='win32')return;let fd,failure;try{fd=fs.openSync(root,(fs.constants?.O_RDONLY??0)|(fs.constants?.O_DIRECTORY??0));fs.fsyncSync(fd);}catch(error){failure=error;}if(fd!==undefined)try{fs.closeSync(fd);}catch(error){failure??=error;}if(failure)throw publicationFault(failure);}
+function stateFilePresent(file){try{fs.lstatSync(file);return true;}catch(error){if(error?.code==='ENOENT')return false;throw Error('Original private state could not be inspected; reconciliation required.');}}
+
 function outside(project,target){const relative=path.relative(project,target);return Boolean(relative)&&(path.isAbsolute(relative)||relative==='..'||relative.startsWith('..'+path.sep));}
 function baselineValue(bytes,source){
   if(!(bytes instanceof Uint8Array)||bytes.length>MAX_BYTES||typeof source!=='string'||Buffer.byteLength(source)>1_000_000)throw Error('Invalid bounded whole-piece baseline.');
@@ -33,7 +37,7 @@ function baselineValue(bytes,source){
 }
 
 export class BumbleStage {
-  #root;#file;#source;#baseline;#limits;#frame;#capacity;#capacityBinding;
+  #root;#file;#source;#baseline;#limits;#frame;#capacity;#capacityBinding;#marker;#store;
   constructor({root,project_root=process.cwd(),source,baseline_bytes,limits,task_frame,capacity}){
     if(!(capacity instanceof BumbleCapacity))throw Error('The owner-global physical capacity ledger is required.');
     this.#capacity=capacity;this.#capacityBinding=capacity.summary().configuration_sha256;
@@ -41,7 +45,7 @@ export class BumbleStage {
     const project=fs.realpathSync(project_root),literal=path.resolve(root);
     if(!outside(project,literal))throw Error('Supplementary evidence belongs outside project source.');
     // Resolve an existing parent before creation, not after a symlink could create project files.
-    const ancestor=fs.existsSync(literal)?literal:path.dirname(literal);
+    const rootExisted=stateFilePresent(literal),ancestor=rootExisted?literal:path.dirname(literal);
     if(!outside(project,fs.realpathSync(ancestor)))throw Error('Supplementary store parent resolves inside project source.');
     this.#baseline=baselineValue(baseline_bytes,source);this.#source=source;
     const plan=new BumblePlan(limits);this.#limits=clone(plan.snapshot());
@@ -56,16 +60,41 @@ export class BumbleStage {
     if(new Set(this.#frame.map(f=>sha(encode(f.task)))).size!==this.#frame.length||plan.negative_ids.size&&[...plan.negative_ids].some(id=>!this.#frame.some(f=>f.id===id)))throw Error('Duplicated task content or unbound negative audit frame.');
     preparePrivateEvidence(literal);this.#root=fs.realpathSync(literal);this.#file=path.join(this.#root,'stage.json');
     if(!outside(project,this.#root))throw Error('Supplementary evidence resolves inside project source.');
+    this.#marker=path.join(this.#root,'initialisation.json');
     this.#locked(()=>{
-      const baselineFile=path.join(this.#root,'baseline.json');
-      if(!fs.existsSync(baselineFile))this.#exclusiveFile(baselineFile,baseline_bytes);
-      else if(sha(this.#regularBytes(baselineFile))!==this.#baseline.baseline_sha256)throw Error('Sealed baseline changed; original retained.');
-      if(!fs.existsSync(this.#file))this.#save({schema:'momm-bumble-stage/1',capacity_binding:this.#capacityBinding,baseline:this.#baseline,task_frame:this.#frame,plan:this.#limits,attempts:[],raw_bytes:0,investigations:[]});
+      const baselineFile=path.join(this.#root,'baseline.json'),hasState=stateFilePresent(this.#file),hasBaseline=stateFilePresent(baselineFile),hasMarker=stateFilePresent(this.#marker);
+      if(!hasState&&!hasBaseline&&!hasMarker){
+        if(rootExisted||fs.readdirSync(this.#root).some(name=>name!=='writer.lock'))throw Error('Original supplementary state is missing; reconciliation required.');
+        const marker={schema:'momm-bumble-stage-initialisation/1',store_id:crypto.randomUUID(),binding_sha256:this.#initialBinding()};
+        this.#exclusiveFile(this.#marker,Buffer.from(encode(marker)+'\n'));this.#store=marker.store_id;
+        this.#exclusiveFile(baselineFile,baseline_bytes);
+        this.#save({schema:'momm-bumble-stage/2',store_id:this.#store,capacity_binding:this.#capacityBinding,baseline:this.#baseline,task_frame:this.#frame,plan:this.#limits,attempts:[],raw_bytes:0,investigations:[]});
+      }else if(!hasState||!hasBaseline||!hasMarker)throw Error('Original stage, baseline or initialization is missing; no reset or migration performed.');
+      this.#store=this.#readMarker();
+      if(sha(this.#regularBytes(baselineFile))!==this.#baseline.baseline_sha256)throw Error('Sealed baseline changed; original retained.');
       this.#read();
     });
   }
-  #regularBytes(file){const stat=fs.lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size>MAX_BYTES)throw Error('Supplementary store is not a bounded private regular file.');return fs.readFileSync(file);}
-  #exclusiveFile(file,bytes){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
+  #initialBinding(){return sha(encode({baseline:this.#baseline,frame:this.#frame,limits:this.#limits,capacity_binding:this.#capacityBinding}));}
+  #readMarker(){
+    const marker=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(this.#regularBytes(this.#marker)));
+    if(Object.keys(marker).sort().join(',')!=='binding_sha256,schema,store_id'||marker.schema!=='momm-bumble-stage-initialisation/1'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(marker.store_id)||marker.binding_sha256!==this.#initialBinding())throw Error('Supplementary initialization binding changed.');
+    return marker.store_id;
+  }
+  #regularBytes(file){
+    const refuse=()=>{throw Error('Supplementary store changed or is not a bounded private regular file.');},a=fs.lstatSync(file,{bigint:true});
+    const same=s=>s.isFile()&&!s.isSymbolicLink()&&s.nlink===1n&&s.ino>0n&&s.ino===a.ino&&(process.platform==='win32'||s.dev===a.dev)&&s.size===a.size&&s.mtimeNs===a.mtimeNs;
+    if(!same(a)||a.size<0n||a.size>BigInt(MAX_BYTES))refuse();
+    const fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));
+    try{
+      if(!same(fs.fstatSync(fd,{bigint:true})))refuse();
+      const bytes=Buffer.alloc(Number(a.size)+1);let n=0;
+      while(n<bytes.length){const got=fs.readSync(fd,bytes,n,bytes.length-n,n);if(!got)break;n+=got;}
+      if(n!==Number(a.size)||!same(fs.fstatSync(fd,{bigint:true}))||!same(fs.lstatSync(file,{bigint:true})))refuse();
+      return bytes.subarray(0,n);
+    }finally{fs.closeSync(fd);}
+  }
+  #exclusiveFile(file,bytes){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}syncPrivateDirectory(this.#root);}
   #locked(fn){
     requirePrivateEvidence(this.#root);const lock=path.join(this.#root,'writer.lock');let fd;
     try{fd=fs.openSync(lock,'wx',0o600);}catch{throw Error('Supplementary stage is busy; no lock is removed automatically.');}
@@ -87,7 +116,7 @@ export class BumbleStage {
     const state=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(this.#regularBytes(this.#file)));
     const global=this.#capacity.summary();
     if(state.capacity_binding!==this.#capacityBinding||global.configuration_sha256!==this.#capacityBinding)throw Error('Owner-global capacity binding changed.');
-    if(state.schema!=='momm-bumble-stage/1'||encode(state.baseline)!==encode(this.#baseline)||encode(state.task_frame)!==encode(this.#frame)||!Array.isArray(state.attempts)||state.attempts.length>this.#limits.limits.max_tasks||!Number.isSafeInteger(state.raw_bytes)||state.raw_bytes<0||state.attempts.some(a=>!identity(a.reservation_id)||!identity(a.check_id)||!hash(a.identity_binding)||!hash(a.scope_binding)||!a.task||!['admitting','admission_denied','reserved','transmission_possible','terminal'].includes(a.state))||new Set(state.attempts.map(a=>a.reservation_id)).size!==state.attempts.length)throw Error('Supplementary state binding or structure changed.');
+    if(this.#readMarker()!==this.#store||state.store_id!==this.#store||state.schema!=='momm-bumble-stage/2'||encode(state.baseline)!==encode(this.#baseline)||encode(state.task_frame)!==encode(this.#frame)||!Array.isArray(state.attempts)||state.attempts.length>this.#limits.limits.max_tasks||!Number.isSafeInteger(state.raw_bytes)||state.raw_bytes<0||state.attempts.some(a=>!identity(a.reservation_id)||!identity(a.check_id)||!hash(a.identity_binding)||!hash(a.scope_binding)||!a.task||!['admitting','admission_denied','reserved','transmission_possible','terminal'].includes(a.state))||new Set(state.attempts.map(a=>a.reservation_id)).size!==state.attempts.length)throw Error('Supplementary state binding or structure changed.');
     const plan=new BumblePlan({...this.#limits.limits,negative_ids:this.#limits.negative_ids},state.plan);
     if(!Array.isArray(state.investigations)||state.investigations.length!==plan.state.investigations||new Set(state.investigations).size!==state.investigations.length||!state.investigations.every(hash))throw Error('Supplementary investigation accounting changed.');
     if(plan.state.reservations.length!==state.attempts.length||state.attempts.some(a=>!plan.state.reservations.some(r=>r.id===a.reservation_id&&r.task_id===a.check_id)))throw Error('Supplementary attempt/reservation mismatch.');
@@ -97,7 +126,7 @@ export class BumbleStage {
       if(Object.hasOwn(a,'admission_request')){
         // Historical pre-intent interruption: retain the exact pending attempt
         // and expose inspection/reconciliation, never recreate proof or admit.
-        if(a.state==='admitting'&&!fs.existsSync(this.#admissionPath(a))){
+        if(a.state==='admitting'&&!stateFilePresent(this.#admissionPath(a))){
           this.#admissionExpected(a);
           if(a.capacity_reservation_id!==null)throw Error('Pending admission cannot claim a capacity identity.');
           continue;
@@ -128,13 +157,17 @@ export class BumbleStage {
     return {state,plan,physical_release_pending,physical_release_pending_reservations};
   }
   #save(state){
+    if(state.store_id!==this.#store||this.#readMarker()!==this.#store)throw Error('Stage initialization changed; original state retained.');
     const bytes=Buffer.from(encode(state)+'\n');if(bytes.length>MAX_BYTES)throw Error('Supplementary storage budget exhausted. No dispatch authorized.');
     const temporary=path.join(this.#root,`stage-${crypto.randomUUID()}.tmp`);
-    try{this.#exclusiveFile(temporary,bytes);requirePrivateEvidence(this.#root);fs.renameSync(temporary,this.#file);}finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary);}
+    let failure,cleanup;
+    try{this.#exclusiveFile(temporary,bytes);requirePrivateEvidence(this.#root);fs.renameSync(temporary,this.#file);syncPrivateDirectory(this.#root);}catch(error){failure=error;}
+    try{if(stateFilePresent(temporary))fs.unlinkSync(temporary);}catch(error){cleanup=error;}
+    if(cleanup)throw publicationFault(failure??cleanup,cleanup);if(failure)throw failure;
   }
   #resultPath(a){return path.join(this.#root,`result-${a.reservation_id}.json`);}
   #intentPath(a){return path.join(this.#root,`terminal-intent-${a.reservation_id}.json`);}
-  #hasTerminalEvidence(a){return fs.existsSync(this.#intentPath(a))||fs.existsSync(this.#resultPath(a));}
+  #hasTerminalEvidence(a){return stateFilePresent(this.#intentPath(a))||stateFilePresent(this.#resultPath(a));}
   #transmissionPath(a){return path.join(this.#root,`transmission-intent-${a.reservation_id}.json`);}
   #admissionPath(a){return path.join(this.#root,`admission-intent-${a.reservation_id}.json`);}
   #deniedPath(a){return path.join(this.#root,`admission-denied-${a.reservation_id}.json`);}
@@ -169,9 +202,9 @@ export class BumbleStage {
   }
   #adoptAdmission(state,plan,a){
     if(!a||!Object.hasOwn(a,'admission_request'))throw Error('Original admission intent is missing; no legacy identity is invented.');
-    if(a.state==='admitting'&&!fs.existsSync(this.#admissionPath(a)))return {reconciled:false,admitted:false,reason:'original_admission_intent_missing',dispatch_authorized:false,quorum_votes:0,completion:false};
+    if(a.state==='admitting'&&!stateFilePresent(this.#admissionPath(a)))return {reconciled:false,admitted:false,reason:'original_admission_intent_missing',dispatch_authorized:false,quorum_votes:0,completion:false};
     const intent=this.#readAdmission(a),physical=this.#matchAdmission(intent);
-    if(fs.existsSync(this.#deniedPath(a))){
+    if(stateFilePresent(this.#deniedPath(a))){
       const denied=this.#readDenied(a);if(physical)throw Error('Original admission refusal conflicts with a global hold.');
       if(a.state!=='admission_denied'){
         if(a.state!=='admitting')throw Error('Original admission state conflicts with its refusal.');
@@ -241,7 +274,7 @@ export class BumbleStage {
     if(bytes.length>2048)throw Error('Bounded revalidation metadata exceeded; reservation stays held.');
     // One bounded append-only companion per admitted attempt (max 1,000), not
     // a replacement for the original attempt, result or terminal intent.
-    if(fs.existsSync(file)){if(!this.#regularBytes(file).equals(bytes))throw Error('Original revalidation record changed; reservation stays held.');}
+    if(stateFilePresent(file)){if(!this.#regularBytes(file).equals(bytes))throw Error('Original revalidation record changed; reservation stays held.');}
     else this.#exclusiveFile(file,bytes);
   }
   #adopt(state,plan,a,caller=null){
@@ -249,7 +282,7 @@ export class BumbleStage {
     const fields=['schema','reservation_id','capacity_reservation_id','capacity_binding','baseline_sha256','task_id','attempt_id','identity_binding','scope_binding','qualification_sha256','result_sha256','input_sha256','input_supported','finished','retained_bytes','overflow_bytes','candidate_count','outcome','axes'];
     if(!intent||Object.keys(intent).sort().join(',')!==fields.sort().join(',')||intent.schema!=='momm-bumble-terminal-intent/1'||intent.reservation_id!==a.reservation_id||intent.capacity_reservation_id!==a.capacity_reservation_id||intent.capacity_binding!==this.#capacityBinding||intent.baseline_sha256!==this.#baseline.baseline_sha256||intent.task_id!==a.task.task_id||intent.attempt_id!==a.task.attempt_id||intent.identity_binding!==a.identity_binding||intent.scope_binding!==a.scope_binding||intent.qualification_sha256!==a.qualification_sha256||!hash(intent.result_sha256)||!hash(intent.input_sha256)||typeof intent.input_supported!=='boolean'||typeof intent.finished!=='boolean'||!Number.isSafeInteger(intent.retained_bytes)||intent.retained_bytes<0||intent.retained_bytes>a.task.budget.response_bytes||!Number.isSafeInteger(intent.overflow_bytes)||intent.overflow_bytes<0||!Number.isSafeInteger(intent.candidate_count)||intent.candidate_count<0||!intent.axes||Object.keys(intent.axes).sort().join(',')!=='now,payload,transport'||!finiteTime(intent.axes.now))throw Error('Original terminal intent is unbound or invalid; reservation stays held.');
     if(caller&&(caller.transport!==intent.axes.transport||sha(caller.raw)!==intent.input_sha256||caller.input_supported!==intent.input_supported||caller.finished!==intent.finished))throw Error('Recovery cannot replace the original response or terminal axes.');
-    if(!fs.existsSync(this.#resultPath(a))&&caller){
+    if(!stateFilePresent(this.#resultPath(a))&&caller){
       // Only the exact original input can materialize an absent result. Its
       // original intent time and result digest stay authoritative; no model
       // request, replacement, send permit or physical release is performed.
@@ -312,7 +345,7 @@ export class BumbleStage {
       // This method publishes a local intent only after the exact global proof.
       // An existing intent without that proof is therefore a conflict, not a
       // reason to commit a fresh global release and leave an unadoptable store.
-      if(!priorPhysical?.physical_release&&fs.existsSync(file))throw Error('Original local release intent conflicts with uncommitted global release; no new global release committed.');
+      if(!priorPhysical?.physical_release&&stateFilePresent(file))throw Error('Original local release intent conflicts with uncommitted global release; no new global release committed.');
       // Legacy stores may predate admission headroom for release adoption. Check
       // the worst-case local representation BEFORE committing any new global
       // release proof. An externally committed release still remains pending.
@@ -320,7 +353,7 @@ export class BumbleStage {
       if(receipt!==undefined)this.#capacity.reconcileRelease(a.capacity_reservation_id,receipt);
       const physical=this.#capacity.summary().reservations.find(r=>r.id===a.capacity_reservation_id),expected=this.#physicalReleaseExpected(a,physical),bytes=Buffer.from(encode(expected)+'\n');
       if(Object.hasOwn(a,'physical_release'))return {reconciled:true,released:true,recorded:false,dispatch_authorized:false,quorum_votes:0,completion:false};
-      if(fs.existsSync(file)){if(!this.#regularBytes(file).equals(bytes))throw Error('Original release intent conflicts; no replacement or admission.');}
+      if(stateFilePresent(file)){if(!this.#regularBytes(file).equals(bytes))throw Error('Original release intent conflicts; no replacement or admission.');}
       else this.#exclusiveFile(file,bytes);
       plan.adoptPhysicalRelease(a.reservation_id,{receipt_sha256:expected.receipt_sha256,at:expected.recorded_at});
       a.physical_release={receipt_sha256:expected.receipt_sha256,recorded_at:expected.recorded_at,intent_sha256:sha(bytes)};state.plan=plan.snapshot();this.#save(state);
@@ -434,7 +467,7 @@ export class BumbleStage {
       // An immutable terminal claim excludes a later send, even when local or
       // global adoption failed. Only reconcile the original terminal evidence.
       if(this.#hasTerminalEvidence(a))throw Error('Terminal evidence excludes transmission; reconcile the original result.');
-      if(fs.existsSync(this.#transmissionPath(a)))return this.#recoverTransmission(state,a);
+      if(stateFilePresent(this.#transmissionPath(a)))return this.#recoverTransmission(state,a);
       if(a.state!=='reserved'||now>=a.task.deadline||now>=state.plan.limits.deadline)throw Error('Attempt cannot transmit.');
       const global=this.#capacity.summary().reservations.find(r=>r.id===a.capacity_reservation_id);
       if(!global||global.transmission_possible||global.terminal||now<global.reserved_at)throw Error('Original capacity cannot create a fresh transmission intent.');
@@ -456,7 +489,7 @@ export class BumbleStage {
       if(!a||(!neverSent&&a.state!=='transmission_possible')||(!neverSent&&transport==='known_not_sent'))throw Error('Original attempt is missing, already terminal, or could have transmitted.');
       // A durable intent survives a failed global mark. It is not proof of a
       // never-sent outcome; keep the original hold for exact reconciliation.
-      if(neverSent&&fs.existsSync(this.#transmissionPath(a)))throw Error('Original transmission intent requires reconciliation; never-sent settlement is refused.');
+      if(neverSent&&stateFilePresent(this.#transmissionPath(a)))throw Error('Original transmission intent requires reconciliation; never-sent settlement is refused.');
       if(!neverSent&&now<a.possible_at)throw Error('Terminal time precedes transmission.');
       const input_supported=typeof bytes==='string'||bytes instanceof Uint8Array,raw=input_supported?Buffer.from(bytes):Buffer.alloc(0);
       if(this.#hasTerminalEvidence(a))return this.#adopt(state,plan,a,{transport,raw,input_supported,finished});

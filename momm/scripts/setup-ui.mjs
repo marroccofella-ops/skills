@@ -2334,7 +2334,7 @@ async function dashboardRegression() {
     // disclosure that is not the exact one shown) is refused before any request; the input
     // probe runs and records; generation with exact consent sends one request per UNBLOCKED
     // cell and skips blocked cells with their clearing action; plan() renders; no registry = 503.
-    const cap = fixture("capabilities");
+    const cap = fixture("capabilities with spaces");
     const capRegistry = await loadCapabilitiesRegistry();
     if (!capRegistry.module) {
       checks.capabilities_registry_loaded = false;
@@ -2365,7 +2365,7 @@ async function dashboardRegression() {
         calls.push(args);
         if (args[0] === "--version") return { code: 0, stdout: "9.9.9", stderr: "" };
         const blob = [...args, options.input].filter((v) => typeof v === "string").join("\n");
-        const png = /This is a capability probe/.test(blob) ? blob.match(/(\S*probe\.png)\b/)?.[1]?.replace(/^@/, "") : null;
+        const png = /This is a capability probe/.test(blob) ? blob.match(/View the image file at ([^\r\n]+?probe\.png) with your file or image tool/)?.[1] : null;
         if (png) return { code: 0, stdout: route === "grok" ? JSON.stringify({ text: colourOf(png) }) : colourOf(png), stderr: "" };
         if (/capability probe/.test(blob)) return { code: 0, stdout: route === "grok" ? JSON.stringify({ text: "The page says something." }) : "The page says something.", stderr: "" };
         const {JPEG,fixturePng} = await import('./media-fixtures.mjs');
@@ -2533,7 +2533,7 @@ async function selfTest() {
       && !isAllowedHost({ headers: {} }),
     terminal_rejects_newline_commands: launchTerminal("git status\nrm -rf /") === false,
     clickjacking_blocked: securityHeaders()["X-Frame-Options"] === "DENY",
-    api_keys_not_mentioned: !JSON.stringify(providers).match(/api[_ -]?key/i),
+    api_keys_not_mentioned: !JSON.stringify(providers).match(/api[_ -]?key/i) && !fs.readFileSync(path.join(assetDir,"bumblers.js"),"utf8").match(/api[_ -]?key/i),
     environment_values_never_classified: sampleEnvironment.api_key_names_present[0] === "XAI_API_KEY" && !("values" in sampleEnvironment),
     relevant_environment_categories: sampleEnvironment.proxy_names_present[0] === "HTTP_PROXY"
       && sampleEnvironment.update_controls_present[0] === "NO_UPDATE_CHECK"

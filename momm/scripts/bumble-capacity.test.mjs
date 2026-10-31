@@ -25,5 +25,20 @@ try{
   assert.equal(new BumbleCapacity(freshOptions).reserve({...request,endpoint_id:'other-gpu',run_id:'retired-empty',now:6}).admitted,false,'unoccupied retired physical group must refuse new work');
   assert.equal(fresh.summary().held,0);assert.equal(fresh.summary().reserved_tokens,0);
   assert.equal(fresh.reserve({...request,run_id:'unretired-control',now:6}).admitted,true,'unretired physical group remains admissible under the same otherwise-free bounds');
-  console.log(JSON.stringify({passed:true,network_calls:0,scope:'global owner-private reservations across runs, shared aliases/IPs, conservative token charges and retirement; not measured hardware capacity'}));
+    // A missing component is uncertainty, never a fresh admission budget.
+  const lostOptions={root:path.join(parent,'lost-state-control'),config},lost=new BumbleCapacity(lostOptions);
+  const held=lost.reserve({...request,run_id:'lost-state',now:10});lost.markTransmissionPossible(held.reservation_id,11);
+  const stateFile=path.join(lostOptions.root,'capacity.json'),stateBackup=path.join(lostOptions.root,'preserved-state.json');
+  const originalState=fs.readFileSync(stateFile);fs.renameSync(stateFile,stateBackup);
+  assert.throws(()=>new BumbleCapacity(lostOptions),/missing|reconciliation|reset/i);assert.equal(fs.existsSync(stateFile),false);assert.deepEqual(fs.readFileSync(stateBackup),originalState);
+  fs.renameSync(stateBackup,stateFile);assert.equal(new BumbleCapacity(lostOptions).summary().held,1);
+  const marker=path.join(lostOptions.root,'initialisation.json'),markerBackup=path.join(lostOptions.root,'preserved-initialisation.json');
+  fs.renameSync(marker,markerBackup);assert.throws(()=>new BumbleCapacity(lostOptions),/missing|reset/i);assert.equal(fs.existsSync(marker),false);assert.deepEqual(fs.readFileSync(stateFile),originalState);
+  fs.renameSync(markerBackup,marker);assert.equal(new BumbleCapacity(lostOptions).summary().held,1);
+  const preserved=path.join(parent,'all-capacity-components');fs.mkdirSync(preserved);
+  for(const name of ['capacity.json','initialisation.json'])fs.renameSync(path.join(lostOptions.root,name),path.join(preserved,name));
+  try{assert.throws(()=>new BumbleCapacity(lostOptions),/missing|reconciliation|reset/i);assert.deepEqual(fs.readdirSync(lostOptions.root),[]);}
+  finally{for(const name of ['capacity.json','initialisation.json'])fs.renameSync(path.join(preserved,name),path.join(lostOptions.root,name));}
+  assert.equal(new BumbleCapacity(lostOptions).summary().held,1);
+console.log(JSON.stringify({passed:true,network_calls:0,scope:'global owner-private reservations across runs, shared aliases/IPs, conservative token charges and retirement; not measured hardware capacity'}));
 }finally{assert(path.resolve(parent).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-capacity-test-'));fs.rmSync(parent,{recursive:true,force:true});}

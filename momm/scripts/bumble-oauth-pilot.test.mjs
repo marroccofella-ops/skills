@@ -6,12 +6,32 @@ import {runBumbleOAuthPeerWorker} from './bumble-oauth-peer-worker.mjs';
 import {createTemporaryBumbleOAuthAuthority} from './bumble-oauth-authority.mjs';
 import {validateBumbleOAuthMetadata,prepareBumblePKCE,consumeBumbleOAuthCallback,validateBumbleOAuthTokenEnvelope} from './bumble-oauth-contract.mjs';
 import {privateTestFixture} from './private-test-fixture.mjs';import {preparePrivateEvidence} from './evidence-permissions.mjs';import {defaultExec} from './probes.mjs';
+import vm from 'node:vm';
 delete process.env.MOMM_EVIDENCE_HOME;
 // Test-owned writes only: product filesystem APIs and the process umask stay unchanged.
 const writeFixture=(file,data,options)=>fs.writeFileSync(file,data,{mode:0o600,...(typeof options==='string'?{encoding:options}:options)});
 const H=b=>crypto.createHash('sha256').update(b).digest('hex'),dir=path.dirname(fileURLToPath(import.meta.url)),home=privateTestFixture('momm-oauth-pilot-');
 const keys=crypto.generateKeyPairSync('ed25519'),public_key_pem=keys.publicKey.export({type:'spki',format:'pem'}),public_key_sha256=H(keys.publicKey.export({type:'spki',format:'der'}));
 let passed=0;async function check(name,fn){await fn();passed++;console.log('PASS '+name);}
+await check('both actual coordinators refuse unreadable revocation state',()=>{
+ const hash='a'.repeat(64);
+ for(const name of ['bumble-oauth-pilot.mjs','bumble-peer-shadow.mjs']){
+  const source=fs.readFileSync(path.join(dir,name),'utf8'),match=source.match(/^ +const current=\(\)=>[\s\S]*?^ +current\(\);/m);
+  assert(match,'actual current-authority function must remain under test');
+  const helper=source.split(/\r?\n/).find(line=>/^ +const revocationPresent=/.test(line))??'';
+  const prefix="const p={issued_at:1000,expires_at:5000,authorization_id:'synthetic',coordinator_sha256:hash,executor_sha256:hash,broker_sha256:hash,adapter_sha256:hash,capacity_configuration_sha256:hash,endpoint_id:'synthetic'};let burned=false,previous=1000,lastWall=1000;const beganMono=0,beganWall=1000,anchor=1000,mono=0;";
+  for(const mode of ['ENOENT','EACCES','EPERM','EIO','present']){
+   const execute=()=>vm.runInNewContext(prefix+helper+match[0].replaceAll('import.meta.url',"'file:///synthetic-source/coordinator.mjs'"),{
+    hash,Date:{now:()=>1001},performance:{now:()=>1},read(){},readReceipt(){},requirePrivateEvidence(){},
+    fs:{existsSync:()=>mode==='present',lstatSync(){if(mode==='present')return {};throw Object.assign(Error('Synthetic inspection failure'),{code:mode});},readFileSync:()=>Buffer.from('synthetic')},
+    Buffer,H:()=>hash,fileURLToPath:()=>'/synthetic-source/coordinator.mjs',path:path.posix,worker:'/synthetic-source/worker.mjs',approvals:'/synthetic-approvals',journal:'/synthetic-journal',directory:'/synthetic-source',
+    o:{capacity:{summary:()=>({configuration_sha256:hash}),endpointGroups(){}}},fail(){throw Error('Synthetic protected refusal');}
+   });
+   if(mode==='ENOENT')assert.doesNotThrow(execute,name+' permits verified absence');
+   else assert.throws(execute,/Synthetic protected refusal/,name+' must refuse '+mode);
+  }
+ }
+});
 function setup({alter=()=>{},httpStatus=200,invalidQuote=false,execution=null,privateHook=null}={}){
  const base=path.join(home,crypto.randomUUID());fs.mkdirSync(base,{mode:0o700});const project=path.join(base,'project');fs.mkdirSync(project,{mode:0o700});const root=fs.realpathSync.native(project),evidence=path.join(root,'.ensemble_reviews');preparePrivateEvidence(evidence);fs.mkdirSync(path.join(evidence,'reports'),{mode:0o700});
  const now=Date.now(),artifact='SYNTHETIC ONLY. The stated calculation is 2 + 2 = 5.',input={artifact,model:'synthetic-model',role:'architect',role_version:'1',max_tokens:1024},run_id='rev_oauth_'+crypto.randomUUID().replaceAll('-','');writeFixture(path.join(root,'fixture.txt'),artifact);

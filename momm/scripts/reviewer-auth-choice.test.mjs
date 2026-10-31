@@ -1,21 +1,20 @@
-import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';
+import {ReviewerRegistry} from './reviewer-registry.mjs';import {privateTestFixture} from './private-test-fixture.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
-const {ReviewerRegistry}=await import('./reviewer-registry.mjs');
-const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'momm-auth-choice-'));
-const root=path.join(fixture,'private'),registry=new ReviewerRegistry({root});let checks=0;
+const root=fs.realpathSync.native(privateTestFixture('momm-auth-choice-')),registry=new ReviewerRegistry({root});let checks=0;
 const command=x=>registry.command({...x,revision:registry.read().revision});
 try{
-  command({op:'save',profile:{label:'Default',kind:'bumbler'}});
-  const original=registry.read().profiles[0];assert.equal(original.auth_mode,'oauth');checks++;
-  command({op:'save',profile:{label:'Optional key',kind:'bumbler',auth_mode:'api_key'}});
-  const keyProfile=registry.read().profiles[1];assert.equal(keyProfile.auth_mode,'api_key');assert.equal(keyProfile.state,'draft');assert.equal(keyProfile.quorum_eligible,false);checks++;
-  assert.equal(new ReviewerRegistry({root}).snapshot().profiles[1].auth_mode,'api_key');checks++;
-  command({op:'save',id:keyProfile.id,profile:{label:'Still key',kind:'bumbler'}});assert.equal(registry.read().profiles[1].auth_mode,'api_key');checks++;
-  const before=fs.readFileSync(registry.file);
-  for(const profile of [{label:'Bad',kind:'bumbler',auth_mode:'automatic_fallback'},{label:'Bad',kind:'bumbler',auth_mode:'api_key',api_key:['synthetic','not','a','key'].join('-')},{label:'Bad',kind:'cli',route:'claude',auth_mode:'api_key'}]){assert.throws(()=>command({op:'save',profile}));assert.deepEqual(fs.readFileSync(registry.file),before);checks++;}
-  command({op:'save',id:keyProfile.id,profile:{label:'Now OAuth',kind:'bumbler',auth_mode:'oauth'}});assert.equal(registry.read().profiles[1].auth_mode,'oauth');assert.equal(registry.read().profiles[1].qualification,null);checks++;
-  const bytes=fs.readFileSync(registry.file);for(const op of ['test','qualify','enable','rotate','revoke'])assert.throws(()=>command({op,id:keyProfile.id}),/No request or credential operation/);assert.deepEqual(fs.readFileSync(registry.file),bytes);checks++;
-  console.log(JSON.stringify({passed:true,checks,credential_operations:0,network_calls:0,scope:'saved authentication choice only; native protected entry/transport not activated'}));
-}finally{
-  const absolute=path.resolve(fixture),tmp=path.resolve(os.tmpdir());assert(absolute.startsWith(tmp+path.sep+'momm-auth-choice-'));fs.rmSync(absolute,{recursive:true,force:true});
-}
+ command({op:'save',profile:{label:'Synthetic reviewer',kind:'bumbler'}});const p=registry.read().profiles[0];assert.equal(p.auth_mode,'oauth');checks++;
+ const original=fs.readFileSync(registry.file);
+ for(const auth_mode of ['api_key','API_KEY','automatic_fallback','','OAUTH',' oauth',0,false,['oauth']])for(const kind of ['bumbler','cli'])for(const existing of [false,true]){const value={label:'Refused',kind,auth_mode,...(kind==='cli'?{route:'claude'}:{})};assert.throws(()=>command({op:'save',...(existing?{id:p.id}:{}),profile:value}),e=>e.code==='oauth_required');assert.deepEqual(fs.readFileSync(registry.file),original);checks++;}
+ const syntheticSecret=['synthetic','not','a','credential'].join('-');assert.throws(()=>command({op:'save',profile:{label:'No secret fields',kind:'bumbler',api_key:syntheticSecret}}),e=>e.code==='invalid_configuration'&&!String(e.message).includes(syntheticSecret));assert.deepEqual(fs.readFileSync(registry.file),original);checks++;
+ for(const kind of ['bumbler','cli']){command({op:'save',profile:{label:'Explicit OAuth',kind,auth_mode:'oauth',...(kind==='cli'?{route:'claude'}:{})}});command({op:'save',id:p.id,profile:{label:'Updated OAuth',kind,auth_mode:'oauth',...(kind==='cli'?{route:'claude'}:{})}});assert(registry.read().profiles.every(profile=>profile.auth_mode==='oauth'));checks++;}fs.writeFileSync(registry.file,original);
+ const legacy=JSON.parse(original);legacy.profiles[0].auth_mode='api_key';legacy.profiles[0].state='active';legacy.profiles[0].qualification={synthetic:'historical inert metadata'};const legacyBytes=Buffer.from(JSON.stringify(legacy));fs.writeFileSync(registry.file,legacyBytes);
+ const snapshot=registry.snapshot();assert.equal(snapshot.profiles[0].quarantined,true);assert.equal(snapshot.profiles[0].qualified,false);assert.equal(snapshot.counts.enabled,0);assert.deepEqual(fs.readFileSync(registry.file),legacyBytes);checks++;
+ for(const op of ['save','wording','duplicate','test','qualify','enable','rotate','revoke']){assert.throws(()=>registry.command({op,id:p.id,revision:legacy.revision,...(op==='save'?{profile:{label:'No silent conversion',kind:'cli',route:'claude',auth_mode:'oauth'}}:{}),...(op==='wording'?{wording:'Generated'}:{})}),e=>e.code==='oauth_required');assert.deepEqual(fs.readFileSync(registry.file),legacyBytes);checks++;}
+ for(const kind of ['bumbler','cli'])for(const explicit of [true,false]){assert.throws(()=>registry.command({op:'save',id:p.id,revision:legacy.revision,profile:{label:'No silent conversion',kind,...(kind==='cli'?{route:'claude'}:{}),...(explicit?{auth_mode:'oauth'}:{})}}),e=>e.code==='oauth_required');assert.deepEqual(fs.readFileSync(registry.file),legacyBytes);checks++;}
+ command({op:'archive',id:p.id});assert.equal(registry.read().profiles[0].auth_mode,'api_key');command({op:'undo',id:p.id});const restored=registry.read().profiles[0],restoredSnapshot=registry.snapshot();assert.equal(restored.auth_mode,'api_key');assert.equal(restored.qualification,null,'archive/undo invalidate historical qualification');assert.equal(restored.label,legacy.profiles[0].label);assert.equal(restored.kind,legacy.profiles[0].kind);assert.equal(restored.state,'disabled');assert.equal(restoredSnapshot.profiles[0].quarantined,true);assert.equal(restoredSnapshot.counts.enabled,0);checks++;
+ fs.writeFileSync(registry.file,original);
+ for(const op of ['test','qualify','enable','rotate','revoke']){assert.throws(()=>command({op,id:p.id}),e=>e.code==='policy_required');assert.deepEqual(fs.readFileSync(registry.file),original);checks++;}
+ console.log(JSON.stringify({passed:true,checks,scope:'OAuth-only metadata saves; legacy authentication metadata survives archive/undo in disabled quarantine; qualification is explicitly invalidated; no live-operation qualification'}));
+}finally{assert(path.basename(root).startsWith('momm-auth-choice-'));assert.equal(fs.lstatSync(root).isSymbolicLink(),false);assert.equal(fs.realpathSync.native(root),path.resolve(root));fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});}

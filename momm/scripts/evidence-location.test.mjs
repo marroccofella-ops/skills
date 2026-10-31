@@ -26,6 +26,28 @@ let loc = null;
 try { loc = await import('./evidence-location.mjs'); } catch (error) { loc = { missing: error.message }; }
 const need = (name) => { assert.equal(typeof loc[name], 'function', `evidence-location.mjs must export ${name} (${loc.missing ?? 'not exported'})`); return loc[name]; };
 
+function inspectionErrors(){
+  const text=fs.readFileSync(new URL('./evidence-location.mjs',import.meta.url),'utf8'),method=text.match(/function realLocation\([\s\S]*?(?=\r?\nconst within)/);assert(method);
+  const target='/synthetic-private/not-present-yet';
+  for(const code of ['ENOENT','EACCES','EPERM','EIO']){
+    const locate=vm.runInNewContext('('+method[0]+')',{path:path.posix,realOf(p){if(p===target)throw Object.assign(Error('Synthetic resolution failure'),{code});return p;},fs:{lstatSync(){throw Object.assign(Error('Synthetic inspection failure'),{code});}}});
+    assert.equal(locate(target,false),code==='ENOENT'?target:null,code+' must not be treated as verified absence');
+  }
+}
+function portableReferences(){
+  const project=process.cwd(),outside=path.resolve(project,'..','synthetic-evidence-not-read');
+  for(const dir of [path.join(project,'.ensemble_reviews'),outside]){
+    const options={root:project,dir};
+    for(const name of ['../outside.txt','sub/../../outside.txt',['..','outside.txt'].join(path.win32.sep),['sub','..','..','outside.txt'].join(path.win32.sep),path.win32.join('C:','fixture','outside.txt'),'/outside.txt','file:stream','a//b','a/./b','.. /outside.txt','folder./report.json','folder /report.json','.ensemble_reviews./report.json','NUL','aux.txt','src/CON','com1.log','LPT9','COM\u00b9.log','lpt\u00b2.txt','bad?name','bad*name','.ENSEMBLE_REVIEWS/reports/x.json','CONIN$','CONOUT$','con .txt','COM0','LPT0'])assert.throws(()=>need('evidenceReference')(name,options),e=>e.code==='MOMM_UNSAFE_EVIDENCE_REFERENCE',name);
+    assert.equal(need('evidenceFile')('src/safe.js',options),path.join(project,'src','safe.js'));
+    assert.equal(need('evidenceFile')('src/.hidden/report v2.json',options),path.join(project,'src','.hidden','report v2.json'));
+    assert.equal(need('evidenceFile')('.ensemble_reviews/reports/safe.json',options),path.join(dir,'reports','safe.json'));
+    if(win&&dir===path.join(project,'.ensemble_reviews')){const routed=need('evidenceReference')('.ensemble_reviews/reports/safe.json',{root:project,dir:path.join(project.toUpperCase(),'.ensemble_reviews')});assert.equal(routed.base,path.resolve(project));assert.deepEqual(routed.parts,['.ensemble_reviews','reports','safe.json']);}
+  }
+}
+if(process.argv[2]==='--inspection-errors'){inspectionErrors();console.log(JSON.stringify({passed:true,scope:'Actual source function with synthetic filesystem failures; no permission change'}));process.exit(0);}
+if(process.argv[2]==='--reference-grammar'){portableReferences();console.log(JSON.stringify({passed:true,scope:'Pure portable reference grammar, including relocated evidence; no filesystem access'}));process.exit(0);}
+
 const checks = [];
 async function check(name, fn) {
   try { await fn(); checks.push({ name, passed: true }); }
@@ -474,6 +496,8 @@ try {
   assert(resolved.startsWith(temporary + path.sep) && path.basename(resolved).startsWith('momm-evidence-location-test-'));
   fs.rmSync(resolved, { recursive: true, force: true });
 }
+await check('inspection errors never become verified absence',inspectionErrors);
+await check('portable references refuse traversal, Windows aliases and devices before access',portableReferences);
 const failed = checks.filter((c) => !c.passed);
 console.log(JSON.stringify({ node: process.version, passed: checks.length - failed.length, total: checks.length, checks }, null, 2));
 process.exitCode = failed.length ? 1 : 0;

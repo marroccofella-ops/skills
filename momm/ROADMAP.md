@@ -1,5 +1,35 @@
 # MOMM Roadmap — alignment record
 
+31 October development repair, qualification pending: reviewer drafts now accept
+OAuth/account sessions only; unsupported legacy choices are quarantined as inert
+metadata without automatic conversion. Unrelated OAuth drafts stay accessible,
+and explicit archive/purge remains available. The issued-key worker is retired and refuses before input or
+credential access. New reviewer names are blank rather than machine-specific.
+The unpublished 1.17.4 entry is removed from the published-release array.
+
+Capacity and stage stores now bind state to a separate initialization record and
+refuse missing components, retained empty roots or legacy state instead of
+silently starting empty. Only a newly created store root can initialize.
+This detects component loss; it does not authenticate a whole-folder rollback or
+replace an external durable state authority. Original holds are not migrated or
+released. Portable evidence references refuse backslashes, drive/stream syntax
+and traversal. Late shadow answers are withheld while original worker axes remain
+recorded. Conservative Bearer redaction remains intentional.
+An uninspectable stage intent now refuses instead of being treated as absent,
+and token expiry is anchored before exchange with response latency deducted.
+The Setup Center's mocked image probe also runs with spaces in its fixture path.
+POSIX ledger commits now flush the containing directory after publication; a
+failed flush reports a possibly published outcome requiring reconciliation,
+preserving the private cause. Stage cleanup faults preserve the primary error. Controlled ordering tests do not certify power-loss
+recovery, and Windows still has no qualified directory-flush primitive here.
+
+The closed policy describes the default native entry, not arbitrary in-process
+host compositions. The unsigned shadow seam is no longer exported by that entry.
+The signed OAuth pilot remains an unqualified trusted-host component. Protected
+service identity, storage/rollback guarantees, backend physical completion,
+historical hold reconciliation and one genuine BAB review remain release gates.
+These source repairs are not a full-pack pass, live activation or release.
+
 27 October20:08 development checkpoint: the separate OAuth discovery/code-exchange
 transport now has24 mocked checks, and the canonical worker has32 mocked/in-process
 integration checks plus corrected exception/stdin controls. Both source scopes

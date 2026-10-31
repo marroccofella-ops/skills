@@ -65,15 +65,20 @@ export async function discoverBumbleOAuth(profile,config,privateInput,{authorize
 export async function exchangeBumbleOAuthCode(contract,exchange,config,privateInput,{authorize=null,request=https.request,minimum_lifetime_ms=180000}={}){
  if(typeof authorize!=='function')fail('trusted_host_approval_required');
  if(typeof request!=='function')fail('invalid_request_fn');
+ if(!Number.isSafeInteger(minimum_lifetime_ms)||minimum_lifetime_ms<0||minimum_lifetime_ms>86400000)fail('invalid_lifetime');
  const descriptor=describeBumbleOAuthExchange(exchange,contract),endpoint=descriptor.token_endpoint,c=connection(config,endpoint),issuer=new URL(contract.profile.issuer);
  if(new URL(endpoint).origin!==issuer.origin)fail('cross_origin_endpoint');
  approved(authorize,'token_exchange',endpoint,contract.profile,c,descriptor.request_sha256);const ca=certificate(privateInput,c);let material;
  try{
   material=takeBumbleOAuthExchange(exchange,contract); // Burn before possibly ambiguous transmission; never retry.
   if(H(material.body)!==descriptor.request_sha256)fail('request_binding');
+  const sentAt=wall(),sentMono=mono();
   const raw=await fetchPrivate(endpoint,c,ca,material.body,request);
   approved(authorize,'token_exchange',endpoint,contract.profile,c,descriptor.request_sha256);
-  const token=validateBumbleOAuthTokenEnvelope(raw,{contract,now:wall(),minimum_lifetime_ms});
+  // Anchor expiry conservatively before transmission; response time is not
+  // fresh token lifetime. Include elapsed monotonic time even if wall time rolls back.
+  const elapsed=Math.ceil(Math.max(0,wall()-sentAt,mono()-sentMono));
+  const token=validateBumbleOAuthTokenEnvelope(raw,{contract,now:sentAt,minimum_lifetime_ms:minimum_lifetime_ms+elapsed});
   if(token.access_token.length>4096){token.access_token.fill(0);fail('token_too_large_for_worker');}
   Object.defineProperty(token,'toJSON',{enumerable:false,value(){throw Error('Private OAuth token material is not serializable.');}});
   return Object.freeze(token);

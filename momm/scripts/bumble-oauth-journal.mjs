@@ -8,6 +8,8 @@ import {preparePrivateEvidence,requirePrivateEvidence} from './evidence-permissi
 import {parseBumbleJSON} from './bumble-contract.mjs';
 const H=b=>crypto.createHash('sha256').update(b).digest('hex'),SHA=/^[a-f0-9]{64}$/,UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const uint=v=>Number.isSafeInteger(v)&&v>=0;
+function publicationFault(cause,cleanup_error){const error=Object.assign(new Error('Private state publication may have completed; reconciliation required.',{cause}),{code:'MOMM_PRIVATE_STATE_RECONCILIATION_REQUIRED',publication_possible:true});if(cleanup_error)Object.defineProperty(error,'cleanup_error',{value:cleanup_error});return error;}
+function syncPrivateDirectory(root){if(process.platform==='win32')return;let fd,failure;try{fd=fs.openSync(root,(fs.constants?.O_RDONLY??0)|(fs.constants?.O_DIRECTORY??0));fs.fsyncSync(fd);}catch(error){failure=error;}if(fd!==undefined)try{fs.closeSync(fd);}catch(error){failure??=error;}if(failure)throw publicationFault(failure);}
 const fault=code=>{throw Object.assign(Error('OAuth journal refused: '+code),{code});};
 const closed=(v,fields)=>{if(!v||typeof v!=='object'||Array.isArray(v)||![Object.prototype,null].includes(Object.getPrototypeOf(v)))return false;const ds=Object.getOwnPropertyDescriptors(v),ks=Reflect.ownKeys(ds);return ks.length===fields.length&&ks.every(k=>typeof k==='string'&&fields.includes(k)&&ds[k].enumerable&&Object.hasOwn(ds[k],'value'));};
 const clone=v=>JSON.parse(JSON.stringify(v));
@@ -37,7 +39,7 @@ export class BumbleOAuthJournal{
   if(fs.realpathSync.native(this.#root)!==this.#root)fault('private_external_home_required');requirePrivateEvidence(this.#root);
  }
  #regular(file,max){const s=fs.lstatSync(file);if(!s.isFile()||s.isSymbolicLink()||s.nlink!==1||s.size>max)fault('invalid_journal_record');const bytes=fs.readFileSync(file),again=fs.lstatSync(file);if(again.ino!==s.ino||again.size!==s.size||again.nlink!==1||again.isSymbolicLink())fault('journal_record_changed');return bytes;}
- #write(file,bytes){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}}
+ #write(file,bytes){const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}syncPrivateDirectory(this.#root);}
  #locked(fn,create=false){
   this.#configured();this.#home(create);const file=path.join(this.#root,'writer.lock');let fd;try{fd=fs.openSync(file,'wx',0o600);}catch{fault('busy_or_unknown_prior_outcome');}const own=fs.fstatSync(fd,{bigint:true});let value,error;
   try{value=fn();}catch(e){error=e;}let cleanup=false;

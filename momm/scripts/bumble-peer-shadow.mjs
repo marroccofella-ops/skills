@@ -45,10 +45,11 @@ const refused = reason => ({schema:'momm-bumble-shadow/1', status:'not_dispatche
 // reconcile unknowns. The host must bind the existing manager and exact operator
 // reconciliation evidence. No missing-proof fallback to counter/idle evidence.
 export async function runBumblePeerShadow(input, host) {
+  const began=performance.now();
   if (host?.approval?.mode !== 'synthetic_shadow' || host.approval.owner_approved !== true) return refused('owner_approval_required');
   const approval = host.approval, now = Date.now();
   if (!Number.isSafeInteger(approval.expires_at) || now >= approval.expires_at || approval.expires_at - now > 3600000 || approval.disclosure !== 'synthetic_code_only' || !boundedShadowRequests(approval.max_requests) || approval.max_tokens !== 1024 || approval.deadline_ms !== 180000 || !sha(approval.operator_reconciliation_sha256)) return refused('bounded_approval_or_reconciliation_required');
-  if (typeof host.runProcess !== 'function' || !host.capacity || !['reserve','summary','markTransmissionPossible','terminal'].every(name=>typeof host.capacity[name]==='function') || typeof host.root!=='string' || !host.root || !/^rev_[A-Za-z0-9_]{1,124}$/.test(host.run_id??'') || !identity(host.endpoint_id) || !sha(host.adapter_sha256) || !sha(host.connection_sha256)) return refused('trusted_host_binding_required');
+  if (typeof host.runProcess !== 'function' || !host.capacity || !['reserve','summary','markTransmissionPossible','terminal'].every(name=>typeof host.capacity[name]==='function') || typeof host.root!=='string' || !host.root || typeof host.run_id!=='string'||!/^rev_[A-Za-z0-9_]{1,124}$/.test(host.run_id) || !identity(host.endpoint_id) || !sha(host.adapter_sha256) || !sha(host.connection_sha256)) return refused('trusted_host_binding_required');
   if(!host.connection || typeof host.connection!=='object' || Array.isArray(host.connection))return refused('trusted_host_binding_required');
   if(!sha(approval.connection_sha256)||approval.connection_sha256!==host.connection_sha256||!sha(approval.adapter_sha256)||approval.adapter_sha256!==host.adapter_sha256||!Number.isSafeInteger(approval.credential_epoch)||approval.credential_epoch<1||approval.credential_epoch!==host.connection.credential_epoch)return refused('owner_connection_binding_required');
   if(!sha(approval.authorization_sha256)||!sha(approval.capacity_configuration_sha256))return refused('owner_capacity_binding_required');
@@ -61,8 +62,9 @@ export async function runBumblePeerShadow(input, host) {
   const artifact=JSON.parse(JSON.parse(request.request_body).messages[1].content).artifact;
   const frame={artifact,model:request.model,max_tokens:request.max_tokens,role:request.role,role_version:request.role_version};
   if (request.max_tokens > approval.max_tokens) return refused('connection_or_budget_changed');
-  const deadline = Math.min(Date.now() + approval.deadline_ms, approval.expires_at);
-  if (deadline <= Date.now()) return refused('expired_before_admission');
+  const deadline = Math.min(now + approval.deadline_ms, approval.expires_at);
+  const monotonicDeadline = began + Math.min(approval.deadline_ms, approval.expires_at - now);
+  if (deadline <= Date.now() || performance.now() >= monotonicDeadline) return refused('expired_before_admission');
   const run_id = host.run_id, task_id = crypto.randomUUID();
   const binding = H(JSON.stringify([request.peer_contract, request.schema_sha256, request.model, request.role, request.role_version, host.adapter_sha256, host.connection_sha256, approval.operator_reconciliation_sha256]));
   let reservation;
@@ -84,7 +86,7 @@ export async function runBumblePeerShadow(input, host) {
   let execution;
   try {
     const workerInput=JSON.stringify({schema:'momm-bumble-peer-worker/1', attempt_id:started.attempt_id, connection:JSON.parse(connectionBytes), connection_sha256:host.connection_sha256, request_sha256:request.request_sha256, deadline, frame});
-    const timeoutMs=deadline-Date.now();
+    const timeoutMs=Math.floor(Math.min(deadline-Date.now(),monotonicDeadline-performance.now()));
     // Local evidence/marking can exhaust approval. Never create a new 1ms window.
     // The possible-transmission mark and conservative hold remain untouched.
     if(timeoutMs>0){
@@ -101,13 +103,18 @@ export async function runBumblePeerShadow(input, host) {
   }
   const valid = envelope && validWorkerResult(envelope,started.attempt_id);
   if (!valid) envelope = {transport:'outcome_unknown', payload:'unavailable', finished:false, content:null};
-  const result = envelope.transport === 'success' && envelope.payload === 'envelope_valid' ? validateBumblePeerContent(envelope.content, artifact, envelope.finished) : {status:['credential_reflection','invalid_json','invalid_envelope','stale'].includes(envelope.payload) ? envelope.payload : envelope.transport, gates:{transport:envelope.transport==='success',json:false,schema:false,scope:false,finding_accuracy:'unverified'}, review:null, quorum_votes:0, completion:false};
+  const late=Date.now()>=deadline||performance.now()>=monotonicDeadline;
+  // Deadline expiry withholds a usable answer; it cannot invent a known remote
+  // outcome when no valid envelope arrived, or hide an authentication/refusal.
+  const lateAnswer = late && valid && envelope.transport === 'success' && envelope.payload === 'envelope_valid';
+  const result = lateAnswer ? {status:'stale',gates:{transport:true,json:false,schema:false,scope:false,finding_accuracy:'unverified'},review:null,quorum_votes:0,completion:false} : envelope.transport === 'success' && envelope.payload === 'envelope_valid' ? validateBumblePeerContent(envelope.content, artifact, envelope.finished) : {status:['credential_reflection','invalid_json','invalid_envelope','stale'].includes(envelope.payload) ? envelope.payload : envelope.transport, gates:{transport:envelope.transport==='success',json:false,schema:false,scope:false,finding_accuracy:'unverified'}, review:null, quorum_votes:0, completion:false};
   const status = result.status === 'advisory_valid' ? 'success' : envelope.transport === 'authentication_required' ? 'authentication_required' : envelope.transport === 'success' ? 'invalid_output' : 'error';
-  const record = {schema:'momm-attempt/1', run_id, attempt_id:started.attempt_id, route:'bumble-shadow', ordinal:1, piece:'synthetic', task_id, reservation_id:reservation.reservation_id, input_sha256:request.artifact_sha256, request_sha256:request.request_sha256, schema_sha256:request.schema_sha256, peer_contract:request.peer_contract, model:request.model, model_family:'unknown', role:request.role, role_version:request.role_version, status, outcome:status === 'success' ? 'succeeded' : status === 'invalid_output' ? 'invalid_output' : status === 'authentication_required' ? 'authentication_required' : 'failed', original_transport:envelope.transport, original_payload:envelope.payload, finished_at:new Date().toISOString(), usage:envelope.reported_usage ?? null, request_id:envelope.request_id ?? null, http_status:envelope.http_status ?? null, retry_after:envelope.retry_after ?? null, raw_envelope_sha256:envelope.raw_envelope_sha256 ?? null, content:envelope.content, gates:result.gates, review:result.review, quorum_votes:0, accounting:{cost:'unavailable'}, automatic_retries:0, completion:false};
+  const record = {schema:'momm-attempt/1', run_id, attempt_id:started.attempt_id, route:'bumble-shadow', ordinal:1, piece:'synthetic', task_id, reservation_id:reservation.reservation_id, input_sha256:request.artifact_sha256, request_sha256:request.request_sha256, schema_sha256:request.schema_sha256, peer_contract:request.peer_contract, model:request.model, model_family:'unknown', role:request.role, role_version:request.role_version, status, outcome:status === 'success' ? 'succeeded' : status === 'invalid_output' ? 'invalid_output' : status === 'authentication_required' ? 'authentication_required' : 'failed', original_transport:envelope.transport, original_payload:envelope.payload, finished_at:new Date().toISOString(), usage:envelope.reported_usage ?? null, request_id:envelope.request_id ?? null, http_status:envelope.http_status ?? null, retry_after:envelope.retry_after ?? null, raw_envelope_sha256:envelope.raw_envelope_sha256 ?? null, content:late?null:envelope.content, ...(late&&valid?{received_after_deadline:true}:{}), gates:result.gates, review:result.review, quorum_votes:0, accounting:{cost:'unavailable'}, automatic_retries:0, completion:false};
   let evidence=null;
   try {
     evidence = persistAttempt(host.root, record);
-    host.capacity.terminal(reservation.reservation_id, {transport:envelope.transport === 'success' ? 'success' : envelope.transport === 'refused' || envelope.transport === 'authentication_required' ? 'refused' : 'outcome_unknown', payload:envelope.transport === 'success' ? result.status === 'advisory_valid' ? 'valid' : 'invalid' : 'unavailable', now:Date.now()});
+    const transport = envelope.transport === 'success' ? 'success' : envelope.transport === 'refused' || envelope.transport === 'authentication_required' ? 'refused' : 'outcome_unknown';
+    host.capacity.terminal(reservation.reservation_id, {transport, payload:late && transport !== 'outcome_unknown' ? 'stale' : transport === 'success' ? result.status === 'advisory_valid' ? 'valid' : 'invalid' : 'unavailable', now:Date.now()});
     return {...base, ...result, evidence, reservation_held:true, credentials_read:'unknown', physical_release:'not_verified'};
   } catch { return {...base, status:'evidence_or_capacity_reconciliation_required', evidence, reservation_held:true, remote_outcome:'unknown'}; }
 }
@@ -161,7 +168,7 @@ export function createBumbleShadowBroker(options) {
   if(signature.length!==64||signature.toString('base64url')!==envelope.signature||!crypto.verify(null,Buffer.from(envelope.payload),key,signature))fail();
   const p=fields(parseBumbleJSON(envelope.payload),['schema','authorization_id','issued_at','expires_at','run_id','endpoint_id','connection_sha256','adapter_sha256','broker_sha256','capacity_configuration_sha256','operator_reconciliation_sha256','credential_epoch','disclosure','mode','max_requests','max_tokens','deadline_ms','fixtures']);
   const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-  if(p.schema!=='momm-bumble-shadow-approval/1'||!uuid.test(p.authorization_id)||o.approval_file!==`approval-${p.authorization_id}.json`||!/^rev_[A-Za-z0-9_]{1,124}$/.test(p.run_id)||!identity(p.endpoint_id)||p.mode!=='synthetic_shadow'||p.disclosure!=='synthetic_code_only'||!boundedShadowRequests(p.max_requests)||p.max_tokens!==1024||p.deadline_ms!==180000||!Number.isSafeInteger(p.issued_at)||p.issued_at<0||!Number.isSafeInteger(p.expires_at)||p.expires_at<=p.issued_at||p.expires_at-p.issued_at>3600000||!Number.isSafeInteger(p.credential_epoch)||p.credential_epoch<1||!['connection_sha256','adapter_sha256','broker_sha256','capacity_configuration_sha256','operator_reconciliation_sha256'].every(k=>sha(p[k])))fail();
+  if(p.schema!=='momm-bumble-shadow-approval/1'||typeof p.authorization_id!=='string'||!uuid.test(p.authorization_id)||o.approval_file!==`approval-${p.authorization_id}.json`||typeof p.run_id!=='string'||!/^rev_[A-Za-z0-9_]{1,124}$/.test(p.run_id)||!identity(p.endpoint_id)||p.mode!=='synthetic_shadow'||p.disclosure!=='synthetic_code_only'||!boundedShadowRequests(p.max_requests)||p.max_tokens!==1024||p.deadline_ms!==180000||!Number.isSafeInteger(p.issued_at)||p.issued_at<0||!Number.isSafeInteger(p.expires_at)||p.expires_at<=p.issued_at||p.expires_at-p.issued_at>3600000||!Number.isSafeInteger(p.credential_epoch)||p.credential_epoch<1||!['connection_sha256','adapter_sha256','broker_sha256','capacity_configuration_sha256','operator_reconciliation_sha256'].every(k=>sha(p[k])))fail();
   // Own one serialized snapshot; later caller mutation cannot change the plan.
   const connection=fields(o.connection,['connect_address','port','tls_identity','certificate_file','certificate_sha256','credential_file','model','credential_epoch']);
   const address=typeof connection.connect_address==='string'?connection.connect_address.split('.').map(Number):[];
@@ -177,12 +184,13 @@ export function createBumbleShadowBroker(options) {
     fixtures.set(f.id,f);
   }
   const anchor=Date.now(),mono=performance.now();let lastWall=anchor,burned=false;
+  const revocationPresent=file=>{try{fs.lstatSync(file);return true;}catch(error){if(error?.code==='ENOENT')return false;fail();}};
   const current=()=>{
     const now=Date.now(),elapsed=performance.now()-mono;
     if(burned||now<lastWall||now<p.issued_at||now>=p.expires_at||elapsed<0||elapsed>=p.expires_at-anchor){burned=true;fail();}lastWall=now;
     if(H(fs.readFileSync(worker))!==p.adapter_sha256||H(fs.readFileSync(fileURLToPath(import.meta.url)))!==p.broker_sha256)fail();
     readReceipt();requirePrivateEvidence(journal);
-    if(fs.existsSync(path.join(approvals,`revoked-${p.authorization_id}.json`))||o.capacity.summary().configuration_sha256!==p.capacity_configuration_sha256)fail();
+    if(revocationPresent(path.join(approvals,`revoked-${p.authorization_id}.json`))||o.capacity.summary().configuration_sha256!==p.capacity_configuration_sha256)fail();
     o.capacity.endpointGroups(p.endpoint_id);
   };
   current();

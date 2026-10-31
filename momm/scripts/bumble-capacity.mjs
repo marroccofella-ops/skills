@@ -11,6 +11,10 @@ const hash=v=>crypto.createHash('sha256').update(JSON.stringify(canonical(v))).d
 const sha=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const uint=v=>Number.isSafeInteger(v)&&v>=0;
 const MAX_BYTES=2_000_000;
+function publicationFault(cause,cleanup_error){const error=Object.assign(new Error('Private state publication may have completed; reconciliation required.',{cause}),{code:'MOMM_PRIVATE_STATE_RECONCILIATION_REQUIRED',publication_possible:true});if(cleanup_error)Object.defineProperty(error,'cleanup_error',{value:cleanup_error});return error;}
+function syncPrivateDirectory(root){if(process.platform==='win32')return;let fd,failure;try{fd=fs.openSync(root,(fs.constants?.O_RDONLY??0)|(fs.constants?.O_DIRECTORY??0));fs.fsyncSync(fd);}catch(error){failure=error;}if(fd!==undefined)try{fs.closeSync(fd);}catch(error){failure??=error;}if(failure)throw publicationFault(failure);}
+function stateFilePresent(file){try{fs.lstatSync(file);return true;}catch(error){if(error?.code==='ENOENT')return false;throw Error('Original private state could not be inspected; reconciliation required.');}}
+
 const originalReleaseBinding=r=>{const value={...r,released:false};delete value.physical_release;return hash(value);};
 const releaseEnvelope=value=>{
  if(!value||typeof value!=='object'||Array.isArray(value)||![Object.prototype,null].includes(Object.getPrototypeOf(value)))throw Error('Invalid release envelope.');
@@ -52,15 +56,26 @@ function configuration(input){
   return value;
 }
 export class BumbleCapacity {
-  #root;#file;#config;#releaseVerifier;
+  #root;#file;#config;#releaseVerifier;#marker;#store;
   constructor({root,config,project_root=process.cwd(),release_verifier=null}){
     if(release_verifier!==null&&!isBumbleReleaseVerifier(release_verifier))throw Error('A pinned trusted-host release verifier is required.');
     this.#releaseVerifier=release_verifier;
     if(!path.isAbsolute(root))throw Error('Global capacity needs an owner-private absolute home.');
-    const project=fs.realpathSync(project_root),literal=path.resolve(root),ancestor=fs.existsSync(literal)?literal:path.dirname(literal);
+    const project=fs.realpathSync(project_root),literal=path.resolve(root),rootExisted=stateFilePresent(literal),ancestor=rootExisted?literal:path.dirname(literal);
     if(!outside(project,literal)||!outside(project,fs.realpathSync(ancestor)))throw Error('Global capacity must resolve outside source before creation.');
     this.#config=configuration(config);preparePrivateEvidence(literal);this.#root=fs.realpathSync(literal);this.#file=path.join(this.#root,'capacity.json');
-    this.#locked(()=>{if(!fs.existsSync(this.#file))this.#save({schema:'momm-bumble-capacity-state/2',config:this.#config,reservations:[],retired_groups:[],reserved_tokens:0});this.#read();});
+    this.#marker=path.join(this.#root,'initialisation.json');
+    this.#locked(()=>{
+      const hasState=stateFilePresent(this.#file),hasMarker=stateFilePresent(this.#marker);
+      if(!hasState&&!hasMarker){
+        if(rootExisted||fs.readdirSync(this.#root).some(name=>name!=='writer.lock'))throw Error('Original capacity state is missing; reconciliation required.');
+        const marker={schema:'momm-bumble-capacity-initialisation/1',store_id:crypto.randomUUID(),configuration_sha256:hash(this.#config)};
+        const fd=fs.openSync(this.#marker,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify(marker)+'\n');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+        this.#store=marker.store_id;
+        this.#save({schema:'momm-bumble-capacity-state/3',store_id:this.#store,config:this.#config,reservations:[],retired_groups:[],reserved_tokens:0});
+      }else if(!hasState||!hasMarker)throw Error('Original capacity state or initialization is missing; no reset or migration performed.');
+      this.#store=this.#readMarker();this.#read();
+    });
   }
   #locked(fn){
     requirePrivateEvidence(this.#root);const lock=path.join(this.#root,'writer.lock');let fd;
@@ -71,13 +86,19 @@ export class BumbleCapacity {
     try{fs.closeSync(fd);}catch{cleanup=true;}
     if(error)throw error;if(cleanup)throw Error('Global capacity write requires reconciliation.');return value;
   }
+  #readMarker(){
+    const stat=fs.lstatSync(this.#marker);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size<1||stat.size>4096)throw Error('Capacity initialization refused.');
+    const marker=JSON.parse(fs.readFileSync(this.#marker,'utf8'));
+    if(Object.keys(marker).sort().join(',')!=='configuration_sha256,schema,store_id'||marker.schema!=='momm-bumble-capacity-initialisation/1'||!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(marker.store_id)||marker.configuration_sha256!==hash(this.#config))throw Error('Capacity initialization binding changed.');
+    return marker.store_id;
+  }
   #read(){
     requirePrivateEvidence(this.#root);const stat=fs.lstatSync(this.#file);
     if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size>MAX_BYTES)throw Error('Global capacity state refused.');
     const state=JSON.parse(fs.readFileSync(this.#file,'utf8'));
     // Development v1 records did not retain original transmission time. Never
     // invent a timestamp or release those holds during a silent migration.
-    if(state.schema!=='momm-bumble-capacity-state/2'||hash(configuration(state.config))!==hash(this.#config)||!Array.isArray(state.reservations)||state.reservations.length>this.#config.max_attempts||!Array.isArray(state.retired_groups)||state.retired_groups.length>this.#config.resource_groups.length||new Set(state.retired_groups).size!==state.retired_groups.length||state.retired_groups.some(id=>!this.#config.resource_groups.some(g=>g.id===id))||!uint(state.reserved_tokens)||state.reserved_tokens>this.#config.max_reserved_tokens)throw Error('Global capacity binding or budget changed; legacy original holds require explicit reconciliation.');
+    if(this.#readMarker()!==this.#store||state.store_id!==this.#store||state.schema!=='momm-bumble-capacity-state/3'||hash(configuration(state.config))!==hash(this.#config)||!Array.isArray(state.reservations)||state.reservations.length>this.#config.max_attempts||!Array.isArray(state.retired_groups)||state.retired_groups.length>this.#config.resource_groups.length||new Set(state.retired_groups).size!==state.retired_groups.length||state.retired_groups.some(id=>!this.#config.resource_groups.some(g=>g.id===id))||!uint(state.reserved_tokens)||state.reserved_tokens>this.#config.max_reserved_tokens)throw Error('Global capacity binding or budget changed; legacy original holds require explicit reconciliation.');
     let tokens=0;const ids=new Set(),budgets=new Map();
     for(const r of state.reservations){
       const endpoint=this.#config.endpoints.find(e=>e.id===r.endpoint_id);
@@ -106,10 +127,11 @@ export class BumbleCapacity {
     return state;
   }
   #save(state){
+    if(state.store_id!==this.#store||this.#readMarker()!==this.#store)throw Error('Capacity initialization changed; original state retained.');
     const bytes=Buffer.from(JSON.stringify(state)+'\n');if(bytes.length>MAX_BYTES)throw Error('Global capacity storage budget exhausted.');
     const temporary=path.join(this.#root,`capacity-${crypto.randomUUID()}.tmp`),fd=fs.openSync(temporary,'wx',0o600);
     try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
-    try{requirePrivateEvidence(this.#root);fs.renameSync(temporary,this.#file);}finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary);}
+    try{requirePrivateEvidence(this.#root);fs.renameSync(temporary,this.#file);syncPrivateDirectory(this.#root);}finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary);}
   }
   reserve({endpoint_id,run_id,task_id,worker_binding,max_tokens,deadline,now,admission_budget}){
     if(![endpoint_id,run_id,task_id].every(text)||!sha(worker_binding)||!Number.isSafeInteger(max_tokens)||max_tokens<1||!uint(deadline)||!uint(now)||deadline<=now)throw Error('Invalid global reservation request.');

@@ -48,7 +48,9 @@ function checkState(state){
   state.event_archives??=[];
   if(!Array.isArray(state.event_archives)||state.event_archives.length>MAX_EVENT_ARCHIVES||state.event_archives.some(a=>!plain(a)||Object.keys(a).sort().join(',')!=='bytes,count,sha256'||typeof a.sha256!=='string'||!/^[a-f0-9]{64}$/.test(a.sha256)||!Number.isSafeInteger(a.count)||a.count<1||a.count>RECENT_EVENTS||!Number.isSafeInteger(a.bytes)||a.bytes<1)||state.event_archives.reduce((n,a)=>n+a.bytes,0)>MAX_AUDIT_BYTES)throw fault('storage_budget','Private settings history budget reached or its metadata is invalid.');
   for(const e of state.events){fields(e,['id','at','action','profile_id']);if(typeof e.id!=='string'||e.id.length>100||typeof e.at!=='string'||e.at.length>40||!Number.isFinite(Date.parse(e.at))||typeof e.action!=='string'||e.action.length>80||typeof e.profile_id!=='string'||e.profile_id.length>200)throw fault('invalid_configuration','Invalid settings event.');}
-  const ids=new Set();for(const p of state.profiles){p.auth_mode??='oauth';if(!['oauth','api_key'].includes(p.auth_mode)||(p.kind==='cli'&&p.auth_mode!=='oauth'))throw fault('invalid_configuration','Unsupported saved authentication choice.');if(!p.id||ids.has(p.id)||p.quorum_eligible!==false||!['draft','disabled','active','archived','purged'].includes(p.state))throw fault('invalid_configuration','Invalid profile state.');ids.add(p.id);}
+  // A known legacy choice is inert metadata, retained for explicit archive or
+  // purge. It cannot block unrelated OAuth drafts or become an auth fallback.
+  const ids=new Set();for(const p of state.profiles){p.auth_mode??='oauth';if(!['oauth','api_key'].includes(p.auth_mode))throw fault('oauth_required','Saved authentication choice is unsupported. Original settings retained.');if(!p.id||ids.has(p.id)||p.quorum_eligible!==false||!['draft','disabled','active','archived','purged'].includes(p.state))throw fault('invalid_configuration','Invalid profile state.');ids.add(p.id);}
   if(!Array.isArray(state.baseline_excluded)||!state.baseline_excluded.every(r=>BUILTIN_ROUTES.includes(r)))throw fault('invalid_configuration','Unknown baseline exclusions.');
   for(const c of state.connectors){fields(c,['id','revision','label','base_url','resource_group','pod_id','certificate','credential_state','policy_receipt']);if(normalizeEndpoint(c.base_url).resource_group!==c.resource_group||c.credential_state!=='missing'||c.policy_receipt!==null)throw fault('invalid_configuration','Unverified connector authority is not accepted.');}
   return state;
@@ -114,9 +116,9 @@ export class ReviewerRegistry {
   snapshot({query='',state='visible',offset=0,limit=25}={}){
     const store=this.read(),term=String(query).slice(0,200).toLowerCase();
     const list=store.profiles.filter(p=>p.state!=='purged'&&(state==='visible'?p.state!=='archived':p.state===state)&&`${p.label} ${p.model_id||''}`.toLowerCase().includes(term));
-    const page=list.slice(Math.max(0,offset),Math.max(0,offset)+Math.min(100,Math.max(1,limit))).map(p=>({...copy(p),quorum_eligible:false,qualified:false}));
+    const page=list.slice(Math.max(0,offset),Math.max(0,offset)+Math.min(100,Math.max(1,limit))).map(p=>({...copy(p),quorum_eligible:false,qualified:false,...(p.auth_mode!=='oauth'?{quarantined:true}:{})}));
     return {schema:REGISTRY_SCHEMA,revision:store.revision,total:list.length,profiles:page,connectors:copy(store.connectors),baseline_excluded:store.baseline_excluded,
-      counts:{registered:store.profiles.filter(p=>p.state!=='purged').length,enabled:store.profiles.filter(p=>p.state==='active').length,active_jobs:store.reservations.filter(r=>!r.released).length},
+      counts:{registered:store.profiles.filter(p=>p.state!=='purged').length,enabled:store.profiles.filter(p=>p.state==='active'&&p.auth_mode==='oauth').length,active_jobs:store.reservations.filter(r=>!r.released).length},
       remote_policy:{active:REMOTE_POLICY_ACTIVE,reason:'Credential policy and live adapter qualification are not activated in this development build.'}};
   }
   command(body){
@@ -132,9 +134,9 @@ export class ReviewerRegistry {
         if(!['bumbler','remote_api','cli'].includes(kind))throw fault('invalid_configuration','Unsupported reviewer kind.');
         if(kind==='cli'&&!BUILTIN_ROUTES.includes(input.route))throw fault('adapter_required','This CLI needs a reviewed adapter; arbitrary commands are not accepted.');
         const previousProfile=body.id?find():null;
+        if(previousProfile&&previousProfile.auth_mode!=='oauth')throw fault('oauth_required','Unsupported saved authentication is quarantined; archive it explicitly and create a new OAuth draft.');
         const auth_mode=input.auth_mode??previousProfile?.auth_mode??'oauth';
-        if(!['oauth','api_key'].includes(auth_mode))throw fault('invalid_configuration','Choose OAuth or an explicit optional API-key mode; automatic fallback is not supported.');
-        if(kind==='cli'&&auth_mode!=='oauth')throw fault('adapter_required','CLI reviewers use their OAuth sessions. A provider API key requires a separate qualified API connector, never shell arguments.');
+        if(auth_mode!=='oauth')throw fault('oauth_required','OAuth/account sessions only. No credential substitution is supported.');
         let connector_id=input.connector_id||null;
         if(connector_id&&body.connector)throw fault('invalid_configuration','Choose either a saved connection or a new connection, not both.');
         if(kind==='cli'&&(body.connector||connector_id||input.model_id))throw fault('invalid_configuration','CLI profiles do not carry remote connection or model settings.');
@@ -164,6 +166,7 @@ export class ReviewerRegistry {
         return {route:body.route,baseline_gate:'removal cannot reduce required quorum'};
       }
       const p=find();
+      if(p.auth_mode!=='oauth'&&!['archive','undo','purge','disable'].includes(body.op))throw fault('oauth_required','Unsupported saved authentication is quarantined; no credential operation or conversion is permitted.');
       if(p.state==='archived'&&!['undo','purge'].includes(body.op))throw fault('invalid_state','Archived reviewers require explicit Undo; archive time is not reset.');
       if(body.op==='wording'){
         if(typeof body.wording!=='string'||body.wording.length>2000||/[\x00-\x08\x0b-\x1f]/.test(body.wording))throw fault('invalid_configuration','Wording must be bounded plain text.');
