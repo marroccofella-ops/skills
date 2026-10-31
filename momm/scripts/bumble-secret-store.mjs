@@ -7,6 +7,9 @@ import {REMOTE_POLICY_ACTIVE} from './reviewer-registry.mjs';
 import {preparePrivateEvidence,requirePrivateEvidence} from './evidence-permissions.mjs';
 import {windowsTool} from './process-scope.mjs';
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+function revocationPresent(file){
+ try{fs.lstatSync(file);return true;}catch(error){if(error?.code==='ENOENT')return false;throw Error('Credential revocation state could not be inspected.');}
+}
 const SHA=/^[a-f0-9]{64}$/;
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const POLICY='momm-private-lan-credential-policy/1';
@@ -70,11 +73,12 @@ export class BumbleSecretStore {
   }
   #file(ref){if(!UUID.test(ref))throw Error('Invalid owned credential reference.');return path.join(this.#home(),`credential-${ref}.json`);}
   #read(ref,scope){
-    const file=this.#file(ref),stat=fs.lstatSync(file);
+    const file=this.#file(ref);
+    if(revocationPresent(path.join(this.#root,`revoked-${ref}.json`)))throw Error('Credential reference was locally revoked; remote credential status is not claimed.');
+    const stat=fs.lstatSync(file);
     if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size>24000)throw Error('Protected credential record refused.');
     const record=JSON.parse(fs.readFileSync(file,'utf8'));
     if(record.schema!=='momm-protected-credential/1'||record.reference!==ref||record.scope_binding!==credentialScope(scope)||record.protection!==this.#protector?.kind||!SHA.test(record.ciphertext_sha256)||typeof record.ciphertext!=='string'||record.ciphertext.length>16384||!/^[A-Za-z0-9+/]+={0,2}$/.test(record.ciphertext)||hash(Buffer.from(record.ciphertext,'base64'))!==record.ciphertext_sha256)throw Error('Protected credential binding changed.');
-    if(fs.existsSync(path.join(this.#root,`revoked-${ref}.json`)))throw Error('Credential reference was locally revoked; remote credential status is not claimed.');
     return record;
   }
   async store(input){

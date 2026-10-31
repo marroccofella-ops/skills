@@ -1,5 +1,23 @@
 # MOMM Roadmap — alignment record
 
+31 October audit continuation: the remaining OAuth-vault and retired legacy
+store revocation checks now distinguish verified absence from an unreadable
+marker. Any marker entry, including a dangling link, refuses before record
+bytes; inspection errors refuse as well. Synthetic actual-method controls cover
+EACCES, EPERM, EIO, present/dangling markers and verified absence. No credential
+or native operation is performed by those controls. The old optional-key
+proposal is explicitly archived; current direction remains OAuth-only. The
+[store refusal guide](references/bumble-ledger-recovery.md) documents retention
+of incomplete/empty roots and exact coupled files. It is not an implemented
+recovery or identity-migration tool and cannot release unknown work.
+
+31 October source-path compatibility follow-up, qualification pending: ordinary
+source files with device-like basenames use literal Windows namespace paths;
+private evidence keeps its portable filename restrictions. Existing linked-path,
+regular-file, size and source-hash checks remain in their respective consumers.
+Real recordCheck controls cover source aliases separately from private-evidence
+refusals. Older Windows/native qualification and the full candidate remain open.
+
 31 October follow-up, qualification pending: relocated evidence checks existing
 POSIX directory identities as well as path spellings, closing a case-alias
 containment gap. Nine modeled identity cases and the native filesystem probe

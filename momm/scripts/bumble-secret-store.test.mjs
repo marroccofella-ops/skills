@@ -6,7 +6,10 @@ import path from 'node:path';
 import {BumbleSecretStore,windowsOpaqueProtector,credentialScope} from './bumble-secret-store.mjs';
 import vm from 'node:vm';
 import {createProcessScope} from './process-scope.mjs';
+import {verifyRevocationInspection} from './revocation-inspection-controls.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
+const revocationInspection=verifyRevocationInspection('legacy');
+if(process.argv[2]==='--revocation-inspection'){console.log(JSON.stringify(revocationInspection));process.exit(0);}
 const parent=fs.mkdtempSync(path.join(os.tmpdir(),'momm-secret-store-test-'));
 try{
   let secretReads=0,backendCalls=0;

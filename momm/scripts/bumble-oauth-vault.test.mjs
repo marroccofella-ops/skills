@@ -1,7 +1,10 @@
 // Synthetic access tokens only; native DPAPI exercised on Windows, no real login/network.
 import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import vm from 'node:vm';import assert from 'node:assert/strict';
 import {BumbleOAuthVault,bumbleOAuthVaultScope} from './bumble-oauth-vault.mjs';import {windowsOpaqueProtector} from './bumble-secret-store.mjs';import {createProcessScope} from './process-scope.mjs';import {realTempDir} from './private-test-fixture.mjs';
+import {verifyRevocationInspection} from './revocation-inspection-controls.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
+const revocationInspection=verifyRevocationInspection('oauth');
+if(process.argv[2]==='--revocation-inspection'){console.log(JSON.stringify(revocationInspection));process.exit(0);}
 const parent=realTempDir('momm-oauth-vault-'),ownerParent=path.dirname(parent),H=b=>crypto.createHash('sha256').update(b).digest('hex'),scope={schema:'momm-bumble-oauth-vault-scope/1',connector_id:'c',endpoint_id:'e',issuer:'https://issuer.example.test',resource:'https://node.example.test/v1',client_id:'momm-public-fixture',profile_sha256:H('profile'),trust_sha256:H('trust'),configuration_epoch:'1',credential_epoch:'1'};
 try{
  assert.doesNotThrow(()=>bumbleOAuthVaultScope({...scope,client_id:'https://client.example.test/momm'}),'public OAuth client IDs are opaque data, not worker/task identity grammar');

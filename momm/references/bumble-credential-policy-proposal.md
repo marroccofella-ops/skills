@@ -1,4 +1,13 @@
-# MOMM 1.18 authentication direction — OAuth default, optional API keys
+# Archived 11 October authentication proposal — superseded
+
+This is historical design text, not current permission to use an API key or
+activate a connector. The current development rule is OAuth/account sessions
+only: see [authentication-policy-1.18.md](authentication-policy-1.18.md).
+The installed protocol, native adapter and all live-test gates remain separate.
+The original proposal is retained in repository history. This notice changes
+this document's hash; it does not migrate or renew an existing policy receipt.
+
+## Historical proposal
 
 On 11 October Dubai time, the owner explicitly superseded the earlier OAuth-only development
 direction: OAuth must remain primary/default, and supported reviewer/API connectors may offer

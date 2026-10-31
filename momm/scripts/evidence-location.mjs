@@ -108,15 +108,20 @@ export const evidenceDir = (options) => evidenceLocation(options).dir;
 // A logical reference: '.ensemble_reviews/...' belongs to the evidence folder, anything else to the
 // project. Returns the base the reference is walked from and the parts to walk, so callers can keep
 // refusing links on every step exactly as they did from the project root.
-// References use portable forward-slash segments, without Win32 device aliases,
-// reserved punctuation or trailing dots/spaces, even on a non-Windows host.
+// Private evidence uses portable segments. Ordinary source files may have
+// device-like basenames; on Windows route those through the literal namespace.
+// Consumers still inspect links, regular-file identity, size and content hashes.
+// The returned source base can be namespaced: textual inequality with root is
+// not proof that it names a different physical directory.
 export function evidenceReference(relative, { root, dir }) {
   if(typeof relative!=='string'||!relative||/[\\:\x00-\x1f\x7f]/.test(relative)||path.posix.isAbsolute(relative)||path.win32.isAbsolute(relative))throw Object.assign(new Error('Unsafe evidence reference; use a project-relative forward-slash path.'),{code:'MOMM_UNSAFE_EVIDENCE_REFERENCE'});
   const project = path.resolve(root), parts = relative.split('/');
-  if((parts[0].toLowerCase()===EVIDENCE_FOLDER&&parts[0]!==EVIDENCE_FOLDER)||parts.some(part=>!part||part==='.'||part==='..'||/[ .]$|[<>"|?*]/.test(part)||/^(?:conin\$|conout\$|con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]) *(?:\.|$)/i.test(part)))throw Object.assign(new Error('Unsafe evidence reference; traversal and ambiguous filename aliases are refused.'),{code:'MOMM_UNSAFE_EVIDENCE_REFERENCE'});
+  const privateReference=parts[0]===EVIDENCE_FOLDER,deviceLike=parts.some(part=>/^(?:conin\$|conout\$|con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]) *(?:\.|$)/i.test(part));
+  if((parts[0].toLowerCase()===EVIDENCE_FOLDER&&!privateReference)||parts.some(part=>!part||part==='.'||part==='..'||/[ .]$|[<>"|?*]/.test(part))||(privateReference&&deviceLike))throw Object.assign(new Error('Unsafe evidence reference; traversal and ambiguous filename aliases are refused.'),{code:'MOMM_UNSAFE_EVIDENCE_REFERENCE'});
   const defaultDir=path.join(project,EVIDENCE_FOLDER),actualDir=path.resolve(dir);
   const isDefault=process.platform==='win32'?actualDir.toLowerCase()===defaultDir.toLowerCase():actualDir===defaultDir;
-  if (parts[0] !== EVIDENCE_FOLDER || isDefault) return { base: project, parts };
+  if (!privateReference) return { base: process.platform==='win32'&&deviceLike?path.toNamespacedPath(project):project, parts };
+  if (isDefault) return { base: project, parts };
   return { base: path.resolve(dir), parts: parts.slice(1) };
 }
 export function evidenceFile(relative, options) {

@@ -25,6 +25,7 @@ async function test(name, fn) {
 // probes exchange must survive it (momm review rev_20260913213315_o8c2, fake-cli-truncates-paths-with-spaces).
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "momm probes tests-"));
 const ok = stdout => ({ code: 0, stdout, stderr: "" });
+function fakeMediaClock(){const at=Math.floor(Date.now()/1000)*1000;return{at,now:()=>at,write(file,bytes){fs.writeFileSync(file,bytes);fs.utimesSync(file,at/1000,at/1000);}};}
 // The reply travels in each CLI's own envelope: claude `result`, grok `text`,
 // antigravity/gemini `response`; codex and copilot print plain text.
 const envelope = (cli, reply) => cli === "claude" ? JSON.stringify({ type: "result", subtype: "success", is_error: false, result: reply })
@@ -706,6 +707,7 @@ try {
     assert.equal(m.reason, "not_installed"); assert.equal(m.verdict, "unavailable"); assert.equal(reg.effectiveCalls.length, readsBefore, "no registry read for an absent CLI");
   });
   await test("generation_probe_ignores_a_file_that_was_already_there", async () => {
+    const timed=fakeMediaClock();
     // Gate rev_20260919000938_1nkh: only a file this request produced verifies a generative cell. A
     // matching file that existed before the request, even one whose time stamp is not older than
     // the request (same second, clock skew), is not evidence; one rewritten by the request is.
@@ -713,15 +715,15 @@ try {
     const routes = { codex: { input: {}, output: { image_gen: { level: "documented", harvest: "~/.codex/generated_images/**/*.png", mime: "image/png" } } } };
     const stale = path.join(home, ".codex", "generated_images", "earlier", "exec-old.png");
     fs.mkdirSync(path.dirname(stale), { recursive: true }); fs.writeFileSync(stale, syntheticPng("red"));
-    const ahead = new Date(Date.now() + 60_000); fs.utimesSync(stale, ahead, ahead);
+    const ahead = new Date(timed.at + 60_000); fs.utimesSync(stale, ahead, ahead);
     const reg = fakeRegistry(routes);
     const idle = modalityExec({ replies: {}, generate: () => ok("Done.") });
-    const r = await runModalityProbes("codex", mopts({ home, registry: reg, exec: idle.exec, command: "codex", consent: true, inputs: false, disclose: () => {} }));
+    const r = await runModalityProbes("codex", mopts({ home, registry: reg, exec: idle.exec, command: "codex", consent: true, inputs: false, now:timed.now,disclose: () => {} }));
     const cell = cellOf(r, "image_gen");
     assert.equal(cell.status, "probe_failed", JSON.stringify(cell)); assert.deepEqual(cell.harvested, []);
     assert.equal(reg.entries.some(e => e.entry.level === "verified"), false, "no verified overlay from a stale file");
-    const rewriting = modalityExec({ replies: {}, generate: () => { fs.writeFileSync(stale, syntheticPng("blue")); return ok("Done."); } });
-    const again = await runModalityProbes("codex", mopts({ home, registry: fakeRegistry(routes), exec: rewriting.exec, command: "codex", consent: true, inputs: false, disclose: () => {} }));
+    const rewriting = modalityExec({ replies: {}, generate: () => { timed.write(stale, syntheticPng("blue")); return ok("Done."); } });
+    const again = await runModalityProbes("codex", mopts({ home, registry: fakeRegistry(routes), exec: rewriting.exec, command: "codex", consent: true, inputs: false, now:timed.now,disclose: () => {} }));
     assert.equal(cellOf(again, "image_gen").status, "verified", cellOf(again, "image_gen").reason);
   });
   // Consent gate (spec + review #1): without --consent the generative cell is listed with its
@@ -876,14 +878,15 @@ try {
   // generation-reprobe-lockout: probe_failed and reprobe are cleared BY a probe, so those cells
   // are sent under --consent; every other blocker is skipped with its clearing action.
   await test("generative_cells_under_probe_failed_or_reprobe_are_probed_other_blockers_skipped", async () => {
+    const timed=fakeMediaClock();
     const base = { level: "documented", harvest: "~/.grok/sessions/**/images/*.jpg", mime: "image/jpeg" };
     for (const blocker of ["probe_failed", "reprobe"]) { const [cell] = generativeCells("grok", { output: { image_gen: { ...base, blocker } } }); assert.equal(cell.blocked, false, `${blocker} must permit a recovery probe`); assert.equal(typeof cell.disclosure, "string"); assert.equal(cell.reprobe, true); }
     for (const blocker of ["zdr", "quota", "auth_tier", "allowlist", "missing_flag"]) { const [cell] = generativeCells("grok", { output: { image_gen: { ...base, blocker } } }); assert.equal(cell.blocked, true, blocker); assert.equal(cell.disclosure, null); }
     const home = path.join(fixture, "reprobe-home"); fs.mkdirSync(home, { recursive: true });
     const reg = fakeRegistry({ grok: { input: {}, output: { image_gen: { ...base, blocker: "reprobe" }, video_gen: { level: "documented", blocker: "zdr", harvest: "~/.grok/sessions/**/*.mp4" } } } });
     const sent = [];
-    const f = modalityExec({ generate: ({ args }) => { sent.push(args.join(" ")); const dir = path.join(home, ".grok", "sessions", "s", "images"); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, "1.jpg"), JPEG); return ok(envelope("grok", "done")); } });
-    const r = await runModalityProbes("grok", mopts({ home, registry: reg, exec: f.exec, command: "grok", consent: true, now: Date.now, disclose: () => {} }));
+    const f = modalityExec({ generate: ({ args }) => { sent.push(args.join(" ")); const dir = path.join(home, ".grok", "sessions", "s", "images"); fs.mkdirSync(dir, { recursive: true }); timed.write(path.join(dir, "1.jpg"), JPEG); return ok(envelope("grok", "done")); } });
+    const r = await runModalityProbes("grok", mopts({ home, registry: reg, exec: f.exec, command: "grok", consent: true, now: timed.now, disclose: () => {} }));
     assert.equal(cellOf(r, "image_gen").status, "verified", cellOf(r, "image_gen").reason);
     assert.equal(sent.length, 1); assert.match(sent[0], /image_gen tool/);
     assert.equal(cellOf(r, "video_gen").status, "skipped"); assert.equal(cellOf(r, "video_gen").blocker, "zdr");
@@ -902,15 +905,16 @@ try {
   // generation-verifies-unrelated-artifacts: only a hashed file produced AFTER this request
   // counts, and an isolated refusal never verifies on files alone.
   await test("generation_counts_only_hashed_files_produced_by_this_request", async () => {
+    const timed=fakeMediaClock();
     const routes = { codex: { input: {}, output: { image_gen: { level: "documented", harvest: "~/.codex/generated_images/**/*.png" } } } };
     const home = path.join(fixture, "unrelated-home"), dir = path.join(home, ".codex", "generated_images", "old"); fs.mkdirSync(dir, { recursive: true });
-    const stale = path.join(dir, "exec-old.png"); fs.writeFileSync(stale, syntheticPng("red")); const t = (Date.now() - 1000) / 1000; fs.utimesSync(stale, t, t);
-    const gen = extra => mopts({ home, registry: fakeRegistry(routes), command: "codex", consent: true, now: Date.now, disclose: () => {}, ...extra });
+    const stale = path.join(dir, "exec-old.png"); fs.writeFileSync(stale, syntheticPng("red")); const t = (timed.at - 1000) / 1000; fs.utimesSync(stale, t, t);
+    const gen = extra => mopts({ home, registry: fakeRegistry(routes), command: "codex", consent: true, now: timed.now, disclose: () => {}, ...extra });
     const none = modalityExec({ generate: () => ok("I have created the image you asked for.") });
     const r1 = await runModalityProbes("codex", gen({ exec: none.exec }));
     assert.equal(cellOf(r1, "image_gen").status, "probe_failed", "a file from one second before the request is not this request's output");
     const fresh = path.join(home, ".codex", "generated_images", "new", "exec-new.png");
-    const writes = modalityExec({ generate: () => { fs.mkdirSync(path.dirname(fresh), { recursive: true }); fs.writeFileSync(fresh, "png"); return ok("written"); } });
+    const writes = modalityExec({ generate: () => { fs.mkdirSync(path.dirname(fresh), { recursive: true }); timed.write(fresh, "png"); return ok("written"); } });
     // hashFile opens with fs.openSync(file, "r") and reads synchronously, so an EACCES at open is
     // a file that cannot be hashed on every Node line. The stub refuses READ opens of `fresh`
     // only: on Node 18 writeFileSync also routes through the public fs.openSync (flag "w"), and
@@ -918,15 +922,15 @@ try {
     const realOpen = fs.openSync; fs.openSync = (...a) => { if (String(a[0]) === fresh && /^r/.test(String(a[1] ?? "r"))) throw Object.assign(new Error("EACCES: denied"), { code: "EACCES" }); return realOpen(...a); };
     let r2; try { r2 = await runModalityProbes("codex", gen({ exec: writes.exec })); } finally { fs.openSync = realOpen; }
     assert.equal(cellOf(r2, "image_gen").status, "probe_failed", "an unhashable file is not evidence"); assert.equal((cellOf(r2, "image_gen").harvested ?? []).length, 0);
-    const refuses = modalityExec({ generate: () => { fs.writeFileSync(fresh, syntheticPng("blue")); return ok("I cannot generate images in this session."); } });
+    const refuses = modalityExec({ generate: () => { timed.write(fresh, syntheticPng("blue")); return ok("I cannot generate images in this session."); } });
     const r3 = await runModalityProbes("codex", gen({ exec: refuses.exec }));
     assert.equal(cellOf(r3, "image_gen").status, "probe_failed", "a refusal is not verified on files alone"); assert.match(cellOf(r3, "image_gen").reason, /refus/);
     // The refusal case above left the same bytes at `fresh`. A fake generator answers within the same
     // millisecond, so an identical rewrite would keep the size:mtime signature of the pre-request
     // listing and be ignored as unchanged (CI run 35418666762, macOS Node 20). A real request takes
     // seconds; age the leftover so this control tests the rule rather than the clock.
-    const aged = (Date.now() - 5000) / 1000; fs.utimesSync(fresh, aged, aged);
-    const good = modalityExec({ generate: () => { fs.writeFileSync(fresh, syntheticPng("blue")); return ok("wrote it"); } });
+    const aged = (timed.at - 5000) / 1000; fs.utimesSync(fresh, aged, aged);
+    const good = modalityExec({ generate: () => { timed.write(fresh, syntheticPng("blue")); return ok("wrote it"); } });
     const r4 = await runModalityProbes("codex", gen({ exec: good.exec }));
     assert.equal(cellOf(r4, "image_gen").status, "verified", cellOf(r4, "image_gen").reason); assert.equal(cellOf(r4, "image_gen").harvested.length, 1, "control: exactly the file this request wrote");
   });

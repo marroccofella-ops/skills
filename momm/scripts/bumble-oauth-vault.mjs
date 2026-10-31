@@ -8,6 +8,9 @@ import {isWindowsOpaqueProtector} from './bumble-secret-store.mjs';
 const H=b=>crypto.createHash('sha256').update(b).digest('hex'),SHA=Object.freeze({test:v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)}),UUID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9_.:-]{1,200}$/.test(v),clock=v=>Number.isSafeInteger(v)&&v>=0;
 const fail=code=>{throw Object.assign(Error('OAuth vault refused: '+code),{code});};
+function revocationPresent(file){
+ try{fs.lstatSync(file);return true;}catch(error){if(error?.code==='ENOENT')return false;fail('revocation_inspection_failed');}
+}
 const plain=v=>v&&typeof v==='object'&&!Array.isArray(v)&&[Object.prototype,null].includes(Object.getPrototypeOf(v));
 const closed=(v,fields)=>{if(!plain(v))return false;const ds=Object.getOwnPropertyDescriptors(v),ks=Reflect.ownKeys(ds);return ks.length===fields.length&&ks.every(k=>typeof k==='string'&&fields.includes(k)&&ds[k].enumerable&&Object.hasOwn(ds[k],'value'));};
 const outside=(project,target)=>{const r=path.relative(project,target);return Boolean(r)&&(path.isAbsolute(r)||r==='..'||r.startsWith('..'+path.sep));};
@@ -46,7 +49,7 @@ export class BumbleOAuthVault{
  }
  #file(ref){if(typeof ref!=='string'||!UUID.test(ref))fail('invalid_reference');return path.join(this.#root,'oauth-session-'+ref+'.json');}
  #read(ref,binding){
-  const file=this.#file(ref);requirePrivateEvidence(this.#root);if(fs.existsSync(path.join(this.#root,'oauth-revoked-'+ref+'.json')))fail('locally_revoked');let r;try{r=parseBumbleJSON(this.#regular(file).toString('utf8'));}catch{fail('invalid_record');}
+  const file=this.#file(ref);requirePrivateEvidence(this.#root);if(revocationPresent(path.join(this.#root,'oauth-revoked-'+ref+'.json')))fail('locally_revoked');let r;try{r=parseBumbleJSON(this.#regular(file).toString('utf8'));}catch{fail('invalid_record');}
   if(!closed(r,['schema','reference','scope_binding','protection','expires_at','identity_binding','ciphertext','ciphertext_sha256'])||r.schema!=='momm-bumble-protected-oauth-session/1'||r.reference!==ref||r.scope_binding!==binding||r.protection!==this.#protector.kind||!clock(r.expires_at)||!SHA.test(r.identity_binding)||!SHA.test(r.ciphertext_sha256)||typeof r.ciphertext!=='string'||r.ciphertext.length>16384||!/^[A-Za-z0-9+/]+={0,2}$/.test(r.ciphertext)||Buffer.from(r.ciphertext,'base64').toString('base64')!==r.ciphertext||H(Buffer.from(r.ciphertext,'base64'))!==r.ciphertext_sha256)fail('record_binding_changed');return r;
  }
  async store(scope,input){
