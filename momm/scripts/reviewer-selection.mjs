@@ -8,9 +8,29 @@ export function assertReviewerSelection(options,{excluded=[]}={}){
   if(options.reviewers.some(route=>excluded.includes(route)))throw Error('A selected reviewer is excluded in saved settings. Restore it explicitly or choose a permitted selection before dispatch.');
   if(excluded.length&&new Set(options.reviewers.filter(route=>route!==options.governor)).size<(options.minSuccess??1))throw Error('Reviewer selection leaves insufficient external quorum. Restore distinct reviewers; the quorum was not lowered.');
 }
+function settingsPresent(root){
+  try{fs.lstatSync(path.join(root,'registry.json'));return true;}
+  catch(error){if(error?.code!=='ENOENT')throw error;}
+  // ENOENT can also come from a dangling settings root or ancestor. Confirm
+  // an existing directory before treating this as an unconfigured owner.
+  let cursor=path.resolve(root);
+  for(;;){
+    let stat;
+    try{stat=fs.lstatSync(cursor);}
+    catch(error){if(error?.code!=='ENOENT')throw error;const parent=path.dirname(cursor);if(parent===cursor)throw Error('Settings ancestor could not be inspected');cursor=parent;continue;}
+    if(stat.isSymbolicLink()){
+      if(cursor===path.resolve(root))throw Error('Linked settings root could not be inspected');
+      stat=fs.statSync(cursor); // A dangling ancestor must propagate refusal.
+    }
+    if(!stat.isDirectory())throw Error('Settings ancestor is not a directory');
+    return false;
+  }
+}
 export function applyReviewerSettings(options,{root=defaultRegistryHome(),project=process.cwd()}={}){
   if(options.preflight||options.doctor||options.capabilitiesMatrix)return {applied:false,excluded:[],reason:'read-only inventory, not dispatch'};
-  const exists=fs.existsSync(path.join(root,'registry.json'));
+  let exists;
+  try{exists=settingsPresent(root);}
+  catch{throw Error('Saved reviewer settings could not be inspected. No review was dispatched.');}
   const state=exists?new ReviewerRegistry({root,project}).read():null;
   const excluded=state?.baseline_excluded||[];
   const requested=options.reviewers||[],available=[...new Set(requested.filter(route=>!excluded.includes(route)))];

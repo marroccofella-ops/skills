@@ -9,6 +9,19 @@ import {applyReviewerSettings} from './reviewer-selection.mjs';
 import * as selection from './reviewer-selection.mjs';
 import {chooseSecondLookRoute} from './second-look.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
+function selectionInspectionControls(){
+ const source=fs.readFileSync(new URL('./reviewer-selection.mjs',import.meta.url),'utf8'),script=source.replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'')+'\n;globalThis.apply=applyReviewerSettings;',root=path.join(os.tmpdir(),'synthetic-reviewer-settings-not-read');
+ for(const code of ['EACCES','EPERM','EIO','ENOTDIR','ENOENT','present','linked','danglingRoot','danglingAncestor','missingRoot']){
+  let reads=0;const error=()=>Object.assign(Error('Synthetic settings inspection failure'),{code});
+  const missing=()=>Object.assign(Error('Synthetic verified absence'),{code:'ENOENT'}),stat=(link=false)=>({isSymbolicLink:()=>link,isDirectory:()=>!link});
+  const context={path,fs:{existsSync:()=>code==='present',lstatSync(file){if(file===path.join(root,'registry.json')){if(['present','linked'].includes(code))return stat(code==='linked');if(['danglingRoot','danglingAncestor','missingRoot'].includes(code))throw missing();throw error();}if(file===root&&['danglingAncestor','missingRoot'].includes(code))throw missing();return stat(code==='danglingRoot'||code==='danglingAncestor');},statSync(){throw missing();}},defaultRegistryHome:()=>root,process:{cwd:()=>process.cwd()},ReviewerRegistry:class{read(){reads++;if(code==='linked')throw Error('linked settings refused');return{baseline_excluded:['copilot'],revision:1};}}};vm.createContext(context);new vm.Script(script).runInContext(context);
+  const options={reviewers:['claude','copilot'],governor:'codex',minSuccess:1},before=JSON.stringify(options);
+  if(['EACCES','EPERM','EIO','ENOTDIR','danglingRoot','danglingAncestor'].includes(code)){assert.throws(()=>context.apply(options,{root}),/inspect|inspection/i,code+' must not silently discard saved policy');assert.equal(JSON.stringify(options),before);assert.equal(reads,0);}
+  else if(code==='linked'){assert.throws(()=>context.apply(options,{root}),/linked/);assert.equal(JSON.stringify(options),before);assert.equal(reads,1);}
+  else{const result=context.apply(options,{root});assert.equal(reads,code==='present'?1:0);assert.equal(options.reviewers.join(','),code==='present'?'claude':'claude,copilot');assert.equal(result.applied,code==='present');}
+ }
+}
+if(process.argv[2]==='--selection-inspection'){selectionInspectionControls();console.log(JSON.stringify({passed:true,checks:10,scope:'Actual selection source with synthetic filesystem failures; no real settings, ACL or provider access'}));process.exit(0);}
 function selectionExclusionControls(){
  const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'momm-selection-exclusion-')),root=path.join(temporary,'private'),rows=[];
  const test=(name,fn)=>{try{fn();rows.push({name,passed:true});}catch(error){rows.push({name,passed:false,error:error.message});}};
@@ -84,6 +97,7 @@ try {
   test('remote tests cannot perform any credential operation',()=>{const bytes=fs.readFileSync(registry.file);for(const op of ['test','qualify','enable','rotate','revoke'])assert.throws(()=>command({op,id:bab}),/No request or credential operation/);assert.deepEqual(fs.readFileSync(registry.file),bytes);});
   test('exclusion retains quorum and rejects explicit bypass',()=>{command({op:'exclude_cli',route:'copilot'});const options={governor:'codex',reviewers:['claude','copilot'],minSuccess:2};assert.throws(()=>applyReviewerSettings(options,{root}),/quorum/);assert.throws(()=>applyReviewerSettings({governor:'codex',reviewers:['copilot'],reviewersExplicit:true},{root}),/excluded/);command({op:'restore_cli',route:'copilot'});});
   test('saved exclusions hold after presets, automatic routing and second look',selectionExclusionControls);
+  test('unreadable saved settings refuse instead of dropping exclusions',selectionInspectionControls);
   test('one thousand saved profiles stay bounded and paged',()=>{registry.mutate(registry.read().revision,state=>{const p=state.profiles[0];for(let n=state.profiles.length;n<1000;n++)state.profiles.push({...p,id:`fixture-profile-${n}`,label:`Bee ${n}`});});assert.equal(registry.snapshot().profiles.length,25);assert.equal(registry.snapshot().counts.registered,1000);assert.throws(()=>command({op:'duplicate',id:bab}),/limit/);});
   test('unsupported migration retains original bytes',()=>{const original=fs.readFileSync(registry.file);const data=JSON.parse(original);data.schema='unsupported/99';fs.writeFileSync(registry.file,JSON.stringify(data));const unsupported=fs.readFileSync(registry.file);assert.throws(()=>registry.read(),/Unsupported registry/);assert.deepEqual(fs.readFileSync(registry.file),unsupported);fs.writeFileSync(registry.file,original);});
   console.log(JSON.stringify({passed:true,checks:count,network_calls:0,live_fleet:false}));
