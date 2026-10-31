@@ -2,9 +2,39 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import {createHash} from 'node:crypto';
 import {ReviewerRegistry,normalizeEndpoint} from './reviewer-registry.mjs';
 import {applyReviewerSettings} from './reviewer-selection.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
+function canonicalEndpointControls(){
+ const bare=normalizeEndpoint('https://example.test/v1');
+ for(const alias of ['https://example.test./v1','https://EXAMPLE.test.:443/v1/'])assert.deepEqual(normalizeEndpoint(alias),bare);
+ assert.deepEqual(normalizeEndpoint('https://example.test.:8443/v1/'),normalizeEndpoint('https://example.test:8443/v1'));
+ assert.notEqual(normalizeEndpoint('https://example.test:8443/v1').resource_group,bare.resource_group);
+ assert.equal(normalizeEndpoint('https://example.test/api').resource_group,bare.resource_group);
+ for(const invalid of ['https://example.test../v1','https://./v1','https://../v1'])assert.throws(()=>normalizeEndpoint(invalid),e=>e.code==='invalid_endpoint');
+}
+if(process.argv[2]==='--endpoint-canonicalization'){canonicalEndpointControls();console.log(JSON.stringify({passed:true,scope:'Pure URL/resource identity controls only; no DNS, socket, credential or registry access'}));process.exit(0);}
+function endpointStructureControls(){
+ for(const suffix of ['?','#','?#'])assert.throws(()=>normalizeEndpoint('https://example.test/v1'+suffix),e=>e.code==='invalid_endpoint');
+ assert.equal(normalizeEndpoint('https://example.test/v1').base,'https://example.test/v1');
+}
+function profileShapeControls(){
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'momm-profile-shape-'));
+ try{
+  const r=new ReviewerRegistry({root:path.join(temporary,'private')});r.command({op:'save',revision:0,profile:{label:'Synthetic'}});const original=fs.readFileSync(r.file);
+  for(const change of [{unexpected_field:'synthetic-private-value'},{label:1},{qualification:{unexpected_field:'synthetic-private-value'}},{wording:{}},{kind:'unreviewed'},{quorum_eligible:'yes'},{state:{}},{archived_at:{}},{archived_at:null},{archived_at:-1},{archived_at:'1'},{archived_at:1.5}]){
+   const state=JSON.parse(original);Object.assign(state.profiles[0],change);fs.writeFileSync(r.file,JSON.stringify(state));const invalid=fs.readFileSync(r.file);
+   try{assert.throws(()=>r.snapshot(),e=>e.code==='invalid_configuration');assert.deepEqual(fs.readFileSync(r.file),invalid,'rejection must preserve original settings bytes');}finally{fs.writeFileSync(r.file,original);}
+  }
+  assert.equal(r.snapshot().profiles[0].label,'Synthetic');
+  const legacy=JSON.parse(original);legacy.profiles[0].auth_mode='api_key';legacy.profiles[0].qualification={synthetic:'private historical metadata'};fs.writeFileSync(r.file,JSON.stringify(legacy));const legacyBytes=fs.readFileSync(r.file);
+  assert.deepEqual(r.read().profiles[0].qualification,legacy.profiles[0].qualification,'private inert history remains recoverable');
+  assert.equal(r.snapshot().profiles[0].qualification,null,'inert historical qualification is not returned to the UI');assert.deepEqual(fs.readFileSync(r.file),legacyBytes);
+ }finally{assert(path.resolve(temporary).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-profile-shape-'));fs.rmSync(temporary,{recursive:true,force:true});}
+}
+if(process.argv[2]==='--endpoint-structure'){endpointStructureControls();console.log(JSON.stringify({passed:true,scope:'Pure endpoint delimiter controls; no network access'}));process.exit(0);}
+if(process.argv[2]==='--profile-shape'){profileShapeControls();console.log(JSON.stringify({passed:true,scope:'Synthetic private registry files only; no real settings or credentials read'}));process.exit(0);}
 const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'momm-registry-test-'));
 const root=path.join(fixture,'private');const registry=new ReviewerRegistry({root});let count=0;
 const test=(name,fn)=>{fn();count++;};
@@ -15,7 +45,11 @@ try {
   test('no arbitrary fields or credential imports',()=>{assert.throws(()=>command({op:'save',profile:{label:'Forged',quorum_eligible:true}}));assert.throws(()=>command({op:'save',profile:{label:'Forged'},connector:{base_url:'https://example.test/v1',secret_ref:'foreign'}}));});
   test('stale revisions never overwrite',()=>{assert.throws(()=>registry.command({op:'archive',id:bab,revision:0}),/another window/);assert.equal(registry.snapshot().profiles[0].state,'draft');});
   test('unknown CLI cannot become arbitrary shell execution',()=>{assert.throws(()=>command({op:'save',profile:{label:'Bad',kind:'cli',route:'custom-command'}}),/reviewed adapter/);});
-  test('shared normalized connectors have one resource identity',()=>{for(const label of ['One','Two'])command({op:'save',profile:{label},connector:{base_url:'https://EXAMPLE.test:443/v1/'}});const state=registry.read();assert.equal(state.connectors.length,1);assert.equal(state.profiles[1].connector_id,state.profiles[2].connector_id);});
+  test('endpoint DNS aliases share one canonical identity',canonicalEndpointControls);
+  test('empty query and fragment delimiters are not API bases',endpointStructureControls);
+  test('unrecognized or invalid stored profile fields never reach snapshots',profileShapeControls);
+  test('shared normalized connectors have one resource identity',()=>{for(const [label,base_url] of [['One','https://EXAMPLE.test:443/v1/'],['Two','https://example.test./v1']])command({op:'save',profile:{label},connector:{base_url}});const state=registry.read();assert.equal(state.connectors.length,1);assert.equal(state.profiles[1].connector_id,state.profiles[2].connector_id);});
+  test('legacy noncanonical endpoint state refuses without rewriting',()=>{const original=fs.readFileSync(registry.file),state=JSON.parse(original);state.connectors[0].base_url='https://example.test./v1';state.connectors[0].resource_group=createHash('sha256').update(new URL(state.connectors[0].base_url).origin).digest('hex');fs.writeFileSync(registry.file,JSON.stringify(state));const legacy=fs.readFileSync(registry.file);try{assert.throws(()=>registry.read(),e=>e.code==='invalid_configuration');assert.deepEqual(fs.readFileSync(registry.file),legacy);}finally{fs.writeFileSync(registry.file,original);}});
   test('unsafe addresses and certificates refused',()=>{for(const url of ['http://example.test/v1','https://localhost/v1','https://127.0.0.1/v1','https://169.254.169.254/v1','https://u:p@example.test/v1','https://example.test/v1?x=1'])assert.throws(()=>normalizeEndpoint(url));assert.throws(()=>command({op:'save',profile:{label:'Bad'},connector:{base_url:'https://example.test/v1',certificate:'BEGIN PRIVATE KEY'}}));});
   test('wording approval binds exact saved hash',()=>{command({op:'wording',id:bab,wording:'Focus on boundary cases.'});const p=registry.read().profiles[0];assert.equal(p.overlay_approved,false);assert.throws(()=>command({op:'approve_wording',id:bab,hash:'old'}));command({op:'approve_wording',id:bab,hash:p.overlay_hash});assert.equal(registry.read().profiles[0].overlay_approved,true);});
   test('duplicate is a new disabled identity without approval',()=>{command({op:'duplicate',id:bab});const p=registry.read().profiles.at(-1);assert.notEqual(p.id,bab);assert.equal(p.state,'disabled');assert.equal(p.overlay_approved,false);});

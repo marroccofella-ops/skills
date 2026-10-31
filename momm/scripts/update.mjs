@@ -722,8 +722,9 @@ export function reviewLogFor(dir, env = process.env) {
     const tail = [];
     for (let cursor = p; ;) {
       try { return path.join(realOf(cursor), ...tail); }
-      catch {
-        try { fs.lstatSync(cursor); return null; } catch { /* absent: resolve its parent */ }
+      catch (error) {
+        if(error?.code!=='ENOENT')return null;
+        try { fs.lstatSync(cursor); return null; } catch (inspection) { if(inspection?.code!=='ENOENT')return null; }
         const parent = path.dirname(cursor);
         if (parent === cursor) return null;
         tail.unshift(path.basename(cursor)); cursor = parent;
@@ -734,6 +735,25 @@ export function reviewLogFor(dir, env = process.env) {
   let projectReal; try { projectReal = realOf(project); } catch { return null; }
   const folder = path.join(path.resolve(chosen), createHash("sha256").update(projectReal).digest("hex").slice(0, 32)), folderReal = realLocation(folder);
   if (!folderReal || [project, projectReal].some(p => within(p, folder) || within(p, folderReal))) return null;
+  // Keep this self-contained copy aligned with evidence-location.mjs. POSIX
+  // realpath need not fold case; only inspected directory identities can do so.
+  if(!win){
+    try{
+      const identity=fs.statSync(projectReal,{bigint:true});
+      if(!identity.isDirectory()||typeof identity.dev!=='bigint'||typeof identity.ino!=='bigint'||identity.ino<=0n)return null;
+      let cursor=folderReal;
+      for(let depth=0;;depth++){
+        if(depth>=1024)return null;
+        let stat;
+        try{stat=fs.statSync(cursor,{bigint:true});}catch(error){if(error?.code!=='ENOENT')return null;}
+        if(stat){
+          if(!stat.isDirectory()||typeof stat.dev!=='bigint'||typeof stat.ino!=='bigint'||stat.ino<=0n)return null;
+          if(stat.dev===identity.dev&&stat.ino===identity.ino)return null;
+        }
+        const parent=path.dirname(cursor);if(parent===cursor)break;cursor=parent;
+      }
+    }catch{return null;}
+  }
   return path.join(folder, "review-log.jsonl");
 }
 export function lastSuccessfulReviews(dirs, env = process.env) {

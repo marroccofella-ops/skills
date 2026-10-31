@@ -13,6 +13,29 @@ function flow(a,scopes=config.scopes){const c=validateBumbleOAuthMetadata({...pr
 function exchange(a){const f=flow(a),callback=a.decide(f.h,{approved:true,subject:'synthetic-owner'}),e=consumeBumbleOAuthCallback(f.i,callback,{now:at});return {a,...f,e,token:a.exchange(e.body.toString())};}
 const request={resource:config.resource,scope:'momm.infer',model_id:config.model_id};
 const admission=()=>({model_id:config.model_id,max_tokens:1024,stream:false,request_sha256:crypto.createHash('sha256').update('synthetic review').digest('hex'),deadline:at+180000});
+function digestTypeControls(onlyStrings=false){
+ let coercions=0;const hash=admission().request_sha256;
+ for(const digest of [[hash],new String(hash),{toString(){coercions++;return hash;}},{[Symbol.toPrimitive](){coercions++;return hash;}},new Proxy({},{get(){coercions++;return()=>hash;}}),null,42,hash+'\n',hash+'\r\n',hash+'\u2028',hash+'\0'].filter(value=>!onlyStrings||typeof value==='string')){
+  const x=exchange(fresh()),permit=x.a.authorize(x.token.access_token,request);
+  assert.throws(()=>x.a.admit(permit,{...admission(),request_sha256:digest}),{code:'inference_budget'});
+  assert.equal(coercions,0,'digest validation must not call coercion hooks');
+  assert.throws(()=>x.a.admit(permit,admission()),{code:'owned_inference_permit_required'});
+  assert.equal(x.a.admit(x.a.authorize(x.token.access_token,request),admission()).backend_dispatched,false);
+ }
+}
+function admissionSnapshotControls(){
+ const x=exchange(fresh()),permit=x.a.authorize(x.token.access_token,request);let reads=0;
+ const hostile=new Proxy(admission(),{get(target,key,receiver){if(key==='max_tokens')return ++reads<=3?1024:999999;return Reflect.get(target,key,receiver);}});
+ const result=x.a.admit(permit,hostile);
+ assert.equal(result.max_tokens,1024,'admission must contain the descriptor value that was validated, not a later Proxy read');
+ assert.equal(reads,0,'request field reads must not invoke Proxy get traps');
+ const y=exchange(fresh());let getterCalls=0;const accessor=admission();Object.defineProperty(accessor,'request_sha256',{enumerable:true,get(){getterCalls++;return admission().request_sha256;}});
+ assert.throws(()=>y.a.admit(y.a.authorize(y.token.access_token,request),accessor),{code:'inference_budget'});assert.equal(getterCalls,0);
+}
+if(process.argv[2]==='--admission-snapshot'){admissionSnapshotControls();console.log(JSON.stringify({passed:true,scope:'Actual in-process authority with hostile caller objects; no live service or backend operation'}));process.exit(0);}
+if(process.argv[2]==='--digest-types'){digestTypeControls(process.argv[3]==='strings');console.log(JSON.stringify({passed:true,scope:'Primitive digest binding in an in-process synthetic authority only; no live admission or network request'}));process.exit(0);}
+check('admission binds one validated data-descriptor snapshot without caller rereads',admissionSnapshotControls);
+check('admission digest is a primitive immutable string, without coercion',digestTypeControls);
 check('actual existing MOMM PKCE client exchanges server-issued code',()=>{const x=exchange(fresh()),t=validateBumbleOAuthTokenEnvelope(JSON.stringify(x.token),{contract:x.c,now:at});assert.equal(t.resource,config.resource);t.access_token.fill(0);assert.throws(()=>x.a.exchange(x.e.body.toString()),{code:'invalid_grant'});});
 check('consent is required and copied handles cannot grant',()=>{const a=fresh(),f=flow(a);assert.throws(()=>a.decide({...f.h},{approved:true,subject:'owner'}),{code:'expired_or_consumed_consent'});const denied=a.decide(f.h,{approved:false,subject:'owner'});assert.equal(new URL(denied).searchParams.get('error'),'access_denied');assert.throws(()=>a.decide(f.h,{approved:true,subject:'owner'}),{code:'expired_or_consumed_consent'});});
 check('bad verifier consumes code without a second chance',()=>{const a=fresh(),f=flow(a),e=consumeBumbleOAuthCallback(f.i,a.decide(f.h,{approved:true,subject:'owner'}),{now:at});const original=e.body.toString();e.body.set('code_verifier','x'.repeat(64));assert.throws(()=>a.exchange(e.body.toString()),{code:'invalid_grant'});assert.throws(()=>a.exchange(original),{code:'invalid_grant'});});

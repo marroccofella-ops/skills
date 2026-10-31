@@ -18,14 +18,17 @@ const plain=value=>value&&Object.getPrototypeOf(value)===Object.prototype;
 function fields(value,keys){if(!plain(value)||Object.keys(value).some(key=>!keys.includes(key)))throw fault('invalid_configuration','Unsupported configuration fields.');}
 function text(value,max=200){if(typeof value!=='string'||!value.trim()||value.length>max||/[\x00-\x08\x0b-\x1f]/.test(value))throw fault('invalid_configuration','Invalid text field.');return value.trim();}
 export function normalizeEndpoint(value){
+  if(typeof value==='string'&&/[?#]/.test(value))throw fault('invalid_endpoint','Use an HTTPS API base without query or fragment delimiters.');
   const url=new URL(text(value,2048));
   if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||!/^\/[A-Za-z0-9/_-]*$/.test(url.pathname))throw fault('invalid_endpoint','Use an HTTPS API base with no credentials, query or fragment.');
   const host=url.hostname.replace(/^\[|\]$/g,'').replace(/\.$/,'').toLowerCase();
+  if(!host||host.endsWith('.'))throw fault('invalid_endpoint','Use a valid endpoint host with at most one DNS root dot.');
   const mapped=host.match(/^::ffff:([a-f0-9]{1,4}):([a-f0-9]{1,4})$/);
   const address=mapped?[parseInt(mapped[1],16)>>8,parseInt(mapped[1],16)&255,parseInt(mapped[2],16)>>8,parseInt(mapped[2],16)&255].join('.'):host;
   const first16=net.isIP(host)===6?(parseInt(host.split(':')[0],16)||0):0;
   if(host==='localhost'||host.endsWith('.localhost')||host==='::1'||host==='::'||(net.isIP(host)===6&&((first16&0xffc0)===0xfe80||(first16&0xff00)===0xff00))||host.includes('%')
     ||(net.isIP(address)===4&&(/^(0|127|169\.254|22[4-9]|23\d|24\d|25[0-5])\./.test(address))))throw fault('invalid_endpoint','Loopback, link-local, metadata and non-unicast destinations are not model endpoints.');
+  url.hostname=url.hostname.replace(/\.$/,'');
   url.pathname=url.pathname.replace(/\/+$/,'')||'/v1';
   return {base:url.toString().replace(/\/$/,''),origin:url.origin,resource_group:digest(url.origin)};
 }
@@ -43,7 +46,15 @@ function ensurePrivate(root,project){
   requirePrivateEvidence(root);
 }
 function checkState(state){
-  if(state.schema!==REGISTRY_SCHEMA||!Number.isSafeInteger(state.revision)||!Array.isArray(state.profiles)||!Array.isArray(state.connectors)||!Array.isArray(state.events)||!Array.isArray(state.reservations))throw fault('unsupported_schema','Unsupported registry. Previous configuration retained.');
+  if(!plain(state)||state.schema!==REGISTRY_SCHEMA||!Number.isSafeInteger(state.revision)||!Array.isArray(state.profiles)||!Array.isArray(state.connectors)||!Array.isArray(state.events)||!Array.isArray(state.reservations))throw fault('unsupported_schema','Unsupported registry. Previous configuration retained.');
+  for(const profile of state.profiles){
+    fields(profile,['id','revision','label','kind','auth_mode','model_id','connector_id','route','task_type','state','wording','overlay_hash','overlay_approved','quorum_eligible','qualification','archived_at']);
+    if(typeof profile.id!=='string'||!profile.id||profile.id.length>200||!Number.isSafeInteger(profile.revision)||profile.revision<0||!['bumbler','remote_api','cli'].includes(profile.kind)||typeof profile.wording!=='string'||profile.wording.length>2000||typeof profile.overlay_hash!=='string'||!/^[a-f0-9]{64}$/.test(profile.overlay_hash)||typeof profile.overlay_approved!=='boolean'||(profile.qualification!==null&&profile.auth_mode!=='api_key')||(Object.hasOwn(profile,'archived_at')&&(!Number.isSafeInteger(profile.archived_at)||profile.archived_at<0)))throw fault('invalid_configuration','Invalid stored profile fields. Original settings retained.');
+    text(profile.label,80);text(profile.task_type,120);
+    if(profile.model_id!==null)text(profile.model_id,160);
+    if(profile.connector_id!==null)text(profile.connector_id,200);
+    if(profile.route!==null&&!BUILTIN_ROUTES.includes(profile.route))throw fault('invalid_configuration','Unknown stored reviewer route.');
+  }
   if(state.profiles.length>MAX_PROFILES*2||state.profiles.filter(p=>p.state!=='purged').length>MAX_PROFILES||state.connectors.length>MAX_CONNECTORS||state.reservations.length>MAX_PROFILES)throw fault('registry_full','Registry capacity reached.');
   state.event_archives??=[];
   if(!Array.isArray(state.event_archives)||state.event_archives.length>MAX_EVENT_ARCHIVES||state.event_archives.some(a=>!plain(a)||Object.keys(a).sort().join(',')!=='bytes,count,sha256'||typeof a.sha256!=='string'||!/^[a-f0-9]{64}$/.test(a.sha256)||!Number.isSafeInteger(a.count)||a.count<1||a.count>RECENT_EVENTS||!Number.isSafeInteger(a.bytes)||a.bytes<1)||state.event_archives.reduce((n,a)=>n+a.bytes,0)>MAX_AUDIT_BYTES)throw fault('storage_budget','Private settings history budget reached or its metadata is invalid.');
@@ -116,7 +127,7 @@ export class ReviewerRegistry {
   snapshot({query='',state='visible',offset=0,limit=25}={}){
     const store=this.read(),term=String(query).slice(0,200).toLowerCase();
     const list=store.profiles.filter(p=>p.state!=='purged'&&(state==='visible'?p.state!=='archived':p.state===state)&&`${p.label} ${p.model_id||''}`.toLowerCase().includes(term));
-    const page=list.slice(Math.max(0,offset),Math.max(0,offset)+Math.min(100,Math.max(1,limit))).map(p=>({...copy(p),quorum_eligible:false,qualified:false,...(p.auth_mode!=='oauth'?{quarantined:true}:{})}));
+    const page=list.slice(Math.max(0,offset),Math.max(0,offset)+Math.min(100,Math.max(1,limit))).map(p=>({...copy(p),qualification:null,quorum_eligible:false,qualified:false,...(p.auth_mode!=='oauth'?{quarantined:true}:{})}));
     return {schema:REGISTRY_SCHEMA,revision:store.revision,total:list.length,profiles:page,connectors:copy(store.connectors),baseline_excluded:store.baseline_excluded,
       counts:{registered:store.profiles.filter(p=>p.state!=='purged').length,enabled:store.profiles.filter(p=>p.state==='active'&&p.auth_mode==='oauth').length,active_jobs:store.reservations.filter(r=>!r.released).length},
       remote_policy:{active:REMOTE_POLICY_ACTIVE,reason:'Credential policy and live adapter qualification are not activated in this development build.'}};

@@ -55,6 +55,27 @@ const within = (base, candidate, win) => {
   return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel));
 };
 
+// POSIX realpath need not normalize case. Compare existing ancestor identities
+// as well as path spellings; absence alone may ascend, unreadable identity refuses.
+function physicalAncestor(project, candidate) {
+  const identity = fs.statSync(project, { bigint: true });
+  if (!identity.isDirectory() || typeof identity.dev !== 'bigint' || typeof identity.ino !== 'bigint' || identity.ino <= 0n) throw Error('Project directory identity unavailable');
+  let cursor = candidate;
+  for (let depth = 0; depth < 1024; depth++) {
+    let stat;
+    try { stat = fs.statSync(cursor, { bigint: true }); }
+    catch (error) { if (error?.code !== 'ENOENT') throw error; }
+    if (stat) {
+      if (!stat.isDirectory() || typeof stat.dev !== 'bigint' || typeof stat.ino !== 'bigint' || stat.ino <= 0n) throw Error('Evidence ancestor identity unavailable');
+      if (stat.dev === identity.dev && stat.ino === identity.ino) return true;
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) return false;
+    cursor = parent;
+  }
+  throw Error('Evidence ancestor depth exceeded');
+}
+
 export const projectKey = (projectRealPath) => createHash('sha256').update(String(projectRealPath)).digest('hex').slice(0, 32);
 
 // { dir, home, project }: home and project are null in the default mode.
@@ -71,7 +92,13 @@ export function evidenceLocation({ cwd = process.cwd(), env = process.env, home 
   const dir = path.join(base, projectKey(projectReal));
   const dirReal = realLocation(dir, win);
   if (!dirReal) throw fail(`The evidence home ${dir} could not be resolved: a link on that path leads nowhere, or the folder cannot be reached. ${REMEDY}`, 'unresolvable');
-  if ([project, projectReal].some((p) => within(p, dir, win) || within(p, dirReal, win))) {
+  const lexicalInside = [project, projectReal].some((p) => within(p, dir, win) || within(p, dirReal, win));
+  let physicalInside = false;
+  if (!win && !lexicalInside) {
+    try { physicalInside = physicalAncestor(projectReal, dirReal); }
+    catch { throw fail('The evidence home directory identities could not be inspected. '+REMEDY, 'unresolvable'); }
+  }
+  if (lexicalInside || physicalInside) {
     throw fail(`The evidence home must lie outside the project: ${dir}${dirReal !== dir ? ` (real path ${dirReal})` : ''} is inside the project ${project}${projectReal !== project ? ` (real path ${projectReal})` : ''}. ${REMEDY}`, 'inside_project');
   }
   return { dir, home: base, project: projectReal };

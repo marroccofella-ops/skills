@@ -9,6 +9,12 @@ const H=v=>crypto.createHash('sha256').update(v).digest('hex');
 const random=()=>crypto.randomBytes(32).toString('base64url');
 const fail=code=>{throw Object.assign(Error('Temporary OAuth refused: '+code),{code});};
 const data=(v,keys)=>{if(!v||![Object.prototype,null].includes(Object.getPrototypeOf(v)))return false;const ds=Object.getOwnPropertyDescriptors(v),ks=Reflect.ownKeys(ds);return ks.length===keys.length&&ks.every(k=>typeof k==='string'&&keys.includes(k)&&ds[k].enumerable&&Object.hasOwn(ds[k],'value'));};
+function dataValues(value,keys){
+ if(!value||![Object.prototype,null].includes(Object.getPrototypeOf(value)))return null;
+ const descriptors=Object.getOwnPropertyDescriptors(value),names=Reflect.ownKeys(descriptors);
+ if(names.length!==keys.length||!names.every(key=>typeof key==='string'&&keys.includes(key)&&descriptors[key].enumerable&&Object.hasOwn(descriptors[key],'value')))return null;
+ return Object.fromEntries(keys.map(key=>[key,descriptors[key].value]));
+}
 function fields(raw,names){
  if(typeof raw!=='string'||Buffer.byteLength(raw)>8192||/%(?![a-fA-F0-9]{2})/.test(raw))fail('invalid_form');
  const p=new URLSearchParams(raw);if([...p.keys()].length!==names.length||names.some(k=>p.getAll(k).length!==1)||[...p.keys()].some(k=>!names.includes(k)))fail('invalid_form');
@@ -71,9 +77,10 @@ export function createTemporaryBumbleOAuthAuthority(config,{now=Date.now}={}){
    const at=clock(),g=permits.get(permit);permits.delete(permit);
    if(!g||g.epoch!==epoch||g.scope!=='momm.infer')fail('owned_inference_permit_required');
    const token=tokens.get(g.key);if(!token||token.until<=at||!token.scopes.includes('momm.infer'))fail('invalid_token_or_scope');
-   if(!data(request,['model_id','max_tokens','stream','request_sha256','deadline'])||request.model_id!==model_id||!Number.isSafeInteger(request.max_tokens)||request.max_tokens<1||request.max_tokens>1024||request.stream!==false||!/^\b[a-f0-9]{64}\b$/.test(request.request_sha256)||!Number.isSafeInteger(request.deadline)||request.deadline<=at||request.deadline-at>180000||request.deadline>token.until||request.deadline>p.expires_at)fail('inference_budget');
+   const bound=dataValues(request,['model_id','max_tokens','stream','request_sha256','deadline']);
+   if(!bound||bound.model_id!==model_id||!Number.isSafeInteger(bound.max_tokens)||bound.max_tokens<1||bound.max_tokens>1024||bound.stream!==false||typeof bound.request_sha256!=='string'||!/^\b[a-f0-9]{64}\b$/.test(bound.request_sha256)||!Number.isSafeInteger(bound.deadline)||bound.deadline<=at||bound.deadline-at>180000||bound.deadline>token.until||bound.deadline>p.expires_at)fail('inference_budget');
    if(admitted)fail('single_review_budget_exhausted');admitted=true;
-   return Object.freeze({schema:'momm-bumble-oauth-admission/1',...request,epoch,authorized:true,backend_dispatched:false,physical_release_verified:false,quorum_votes:0,completion:false});
+   return Object.freeze({schema:'momm-bumble-oauth-admission/1',...bound,epoch,authorized:true,backend_dispatched:false,physical_release_verified:false,quorum_votes:0,completion:false});
   },
   revoke(token){clock();const key=tokenKey(token);if(key)tokens.delete(key);return Object.freeze({revoked:true,physical_release_verified:false});},
   close(){close();epoch=crypto.randomUUID();return Object.freeze({revoked:true,physical_release_verified:false});}

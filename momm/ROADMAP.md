@@ -1,5 +1,21 @@
 # MOMM Roadmap — alignment record
 
+31 October follow-up, qualification pending: relocated evidence checks existing
+POSIX directory identities as well as path spellings, closing a case-alias
+containment gap. Nine modeled identity cases and the native filesystem probe
+are separate evidence; new hosted macOS qualification is still required.
+The standalone updater applies the same identity and inspection-refusal rules;
+its modeled controls and native agreement matrix are separate from activation.
+Temporary OAuth admissions require a primitive string request digest without
+coercing arrays or objects, and copy one validated descriptor snapshot rather
+than rereading caller-controlled properties. Stored reviewer profiles reject
+unknown fields and invalid shapes. DNS root-dot aliases now share one canonical
+connector/resource identity. Inconsistent legacy endpoint state refuses without
+rewriting its bytes or migrating held work; owner reconciliation remains explicit.
+Empty query/fragment delimiters are refused as API bases. Native probe success
+metadata is published only after the assertion passes.
+These are source repairs, not native activation, a real BAB review or a release.
+
 31 October development repair, qualification pending: reviewer drafts now accept
 OAuth/account sessions only; unsupported legacy choices are quarantined as inert
 metadata without automatic conversion. Unrelated OAuth drafts stay accessible,
