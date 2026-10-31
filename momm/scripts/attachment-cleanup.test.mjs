@@ -12,6 +12,7 @@ import {readMedia} from './media-bytes.mjs';
 import {takeEvidenceHomeOption,evidenceLocation,recordEvidenceProject} from './evidence-location.mjs';
 import {settleCompatibility,rememberedNotice} from './compatibility.mjs';
 import {repeatedStatusNotices,diffInputNotice} from './run-notices.mjs';
+import {assertReviewerSelection} from './reviewer-selection.mjs';
 delete process.env.MOMM_EVIDENCE_HOME; // test isolation: this suite decides where its fixtures' evidence lives
 const dispatcher=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
 const source=fs.readFileSync(dispatcher,'utf8');
@@ -157,7 +158,7 @@ try{
     const options={governor:'codex',reviewers:['codex'],timeoutMs:1000,maxBytes:1000,attach:[path.join(f.cwd,'synthetic.gif')]};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
-      applyReviewerSettings:()=>({applied:false,excluded:[]}), // this VM targets staging ownership; selection has its own real regressions
+      applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       preparePrivateEvidence:()=>({verified:true}),resolveDispatchCapabilities:async()=>({capabilities:null,registry:null}),
       // 1.17 A7: the real resolver (default mode here: no MOMM_EVIDENCE_HOME in this stub process).
@@ -182,7 +183,7 @@ try{
     const fail=()=>{throw Error(`synthetic ${boundary} failure`);};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
-      applyReviewerSettings:()=>({applied:false,excluded:[]}), // this VM targets staging ownership; selection has its own real regressions
+      applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       // This VM test targets staging ownership; native permission enforcement
       // is exercised independently by evidence-permissions-native.test.mjs.
