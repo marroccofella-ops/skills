@@ -120,7 +120,12 @@ if(manifest.momm_development){
   assert(!fs.existsSync(path.join(root,`docs/momm/releases/${dev.version}.html`)),'unpublished local notes do not belong in deployable public HTML');
   assert(!releases.some(r=>r.version===dev.version),'unfinished development must not be inserted into public history');
 }else assert(releases.some(r=>r.version===manifest.momm),'current version missing from archive');
-for(const entry of releases)assert(manifest.momm_releases.some(r=>r.version===entry.version),'missing changelog entry '+entry.version);
+for(const entry of releases){
+  if(entry.kind==='version-notes'){
+    assert.notEqual(entry.version,manifest.momm,'candidate notes must not select the stable updater version');
+    assert(!manifest.momm_releases.some(r=>r.version===entry.version),'candidate notes must not appear as an updater release');
+  }else assert(manifest.momm_releases.some(r=>r.version===entry.version),'missing changelog entry '+entry.version);
+}
 assert.equal(s.log_successes, s.stored_successes + s.summary_only_successes);
 assert.equal(s.dispositions, Object.values(s.decisions).reduce((a, b) => a + b, 0));
 assert.deepEqual(canonical({ z: [{ b: 2, a: 1 }], a: 0 }), { a: 0, z: [{ a: 1, b: 2 }] });
