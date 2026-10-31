@@ -29,7 +29,7 @@ import { preparePrivateEvidence, requirePrivateEvidence, createEvidenceWorkspace
 import { evidenceLocation, evidenceDir, recordEvidenceProject, takeEvidenceHomeOption, evidenceRefusal, EVIDENCE_FOLDER } from "./evidence-location.mjs";
 import { knownIncompatibility, settleCompatibility, rememberedNotice } from "./compatibility.mjs";
 import { repeatedStatusNotices, diffInputNotice } from "./run-notices.mjs";
-import {applyReviewerSettings} from './reviewer-selection.mjs';
+import {applyReviewerSettings,assertReviewerSelection} from './reviewer-selection.mjs';
 import {runNativeBumbleStage} from './bumble-native.mjs';
 
 // Windows: for a bare command name (git.exe, a reviewer CLI, taskkill) both
@@ -3424,7 +3424,7 @@ function guidanceCommand(args) {
 
 // 1.17 B5: one claim, one route, a separate linked report (see second-look.mjs). Everything that can
 // refuse (seal, finding, route, artifact) is checked before the route is launched.
-async function secondLookCommand(options) {
+async function secondLookCommand(options, reviewerSelection) {
   if (!options.secondLook || !options.finding) throw new Error("--second-look needs <run_id> and --finding <finding_id>");
   const extra = [["--input", options.input], ["--range", options.range], ["--attach", options.attach?.length], ["--split", options.split], ["--cover", options.cover], ["--personas", options.personas], ["--guidance", options.guidance || options.guidanceFile], ["--tier", options.tier], ["--min-success", options.minSuccess], ["--strict", options.strict], ["--retry-invalid", options.retryInvalid]].filter(([, value]) => value).map(([flag]) => flag);
   if (extra.length) throw new Error(`--second-look takes only --finding, --reviewers <route>, --governor, --timeout, --effort and --pretty; remove ${extra.join(", ")}`);
@@ -3432,6 +3432,7 @@ async function secondLookCommand(options) {
   if (!Number.isFinite(options.timeoutMs)) throw new Error("Timeout and size limits must be numbers");
   const result = await runSecondLook({
     root: process.cwd(), runId: options.secondLook, findingId: options.finding, reviewers: options.reviewersExplicit ? options.reviewers : null, governor: options.governor ?? null,
+    excluded: reviewerSelection.excluded,
     sanitize: (text) => sanitizeText(text).value, dispatcherVersion: MOMM_VERSION, requirePrivate: () => requirePrivateEvidence(evidenceDir({ cwd: process.cwd(), env: process.env })),
     invoke: async (route, artifact, replyContract, governor) => {
       const started = Date.now();
@@ -3513,7 +3514,7 @@ async function main() {
 
   const currentDepth = parseReviewDepth(process.env.MULTI_LLM_REVIEW_DEPTH); // invalid values throw: fail closed
   if (currentDepth > 0) throw new Error("Nested multi-LLM dispatch is blocked to prevent recursive harness calls");
-  if (options.secondLook !== undefined || options.finding !== undefined) { await secondLookCommand(options); return; }
+  if (options.secondLook !== undefined || options.finding !== undefined) { await secondLookCommand(options, reviewerSelection); return; }
   if (!VALID_GOVERNORS.has(options.governor)) throw new Error("--governor is required and must be codex, gemini, claude, antigravity, copilot, grok, or other");
   if (!Number.isFinite(options.timeoutMs) || !Number.isFinite(options.maxBytes)) throw new Error("Timeout and size limits must be numbers");
 
@@ -3565,6 +3566,7 @@ async function main() {
       options.reviewersAuto = { selected: auto.routes, per_modality: auto.perModality };
     }
   }
+  assertReviewerSelection(options, reviewerSelection);
   const uniqueReviewers = [...new Set(options.reviewers)];
   // 1.17 B1: every role brief loads from momm/roles before anything is dispatched; a missing or
   // malformed brief refuses the run. A brief past its review date is a visible notice, never a refusal.

@@ -2,6 +2,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {ReviewerRegistry,defaultRegistryHome} from './reviewer-registry.mjs';
+// Presets and modality routing run after initial settings. Recheck the final
+// list without silently replacing the owner's selection or lowering quorum.
+export function assertReviewerSelection(options,{excluded=[]}={}){
+  if(options.reviewers.some(route=>excluded.includes(route)))throw Error('A selected reviewer is excluded in saved settings. Restore it explicitly or choose a permitted selection before dispatch.');
+  if(excluded.length&&new Set(options.reviewers.filter(route=>route!==options.governor)).size<(options.minSuccess??1))throw Error('Reviewer selection leaves insufficient external quorum. Restore distinct reviewers; the quorum was not lowered.');
+}
 export function applyReviewerSettings(options,{root=defaultRegistryHome(),project=process.cwd()}={}){
   if(options.preflight||options.doctor||options.capabilitiesMatrix)return {applied:false,excluded:[],reason:'read-only inventory, not dispatch'};
   const exists=fs.existsSync(path.join(root,'registry.json'));

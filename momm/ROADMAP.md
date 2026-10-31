@@ -13,7 +13,10 @@ recovery or identity-migration tool and cannot release unknown work.
 
 31 October source-path compatibility follow-up, qualification pending: ordinary
 source files with device-like basenames use literal Windows namespace paths;
-private evidence keeps its portable filename restrictions. Existing linked-path,
+private evidence keeps its portable filename restrictions. Source references also
+retain the portable separator, punctuation and trailing-dot/space grammar on
+POSIX; legitimate nonportable POSIX names can therefore be refused. This is a
+known compatibility restriction, not full POSIX filename qualification. Existing linked-path,
 regular-file, size and source-hash checks remain in their respective consumers.
 Real recordCheck controls cover source aliases separately from private-evidence
 refusals. Older Windows/native qualification and the full candidate remain open.
@@ -574,7 +577,9 @@ Reference: [BAB shadow milestone](references/bumble-peer-shadow-1.18.md).
   JavaScript strings and other runtime copies cannot be guaranteed erased. The new regression
   entry point is registered in both workflows. Fresh independent coverage and full native
   integration remain required; the earlier failed-quorum report remains historical evidence.
-  Latest owner direction, 11 October Dubai time: OAuth remains the primary/default choice,
+  **Archived 11 October direction, superseded by the current OAuth-only policy:**
+  the following records historical development choices, not present permission.
+  Historical owner direction, 11 October Dubai time: OAuth remains the primary/default choice,
   with an explicit optional API-key mode for supported reviewer/API connectors. This supersedes
   the earlier OAuth-only development direction; the earlier instruction remains history, not the
   current 1.18 plan. Saved remote profiles now retain that choice with OAuth as the legacy default.
@@ -1389,8 +1394,9 @@ helper can defeat signal forwarding. Hard settlement still prevents hung pipes
 from stranding the dispatcher or Setup Center.
 
 Historical September scope: the attached API-key proposal then conflicted with
-OAuth-only policy. The 11 October development direction above supersedes that
-narrow proposal, not the installed protocol or native activation gates. A
+OAuth-only policy. The archived 11 October development direction above then
+superseded that narrow proposal; both are historical, and neither overrides the
+current OAuth-only policy or native activation gates. A
 repository split, automatic execution of peer-authored
 tests, independent benchmarking and marketing outreach remain separate decisions.
 

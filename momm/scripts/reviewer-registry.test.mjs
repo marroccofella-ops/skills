@@ -2,10 +2,37 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import vm from 'node:vm';
 import {createHash} from 'node:crypto';
 import {ReviewerRegistry,normalizeEndpoint} from './reviewer-registry.mjs';
 import {applyReviewerSettings} from './reviewer-selection.mjs';
+import * as selection from './reviewer-selection.mjs';
+import {chooseSecondLookRoute} from './second-look.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
+function selectionExclusionControls(){
+ const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'momm-selection-exclusion-')),root=path.join(temporary,'private'),rows=[];
+ const test=(name,fn)=>{try{fn();rows.push({name,passed:true});}catch(error){rows.push({name,passed:false,error:error.message});}};
+ try{
+  const registry=new ReviewerRegistry({root});registry.command({op:'exclude_cli',route:'copilot',revision:0});
+  const source=fs.readFileSync(new URL('./multi-review.mjs',import.meta.url),'utf8'),tierStart=source.indexOf('function applyTier('),tierEnd=source.indexOf('\nfunction usage(',tierStart);assert(tierStart>=0&&tierEnd>tierStart);
+  const tier=vm.runInNewContext('('+source.slice(tierStart,tierEnd)+')',{QUICK_POOL:['copilot','antigravity']});
+  const guard=selection.assertReviewerSelection??(()=>{});
+  test('quick tier cannot restore a saved exclusion',()=>{const options={governor:'codex',reviewers:['codex','claude','copilot','antigravity','grok'],tier:'quick',timeoutMs:180000};const saved=applyReviewerSettings(options,{root});tier(options);assert.throws(()=>guard(options,saved),/excluded/);});
+  test('automatic media selection cannot restore a saved exclusion',()=>{
+   const options={governor:'codex',reviewers:['claude','copilot','antigravity'],reviewersAuto:true},saved=applyReviewerSettings(options,{root});options.capabilities={matrix:{},autoReviewers:[],routable:()=>true};options.capabilitiesRegistry={};
+   const start=source.indexOf('  {\n    if (options.reviewersAuto && attachedModalities.length)'),end=source.indexOf('  // 1.17 B1:',start);assert(start>=0&&end>start);
+   const context={options,reviewerSelection:saved,attachedModalities:['image'],selectAutoReviewers:()=>({routes:['copilot','antigravity'],perModality:{image:['copilot','antigravity']}}),assertReviewerSelection:guard};
+   assert.throws(()=>vm.runInNewContext(source.slice(start,end),context),/excluded/);
+  });
+  const report={governor:'codex',gate_policy:{requested_routes:['claude','copilot','antigravity']}},finding={sources:['claude']};
+  test('second look default refuses an excluded original route',()=>assert.throws(()=>chooseSecondLookRoute({report,finding,excluded:['copilot']}),/excluded/));
+  test('second look explicit selection refuses an excluded route',()=>assert.throws(()=>chooseSecondLookRoute({report,finding,reviewers:['copilot'],excluded:['copilot']}),/excluded/));
+  test('permitted routes and caller quorum remain unchanged',()=>{const options={reviewers:['claude','antigravity'],governor:'codex',minSuccess:2},before=JSON.stringify(options);guard(options,{excluded:['copilot'],removed_from_selection:['copilot']});assert.equal(JSON.stringify(options),before);assert.equal(chooseSecondLookRoute({report,finding,reviewers:['antigravity'],excluded:['copilot']}),'antigravity');assert.throws(()=>guard({...options,reviewers:['claude']},{excluded:['copilot'],removed_from_selection:['copilot']}),/quorum/);});
+  test('actual dispatch and second-look entry points carry the saved policy',()=>{assert(/assertReviewerSelection\(options, reviewerSelection\);\s*const uniqueReviewers/.test(source),'final dispatch guard missing');assert(/secondLookCommand\(options, reviewerSelection\)/.test(source),'second-look policy handoff missing');assert(/excluded: reviewerSelection\.excluded/.test(source),'second-look saved exclusions missing');const look=fs.readFileSync(new URL('./second-look.mjs',import.meta.url),'utf8');assert(/chooseSecondLookRoute\(\{ report, finding, reviewers, governor, excluded \}\)/.test(look),'second-look route guard wiring missing');});
+  assert(rows.every(row=>row.passed),JSON.stringify(rows));return rows;
+ }finally{assert(path.basename(temporary).startsWith('momm-selection-exclusion-'));fs.rmSync(temporary,{recursive:true,force:true});}
+}
+if(process.argv[2]==='--selection-exclusions'){const rows=selectionExclusionControls();console.log(JSON.stringify({passed:true,checks:rows.length,rows,network_calls:0,scope:'Actual selection functions and source wiring with synthetic saved settings; no provider calls'}));process.exit(0);}
 function canonicalEndpointControls(){
  const bare=normalizeEndpoint('https://example.test/v1');
  for(const alias of ['https://example.test./v1','https://EXAMPLE.test.:443/v1/'])assert.deepEqual(normalizeEndpoint(alias),bare);
@@ -56,6 +83,7 @@ try {
   test('archive and Undo retain original events',()=>{const before=registry.read().events.length;command({op:'archive',id:bab});assert(!registry.snapshot().profiles.some(p=>p.id===bab));assert(registry.snapshot({state:'archived'}).profiles.some(p=>p.id===bab));command({op:'undo',id:bab});assert.equal(registry.read().profiles[0].state,'disabled');assert(registry.read().events.length>before);});
   test('remote tests cannot perform any credential operation',()=>{const bytes=fs.readFileSync(registry.file);for(const op of ['test','qualify','enable','rotate','revoke'])assert.throws(()=>command({op,id:bab}),/No request or credential operation/);assert.deepEqual(fs.readFileSync(registry.file),bytes);});
   test('exclusion retains quorum and rejects explicit bypass',()=>{command({op:'exclude_cli',route:'copilot'});const options={governor:'codex',reviewers:['claude','copilot'],minSuccess:2};assert.throws(()=>applyReviewerSettings(options,{root}),/quorum/);assert.throws(()=>applyReviewerSettings({governor:'codex',reviewers:['copilot'],reviewersExplicit:true},{root}),/excluded/);command({op:'restore_cli',route:'copilot'});});
+  test('saved exclusions hold after presets, automatic routing and second look',selectionExclusionControls);
   test('one thousand saved profiles stay bounded and paged',()=>{registry.mutate(registry.read().revision,state=>{const p=state.profiles[0];for(let n=state.profiles.length;n<1000;n++)state.profiles.push({...p,id:`fixture-profile-${n}`,label:`Bee ${n}`});});assert.equal(registry.snapshot().profiles.length,25);assert.equal(registry.snapshot().counts.registered,1000);assert.throws(()=>command({op:'duplicate',id:bab}),/limit/);});
   test('unsupported migration retains original bytes',()=>{const original=fs.readFileSync(registry.file);const data=JSON.parse(original);data.schema='unsupported/99';fs.writeFileSync(registry.file,JSON.stringify(data));const unsupported=fs.readFileSync(registry.file);assert.throws(()=>registry.read(),/Unsupported registry/);assert.deepEqual(fs.readFileSync(registry.file),unsupported);fs.writeFileSync(registry.file,original);});
   console.log(JSON.stringify({passed:true,checks:count,network_calls:0,live_fleet:false}));
