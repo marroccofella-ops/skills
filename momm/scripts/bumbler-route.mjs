@@ -27,6 +27,18 @@ export function loadBumblers(env=process.env){
   try{return [name,{base_url:bumblerBase(entry.base_url),model:entry.model.trim(),max_tokens:maxTokens,timeout_ms:seconds*1000}];}catch(error){throw problem(name,error.message);}
  })));
 }
+// A rejected reply stays visible to the governor as an unverified opinion. It is never a
+// review: it joins no findings and no count. Models often think aloud before the JSON.
+export function bumblerAnswer(text){
+ const raw=String(text??'');if(raw.length>1_000_000)return null;
+ for(let at=raw.indexOf('{');at>=0;at=raw.indexOf('{',at+1)){
+  let value;try{value=JSON.parse(raw.slice(at,raw.lastIndexOf('}')+1));}catch{continue;}
+  if(!value||typeof value!=='object'||!('verdict' in value||'findings' in value))continue;
+  const clip=(item,max=600)=>typeof item==='string'?item.slice(0,max):null;
+  return {verdict:clip(value.verdict,20),summary:clip(value.summary),findings:(Array.isArray(value.findings)?value.findings:[]).slice(0,20).map(f=>({severity:clip(f?.severity,20),target_file:clip(f?.target_file,300),issue:clip(f?.issue)})),suggestions:(Array.isArray(value.suggested_improvements)?value.suggested_improvements:[]).slice(0,10).map(s=>clip(s)).filter(Boolean)};
+ }
+ return null;
+}
 // Preflight says whether the model answers. Like every route, it is informational.
 export function bumblerReadiness(agent,bumbler,timeoutMs=5000){
  return new Promise(resolve=>{

@@ -21,7 +21,7 @@ import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./at
 import { resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
-import { BUILT_IN_ROUTES, BUMBLER_CLIENT, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
+import { BUILT_IN_ROUTES, BUMBLER_CLIENT, bumblerAnswer, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
 import { ROLE_NAMES, loadRole, loadAllRoles, roleBrief, roleSection, roleGuidanceLayer, staleBriefNotices } from "./roles.mjs";
 import { ATTEMPT_BUDGET, COVERABLE_STATUSES, MODEL_FAMILIES, runPieceCovers, coverSection, coverReportRow, pieceCoverSummary } from "./cover.mjs";
 import { runSecondLook } from "./second-look.mjs";
@@ -1600,7 +1600,8 @@ async function invokeReviewer(agent, artifact, options) {
   // result the route produced (codex only; see codexIsolationArgs in route-isolation.mjs).
   const settings = { route: null };
   const result = await dispatchReviewer(agent, artifact, options, settings);
-  return settings.route ? { ...result, route_settings: settings.route } : result;
+  const shown = result.status === "invalid_output" && settings.bumblerStdout ? bumblerAnswer(sanitizeText(settings.bumblerStdout).value) : null;
+  return { ...result, ...(settings.route ? { route_settings: settings.route } : {}), ...(shown ? { unverified_answer: shown } : {}) };
 }
 
 async function dispatchReviewer(agent, artifact, options, settings) {
@@ -1873,6 +1874,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // 1.17 A4.3: Grok streams, so its record also says how many events arrived and the last one's type,
   // whatever the outcome; a timeout after partial output is still a timeout.
   if (agent === "grok") result = { ...result, progress: { ...(result.progress ?? {}), ...grokStreamProgress(result.stdout) } };
+  if (options.bumblers?.[agent]) settings.bumblerStdout = result.stdout;
   if (result.code !== 0 || result.error || result.timedOut) {
     // Everything this route was sent: the full prompt when it went by stdin, and always the artifact.
     const failure = classifyFailure(result, agent, [input, artifact].filter((text) => typeof text === "string").join("\n"));
@@ -3836,6 +3838,7 @@ async function main() {
     reviewers: results.map((result) => ({
       agent: result.agent,
       status: result.status,
+      ...(result.unverified_answer ? { unverified_answer: result.unverified_answer } : {}),
       ...(options.bumblers?.[result.agent] ? { advisory: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
