@@ -2,15 +2,16 @@
 import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {bumblerBase,loadBumblers} from './bumbler-route.mjs';
 import {inspectCompletion} from './governor.mjs';
+import {privateTestFixture} from './private-test-fixture.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
 const script=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
 const diff='diff --git a/sample.js b/sample.js\n--- a/sample.js\n+++ b/sample.js\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;\n';
 const review={review_status:'complete',verdict:'ACCEPT',confidence:0.8,summary:'Synthetic Bumbler review.',reviewed_scope:[{quote:'const a = 2;',assessment:'Synthetic change inspected.'}],findings:[],suggested_improvements:[]};
 for(const good of ['http://127.0.0.1:9/v1','http://100.64.0.1:8080/v1','https://100.127.255.1:8080/v1'])assert.equal(bumblerBase(good),good);
 for(const bad of ['http://8.8.8.8:8080/v1','http://example.com/v1','http://100.128.0.1/v1','http://100.64.0.1:8080/v2','http://user:pw@100.64.0.1/v1','http://100.64.0.1/v1?x=1','not a url'])assert.throws(()=>bumblerBase(bad),undefined,bad);
-const parent=fs.mkdtempSync(path.join(os.tmpdir(),'momm-bumbler-test-'));
-const home=path.join(parent,'reviewers'),project=path.join(parent,'project');fs.mkdirSync(home);fs.mkdirSync(project);
-const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringify(value));
+const parent=fs.realpathSync.native(privateTestFixture('momm-bumbler-test-'));
+const home=path.join(parent,'reviewers'),project=path.join(parent,'project');fs.mkdirSync(home,{mode:0o700});fs.mkdirSync(project,{mode:0o700});
+const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringify(value),{mode:0o600});
 assert.equal(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:home})).length,0,'no saved Bumblers is not an error');assert.equal(loadBumblers({MOMM_REVIEWER_HOME:home}).constructor,undefined,'inherited names are not saved routes');
 for(const bad of [{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',timeout_seconds:3601}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',max_tokens:70000}},{codex:{base_url:'http://127.0.0.1:9/v1',model:'m'}},{bab:{base_url:'http://8.8.8.8/v1',model:'m'}},{bab:{base_url:'http://127.0.0.1:9/v1'}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',api_key:'x'}}]){save(bad);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/Bumbler /);}
 fs.writeFileSync(path.join(home,'bumblers.json'),'{not json');assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/bumblers\.json/);
@@ -44,5 +45,5 @@ try{
  answer=response=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(Buffer.alloc(5_000_000,32));};const huge=await run(['--reviewers','bab'],diff);assert.equal(row(huge)?.status,'error','an oversized reply is refused');assert.notEqual(row(busy)?.status,'success');assert(row(busy),'a busy model is a status on the report');
  await new Promise(resolve=>{server.closeAllConnections?.();server.close(resolve);});
  const off=await run(['--reviewers','bab'],diff);assert.notEqual(row(off)?.status,'success');assert(row(off),'a model server that is off is a status on the report');assert(off.report,'the review still reports');
- console.log(JSON.stringify({passed:true,network_calls:0,scope:'real multi-review CLI against a local stand-in model server'}));
+ console.log(JSON.stringify({passed:true,transport:'loopback stand-in only',scope:'real multi-review CLI against a local stand-in model server'}));
 }finally{if(server.listening)await new Promise(resolve=>{server.closeAllConnections?.();server.close(resolve);});fs.rmSync(parent,{recursive:true,force:true,maxRetries:3,retryDelay:100});}
