@@ -436,7 +436,7 @@ export function inspectCompletion(root, runId, options = {}) {
         for (const agent of claimed) if (!successful.some(r => r.agent === agent)) state.errors.push(`piece reviewer success has no successful verified row: ${p.id}: ${agent}`);
         const ok = claimed.filter(agent => voting.some(r => r.agent === agent));
         const votes = coverVotesFor(p.id, ok);
-        return { id: p.id, external_successes: ok.length + votes, met: ok.length + votes >= required, ok };
+        return { id: p.id, external_successes: ok.length + votes, met: ok.length + votes >= required, ok, answered: claimed.filter(agent => successful.some(r => r.agent === agent)) };
       });
       // A merged route row reads "success" when any piece succeeded; its per-status piece counts are
       // the piece-level fact it carries. The piece structure may not claim more successes for a
@@ -454,13 +454,13 @@ export function inspectCompletion(root, runId, options = {}) {
       if (failing.length) state.errors.push(`external review quorum not met on piece(s): ${failing.join(", ")}`);
       if (report.quorum && (report.quorum.met !== state.quorum.met || (report.quorum.pieces ?? pieces.length) !== pieces.length)) state.errors.push("report quorum metadata contradicts the sealed piece structure");
       if (report.gate_policy?.strict && Array.isArray(requested)) {
-        for (const p of perPiece) for (const agent of requested) if (agent !== report.governor && !advisory.has(agent) && !p.ok.includes(agent)) state.errors.push(`strict reviewer policy not met on ${p.id}: ${agent}`);
+        for (const p of perPiece) for (const agent of requested) if (agent !== report.governor && !p.answered.includes(agent)) state.errors.push(`strict reviewer policy not met on ${p.id}: ${agent}`);
       }
     } else {
       const votes = coverVotesFor(null, voting.map(r => r.agent));
       state.quorum = { required, achieved: voting.length + votes, met: voting.length + votes >= required, ...(coverRows.length ? { cover_votes: votes } : {}) };
       if (!state.quorum.met) state.errors.push("external review quorum not met");
-      if (report.gate_policy?.strict && Array.isArray(requested) && requested.some(agent => agent !== report.governor && !advisory.has(agent) && !voting.some(r => r.agent === agent))) {
+      if (report.gate_policy?.strict && Array.isArray(requested) && requested.some(agent => agent !== report.governor && !successful.some(r => r.agent === agent))) {
         state.errors.push("strict reviewer policy not met");
       }
     }
