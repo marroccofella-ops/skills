@@ -1,5 +1,23 @@
 # MOMM Roadmap — alignment record
 
+1 November direction, from the owner: a Bumbler is an ordinary reviewer in the
+pool, a lower-powered open model the owner runs. Its route is
+`bumbler-route.mjs` and `bumbler-client.mjs`: it joins by name in `--reviewers`
+and takes the same prompt, containment, validation, evidence and statuses as a
+CLI reviewer. It carries no credential, so saved addresses are limited to the
+tailnet range and loopback; an address is not application authentication, and
+review text goes to that address. Answers are advisory and count towards no
+quorum. Settings live in `bumblers.json` in the reviewer home; the dashboard's
+Bumbler Bees panel manages separate OAuth drafts and does not manage this route.
+The signed OAuth pilot, native gate, holds, witness and physical-release work is
+not used by this route and is no longer a gate for a Bumbler reviewing. Older
+entries below describing those as release gates are history. The default native
+entry still refuses.
+First real review, 1 November: run `rev_20261101143551_01caeb4ab2d0`, one request,
+about 47 seconds on Bab. The transport worked. On a synthetic file with a seeded
+`||` bug the model noted the condition was always true, yet returned ACCEPT with
+no findings. One sample, not a quality measure.
+
 31 October audit continuation: the remaining OAuth-vault and retired legacy
 store revocation checks now distinguish verified absence from an unreadable
 marker. Any marker entry, including a dangling link, refuses before record
