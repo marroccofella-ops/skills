@@ -3833,7 +3833,7 @@ async function main() {
     reviewers: results.map((result) => ({
       agent: result.agent,
       status: result.status,
-      ...(options.bumblers?.[result.agent] ? { advisory: true, credential: "none", model: options.bumblers[result.agent].model, base_url: options.bumblers[result.agent].base_url, max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
+      ...(options.bumblers?.[result.agent] ? { advisory: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
       ...(result.status === "authentication_required" ? { login_hint: LOGIN_HINTS[result.agent] ?? null } : {}),
