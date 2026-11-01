@@ -118,6 +118,11 @@ which saves `bumblers.json`, or edit that file in your reviewer home, which is
 `~/.momm-reviewers` unless `MOMM_REVIEWER_HOME` says otherwise. Keep this file
 out of your project:
 
+Use the private reviewer home created by MOMM's settings setup. The file must
+have owner-only access (for example, 0600 on POSIX), be a regular file with one link, and
+be no larger than 1,000,000 bytes. Linked paths and unverifiable privacy refuse
+before content is loaded. Reading these settings never repairs permissions.
+
 ```json
 {"bab":{"base_url":"http://100.64.0.1:8080/v1","model":"your-model-id","max_tokens":1024,"timeout_seconds":180}}
 ```
