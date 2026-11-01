@@ -136,7 +136,7 @@ export class ReviewerRegistry {
             }
             fs.fsyncSync(writer);
             // Explicit-position writes leave this newly opened descriptor at zero.
-            if(fs.fstatSync(writer).size!==bytes.length||digest(fs.readFileSync(writer))!==sha256)throw fault('invalid_store','Private settings history write did not verify.');
+            if(fs.fstatSync(writer).size!==bytes.length||digest(fs.readFileSync(file))!==sha256)throw fault('invalid_store','Private settings history write did not verify.');
           }finally{fs.closeSync(writer);}
           stored+=remaining;
         }
