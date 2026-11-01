@@ -18,8 +18,13 @@ try{
   const project=path.join(parent,'project'),settings=path.join(parent,'settings');fs.mkdirSync(project,{mode:0o700});
   fs.writeFileSync(path.join(project,'control.txt'),'const value = 1;\n',{mode:0o600});
   const registry=new ReviewerRegistry({root:settings,project});registry.command({op:'exclude_cli',route:'copilot',revision:0});
-  const child=spawnSync(process.execPath,[fileURLToPath(new URL('./multi-review.mjs',import.meta.url)),'--governor','codex','--reviewers','codex','--min-success','1','--input','control.txt','--no-ui'],{cwd:project,encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:2_000_000,env:{...process.env,MOMM_REVIEWER_HOME:settings,NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1',MULTI_LLM_REVIEW_DEPTH:'0'}});
-  assert.equal(child.status,3,'a governor-only synthetic run retains its failed-quorum exit');
+  // Real Windows privacy audits and ledger startup have separate bounds; their
+  // cumulative cost exceeded 30s on an independent machine with no provider call.
+  const timeoutMs=process.platform==='win32'?90000:30000,start=Date.now();
+  const child=spawnSync(process.execPath,[fileURLToPath(new URL('./multi-review.mjs',import.meta.url)),'--governor','codex','--reviewers','codex','--min-success','1','--input','control.txt','--no-ui'],{cwd:project,encoding:'utf8',windowsHide:true,timeout:timeoutMs,maxBuffer:2_000_000,env:{...process.env,MOMM_REVIEWER_HOME:settings,NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1',MULTI_LLM_REVIEW_DEPTH:'0'}});
+  // Shape-only diagnostics: never include raw provider/process output or paths.
+  const diagnostic=JSON.stringify({elapsed_ms:Date.now()-start,timeout_ms:timeoutMs,status:child.status,signal:child.signal,error:child.error?.code??null,stdout_bytes:Buffer.byteLength(child.stdout||''),stderr_bytes:Buffer.byteLength(child.stderr||'')});
+  assert.equal(child.status,3,'a governor-only synthetic run retains its failed-quorum exit: '+diagnostic);
   const report=JSON.parse(child.stdout);assert.equal(report.quorum.met,false);assert(report.reviewers.every(r=>r.status==='self_excluded'));
   assert.deepEqual(report.reviewer_selection,{applied:true,excluded:['copilot'],removed_from_selection:[],registry_revision:1},'saved baseline selection must survive in the report');
   assert.equal(report.bumble.status,'policy_required');assert.equal(report.bumble.dispatched,0);
