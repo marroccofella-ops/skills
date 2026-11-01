@@ -89,8 +89,8 @@
       let value;try{value=await response.json();}catch{if(body)markBumblerUncertain();throw Error(body?'Bumbler change outcome is unknown. Refresh and check saved Bumblers before another change.':'Saved Bumblers could not be read.');}
       if(sentEpoch!==sessionEpoch||token!==sentToken){if(body)markBumblerUncertain();throw Error('The dashboard session changed. Refresh and check saved Bumblers before repeating a change.');}
       if(!response.ok||!Array.isArray(value?.bumblers)){if(body&&(response.ok||response.status>=500||value?.uncertain_write===true))markBumblerUncertain();throw Error(typeof value?.error==='string'?value.error:'Bumbler settings request refused.');}
-      if(!body){if(bumblerBusy||readVersion!==bumblerMutation)throw Error('Saved Bumblers changed while loading. Refresh again.');bumblerNeedsRead=false;renderBumblerState();}
-      return value.bumblers;
+      if(!body){if(bumblerBusy||readVersion!==bumblerMutation)throw Error('Saved Bumblers changed while loading. Refresh again.');}
+      return Object.assign(value.bumblers,{fresh:!body});
     }finally{if(body){bumblerMutation++;bumblerBusy=false;renderBumblerState();}}
   }
   const showBumblers=list=>{$('bump-list').innerHTML=list.map(b=>`<p>${esc(b.name)} · ${esc(b.model)} · ${esc(b.base_url)} · ${esc(b.max_tokens)} tokens · ${esc(b.timeout_seconds)} s <button data-bump="${esc(b.name)}" class="button secondary" type="button">Remove</button></p>`).join('')||'<p>No Bumblers saved.</p>';};
@@ -98,8 +98,8 @@
   function renderBumblerState(){const blocked=!token||bumblerBusy||bumblerUncertain;$('bump-form').querySelector('[type="submit"]').disabled=blocked;$('bump-list').querySelectorAll?.('button').forEach(button=>{button.disabled=blocked;});$('bump-write-warning').hidden=!bumblerUncertain;$('bump-write-ack').disabled=!token||bumblerBusy||bumblerNeedsRead;}
   function markBumblerUncertain(){bumblerUncertain=true;bumblerNeedsRead=true;renderBumblerState();}
   $('bump-write-ack').onclick=()=>{if(!token||bumblerBusy||bumblerNeedsRead)return;bumblerUncertain=false;renderBumblerState();};
-  $('bump-refresh').onclick=()=>bumblerStep(()=>bumblerApi());
-  const bumblerStep=async(step,done='')=>{const mine=++bumblerRequest;try{const list=await step();if(mine!==bumblerRequest)return false;showBumblers(list);renderBumblerState();$('bump-status').textContent=done;return true;}catch(error){if(mine===bumblerRequest)$('bump-status').textContent=error.message;return false;}};
+  $('bump-refresh').onclick=()=>{if(!bumblerBusy)bumblerStep(()=>bumblerApi());};
+  const bumblerStep=async(step,done='')=>{const mine=++bumblerRequest;try{const list=await step();if(mine!==bumblerRequest)return false;showBumblers(list);if(list.fresh){bumblerNeedsRead=false;renderBumblerState();}renderBumblerState();$('bump-status').textContent=done;return true;}catch(error){if(mine===bumblerRequest)$('bump-status').textContent=error.message;return false;}};
   $('bump-panel').ontoggle=()=>{if($('bump-panel').open)bumblerStep(()=>bumblerApi());};
   $('bump-form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,f=form.elements,typed=()=>['name','base_url','model','max_tokens','timeout_seconds','guidance'].map(k=>f[k].value).join('\n'),sent=typed();if(await bumblerStep(()=>bumblerApi({op:'save',name:f.name.value.trim(),entry:{base_url:f.base_url.value.trim(),model:f.model.value,max_tokens:Number(f.max_tokens.value),timeout_seconds:Number(f.timeout_seconds.value),...(f.guidance?.value?.trim()?{guidance:f.guidance.value}:{})}}),'Saved.')&&typed()===sent)form.reset();};
   $('bump-list').onclick=async event=>{const name=event.target?.dataset?.bump;if(!name||!await confirmChange(`Remove Bumbler ${name} from the review pool?`))return;await bumblerStep(()=>bumblerApi({op:'remove',name}),'Removed.');};
