@@ -1,5 +1,5 @@
 // Real multi-review CLI against a local stand-in model server. No real model, credential or tailnet traffic.
-import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {bumblerAnswer,bumblerBase,listBumblers,loadBumblers,removeBumbler,saveBumbler} from './bumbler-route.mjs';
 import {inspectCompletion} from './governor.mjs';
 import {privateTestFixture} from './private-test-fixture.mjs';
@@ -21,6 +21,11 @@ const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringif
 assert.equal(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:home})).length,0,'no saved Bumblers is not an error');assert.equal(loadBumblers({MOMM_REVIEWER_HOME:home}).constructor,undefined,'inherited names are not saved routes');
 for(const bad of [{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',timeout_seconds:3601}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',max_tokens:70000}},{codex:{base_url:'http://127.0.0.1:9/v1',model:'m'}},{bab:{base_url:'http://8.8.8.8/v1',model:'m'}},{bab:{base_url:'http://127.0.0.1:9/v1'}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',api_key:'x'}}]){save(bad);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/Bumbler /);}
 fs.writeFileSync(path.join(home,'bumblers.json'),'{not json');assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/bumblers\.json/);
+if(process.platform==='win32'){
+ // A short 8.3 name for the project must not pass as a home outside it.
+ const short=spawnSync('cmd.exe',['/d','/s','/c',`"for %I in ("${project}") do @echo %~sI"`],{encoding:'utf8',windowsHide:true,windowsVerbatimArguments:true}).stdout.trim().split(/\r?\n/).at(-1),cwd=process.cwd();
+ if(short&&short.toLowerCase()!==project.toLowerCase()&&fs.existsSync(short)){process.chdir(project);try{for(const inner of [path.join(short,'inner'),path.join(project,'inner')])assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:inner}),/outside the project/,inner);}finally{process.chdir(cwd);}}
+}
 const run=(args,input)=>new Promise(resolve=>{
  const env={...process.env,MOMM_REVIEWER_HOME:home,MOMM_EVIDENCE_HOME:path.join(parent,'evidence'),NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1'};
  const child=spawn(process.execPath,[script,'--governor','claude','--no-ui',...args],{cwd:project,env,windowsHide:true,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';child.stdout.setEncoding('utf8');child.stdout.on('data',b=>{stdout+=b;});child.stderr.setEncoding('utf8');child.stderr.on('data',b=>{stderr+=b;});child.stdin.end(input);

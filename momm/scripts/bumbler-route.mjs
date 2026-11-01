@@ -12,17 +12,26 @@ const MAX_CONFIG_BYTES=1_000_000;
 const settingsRefused=()=>Object.assign(Error('Bumbler settings must be a bounded regular file in a private reviewer home outside the project; inspection or reading was refused.'),{code:'BUMBLER_SETTINGS_REFUSED'});
 const sameIdentity=(a,b)=>a.dev===b.dev&&a.ino===b.ino;
 const sameFile=(a,b)=>sameIdentity(a,b)&&a.size===b.size&&a.mtimeNs===b.mtimeNs&&a.ctimeNs===b.ctimeNs;
+function canonical(entry){
+ const rest=[];
+ for(let current=entry;;current=path.dirname(current)){
+  try{return path.join(fs.realpathSync.native(current),...rest.reverse());}
+  catch(error){if(error?.code!=='ENOENT'||path.dirname(current)===current)throw settingsRefused();rest.push(path.basename(current));}
+ }
+}
 function readBumblers(env){
  const selected=defaultRegistryHome(env);
  if(!path.isAbsolute(selected))throw settingsRefused();
- const root=path.resolve(selected),relative=path.relative(fs.realpathSync(process.cwd()),root);
- if(!relative||(!(relative==='..'||relative.startsWith('..'+path.sep))&&!path.isAbsolute(relative)))throw settingsRefused();
+ const root=path.resolve(selected);
  let missing=false;
  for(let entry=root;;entry=path.dirname(entry)){
   try{const stat=fs.lstatSync(entry);if(stat.isSymbolicLink()||!stat.isDirectory())throw settingsRefused();}
   catch(error){if(error?.code==='ENOENT')missing=true;else throw settingsRefused();}
   if(path.dirname(entry)===entry)break;
  }
+ // Literal links are refused above, so this resolves only spellings such as 8.3 short names.
+ const relative=path.relative(fs.realpathSync.native(process.cwd()),canonical(root));
+ if(!relative||(!(relative==='..'||relative.startsWith('..'+path.sep))&&!path.isAbsolute(relative)))throw settingsRefused();
  if(missing)return null;
  const rootBefore=fs.lstatSync(root,{bigint:true}),file=path.join(root,'bumblers.json');
  let before;
