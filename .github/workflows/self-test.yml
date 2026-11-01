@@ -382,6 +382,10 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 2
         run: node momm/scripts/bumbler-route.test.mjs
+      - name: Bumbler recipient configuration controls
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: node momm/scripts/bumbler-config.test.mjs
       - name: Bumbler frontend safety invariants
         if: ${{ !cancelled() }}
         timeout-minutes: 2
