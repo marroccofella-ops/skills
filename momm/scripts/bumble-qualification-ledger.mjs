@@ -14,8 +14,11 @@ function bindObservations(params,ledger,summary){
   const binding=qualificationBinding(params.identity);
   if(!Array.isArray(params.observations))throw Error('Qualification observations must be supplied.');
   return params.observations.map(input=>{
-    if(!input||![Object.prototype,null].includes(Object.getPrototypeOf(input))||!Reflect.ownKeys(input).every(key=>{const d=Object.getOwnPropertyDescriptor(input,key);return typeof key==='string'&&d.enumerable&&Object.hasOwn(d,'value');}))throw Error('Qualification observation must be plain owned data.');
-    const o={...input};
+    if(!input||![Object.prototype,null].includes(Object.getPrototypeOf(input)))throw Error('Qualification observation must be plain owned data.');
+    // One snapshot: nothing is read from input after validation.
+    const owned=Reflect.ownKeys(input).map(key=>[key,Object.getOwnPropertyDescriptor(input,key)]);
+    if(!owned.every(([key,d])=>typeof key==='string'&&d?.enumerable&&Object.hasOwn(d,'value')))throw Error('Qualification observation must be plain owned data.');
+    const o=Object.fromEntries(owned.map(([key,d])=>[key,d.value]));
     const a=summary.attempts.find(a=>a.attempt_id===o.attempt_id);
     if(!a||a.fixture_id!==o.fixture_id||a.binding!==binding||a.purpose!=='qualification'||a.fresh_evidence!==true||a.transmission_possible!==true||a.state!=='terminal'||a.outcome!=='success'||!Number.isSafeInteger(a.terminal_at)||o.observed_at<a.terminal_at||a.terminal_at>params.now)throw Error('Observation lacks its original completed fresh qualification attempt.');
     if((params.require_anchor&&!Object.hasOwn(o,'attempt_finished_at'))||(Object.hasOwn(o,'attempt_finished_at')&&o.attempt_finished_at!==a.terminal_at))throw Error('Qualification age is not anchored to its original attempt.');

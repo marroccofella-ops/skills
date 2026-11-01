@@ -22,6 +22,9 @@ try{
   assert.throws(()=>qualifyBumbleWithLedger(params,{ledger:{summary:()=>ledger.summary()},scope_binding:scope}));
   assert.throws(()=>qualifyBumbleWithLedger({...params,observations:[{...observations[0],get [Symbol('unchecked')](){return 1;}},observations[1]]},{ledger,scope_binding:scope}),/plain owned data/,'a symbol-keyed getter is not plain owned data');
   assert.throws(()=>qualifyBumbleWithLedger({...params,observations:[{...observations[0],[Symbol('unchecked')]:1},observations[1]]},{ledger,scope_binding:scope}),/plain owned data/,'a symbol-keyed value is not plain owned data');
+  {const hidden=Symbol('late');let enumerations=0,getterCalls=0;const proxied=new Proxy({...observations[0]},{ownKeys(target){enumerations++;return enumerations===1?Reflect.ownKeys(target):[...Reflect.ownKeys(target),hidden];},getOwnPropertyDescriptor(target,key){return key===hidden?{enumerable:true,configurable:true,get(){getterCalls++;return 1;}}:Reflect.getOwnPropertyDescriptor(target,key);}});
+   try{qualifyBumbleWithLedger({...params,observations:[proxied,observations[1]]},{ledger,scope_binding:scope});}catch{/* Only the single validated read matters here. */}
+   assert.equal(enumerations,1,'an observation is enumerated once');assert.equal(getterCalls,0,'a getter appearing after validation is never read');}
   assert.equal(qualificationStatusWithLedger(result,{ledger,scope_binding:scope,identity,policy,now:110}).reason,'expired');
   assert.equal(qualificationStatusWithLedger({...result,ledger_binding:{...result.ledger_binding,journal_sha256:H('wrong')}},{ledger,scope_binding:scope,identity,policy,now:11}).eligible,false);
   const restart=new BumbleFixtureLedger(options);
