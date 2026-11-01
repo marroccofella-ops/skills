@@ -2355,7 +2355,7 @@ function authEvidence(agent) {
 // Zero model calls: version probes plus auth evidence for every requested
 // route, so a user sees exactly which reviewers will join and what to run to
 // bring the missing ones online — before any tokens are spent.
-async function preflightCheck(reviewers, governor, bumblers = {}) {
+async function preflightCheck(reviewers, governor, bumblers = Object.create(null)) {
   const knownAdapters = new Set(["codex", "gemini", "claude", "antigravity", "copilot", "grok"]);
   return Promise.all([...new Set(reviewers)].map(async (agent) => {
     if (agent === governor) return { agent, role: "governor", ready: false, note: "self-excluded (governor never reviews its own work)" };
@@ -3478,8 +3478,10 @@ async function main() {
   if (options.selfTest) { await selfTest(options.pretty); return; }
   let reviewerSelection;
   // Saved Bumblers are read only when a run names a route that is not built in.
-  if (options.reviewers.some((route) => !BUILT_IN_ROUTES.has(route))) options.bumblers = loadBumblers();
-  try { reviewerSelection = applyReviewerSettings(options); }
+  try {
+    if (options.reviewers.some((route) => !BUILT_IN_ROUTES.has(route))) options.bumblers = loadBumblers();
+    reviewerSelection = applyReviewerSettings(options);
+  }
   catch(error) { process.stderr.write(`Reviewer settings refused: ${error.message}\n`); process.exitCode=4; return; }
   if (options.capabilitiesMatrix) {
     // The effective matrix for this machine: baseline plus still-valid overlay,
@@ -3703,7 +3705,8 @@ async function main() {
   // 1.17 B3 (--cover): after a piece's native reviews, each coverable failure with budget left gets
   // one cover by another requested route; votes follow the model-family rule in cover.mjs.
   const coversFor = (pieceId, natives, text, piece = null) => runPieceCovers({
-    enabled: options.cover === true, piece: pieceId, natives, requested: uniqueReviewers, governor: options.governor,
+    // A Bumbler neither covers a failed route nor is covered: it holds no quorum role.
+    enabled: options.cover === true, piece: pieceId, natives: natives.filter((row) => !options.bumblers?.[row.agent]), requested: uniqueReviewers.filter((route) => !options.bumblers?.[route]), governor: options.governor,
     roleOf: (agent) => personaFor(agent, options),
     invoke: (route, request) => scheduler.schedule(route, `${pieceId ?? "single"}:cover:${route}:${request.covering_for}`, () => reviewOne(route, text, pieceId, piece, request)),
   });

@@ -119,7 +119,14 @@ export class ReviewerRegistry {
       if(!fs.existsSync(file)){
         if(files.length>=MAX_EVENT_ARCHIVES||stored+bytes.length>MAX_AUDIT_BYTES)throw fault('storage_budget','Private settings history budget reached. Original files retained.');
         const writer=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(writer,bytes);fs.fsyncSync(writer);}finally{fs.closeSync(writer);}files.push(path.basename(file));stored+=bytes.length;
-      }else if(digest(fs.readFileSync(file))!==sha256)throw fault('invalid_store','An original settings-history archive changed.');
+      }else{
+        const existing=fs.readFileSync(file);
+        if(digest(existing)!==sha256){
+          // A strict prefix of these exact bytes is an interrupted write of this archive.
+          if(existing.length>=bytes.length||!bytes.subarray(0,existing.length).equals(existing))throw fault('invalid_store','An original settings-history archive changed.');
+          const writer=fs.openSync(file,'r+');try{fs.writeSync(writer,bytes,existing.length,bytes.length-existing.length,existing.length);fs.fsyncSync(writer);}finally{fs.closeSync(writer);}
+        }
+      }
       if(!state.event_archives.some(a=>a.sha256===sha256))state.event_archives.push({sha256,count:events.length,bytes:bytes.length});
     }
     checkState(state);

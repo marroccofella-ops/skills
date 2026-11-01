@@ -100,6 +100,14 @@ try {
   test('saved exclusions hold after presets, automatic routing and second look',selectionExclusionControls);
   test('unreadable saved settings refuse instead of dropping exclusions',selectionInspectionControls);
   test('one thousand saved profiles stay bounded and paged',()=>{registry.mutate(registry.read().revision,state=>{const p=state.profiles[0];for(let n=state.profiles.length;n<1000;n++)state.profiles.push({...p,id:`fixture-profile-${n}`,label:`Bee ${n}`});});assert.equal(registry.snapshot().profiles.length,25);assert.equal(registry.snapshot().counts.registered,1000);assert.throws(()=>command({op:'duplicate',id:bab}),/limit/);});
+  test('a partial history archive does not block later settings changes',()=>{
+   const home=path.join(fixture,'partial-archive'),store=new ReviewerRegistry({root:home});store.read();store.command({op:'save',revision:0,profile:{label:'A'}});
+   store.mutate(store.read().revision,state=>{state.events=Array.from({length:500},(_,n)=>({id:'e'+n,at:'2026-10-10T00:00:00.000Z',action:'x',profile_id:'p'}));});
+   const write=fs.writeFileSync;let hit=0;fs.writeFileSync=(target,data,...rest)=>{if(typeof target==='number'&&Buffer.isBuffer(data)&&data.subarray(0,60).includes('momm-reviewer-settings-events')&&!hit){hit=1;write(target,data.subarray(0,100));throw Object.assign(Error('Synthetic disk full'),{code:'ENOSPC'});}return write(target,data,...rest);};
+   try{assert.throws(()=>store.command({op:'exclude_cli',route:'grok',revision:store.read().revision}));}finally{fs.writeFileSync=write;}assert.equal(hit,1);
+   store.command({op:'exclude_cli',route:'grok',revision:store.read().revision});const archive=store.read().event_archives.at(-1),file=path.join(home,'events-'+archive.sha256+'.json');assert.equal(fs.statSync(file).size,archive.bytes,'the partial file is completed');
+   const bad=Buffer.alloc(40,97);fs.writeFileSync(file,bad);assert.throws(()=>store.mutate(store.read().revision,state=>{state.events=Array.from({length:501},(_,n)=>({id:'e'+n,at:'2026-10-10T00:00:00.000Z',action:'x',profile_id:'p'}));}),{code:'invalid_store'},'a changed archive still refuses');
+  });
   test('unsupported migration retains original bytes',()=>{const original=fs.readFileSync(registry.file);const data=JSON.parse(original);data.schema='unsupported/99';fs.writeFileSync(registry.file,JSON.stringify(data));const unsupported=fs.readFileSync(registry.file);assert.throws(()=>registry.read(),/Unsupported registry/);assert.deepEqual(fs.readFileSync(registry.file),unsupported);fs.writeFileSync(registry.file,original);});
   console.log(JSON.stringify({passed:true,checks:count,network_calls:0,live_fleet:false}));
 }finally{assert(path.resolve(fixture).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-registry-test-'));fs.rmSync(fixture,{recursive:true,force:true});}

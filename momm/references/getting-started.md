@@ -123,13 +123,13 @@ out of your project:
 
 The name is your choice, in lowercase, and cannot be a built-in reviewer.
 `base_url` is an OpenAI-compatible server ending in `/v1`, on a literal tailnet
-address or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
+address in 100.64.0.0/10 or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
 to 1024 and 180; an explicit `--timeout` wins. Then name it alongside your other
 reviewers:
 
 ```bash
-node scripts/multi-review.mjs --preflight --governor claude --reviewers bab
-node scripts/multi-review.mjs --governor claude --reviewers codex,antigravity,bab --min-success 2
+node momm/scripts/multi-review.mjs --preflight --governor claude --reviewers bab
+node momm/scripts/multi-review.mjs --governor claude --reviewers codex,antigravity,bab --min-success 2
 ```
 
 This route carries no login or API key, so review text goes to that address with

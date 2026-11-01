@@ -16,16 +16,16 @@ export function bumblerBase(value){
 }
 export function loadBumblers(env=process.env){
  const file=path.join(defaultRegistryHome(env),'bumblers.json');let text;
- try{text=fs.readFileSync(file,'utf8');}catch(error){if(error?.code==='ENOENT')return {};throw error;}
- const saved=JSON.parse(text.replace(/^﻿/,''));if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
- return Object.fromEntries(Object.entries(saved).map(([name,entry])=>{
+ try{text=fs.readFileSync(file,'utf8');}catch(error){if(error?.code==='ENOENT')return Object.create(null);throw error;}
+ let saved;try{saved=JSON.parse(text.replace(/^\uFEFF/,''));}catch{throw Error('bumblers.json is not valid JSON');}if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
+ return Object.assign(Object.create(null),Object.fromEntries(Object.entries(saved).map(([name,entry])=>{
   if(!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
   if(!entry||typeof entry!=='object'||Object.keys(entry).some(key=>!FIELDS.has(key)))throw problem(name,'unsupported fields');
   if(typeof entry.model!=='string'||!entry.model.trim()||entry.model.length>200)throw problem(name,'model is required');
   const maxTokens=entry.max_tokens??1024,seconds=entry.timeout_seconds??180;
-  if(!Number.isSafeInteger(maxTokens)||maxTokens<1||!Number.isSafeInteger(seconds)||seconds<1)throw problem(name,'max_tokens and timeout_seconds must be positive whole numbers');
-  try{return [name,{base_url:bumblerBase(entry.base_url),model:entry.model,max_tokens:maxTokens,timeout_ms:seconds*1000}];}catch(error){throw problem(name,error.message);}
- }));
+  if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>65536||!Number.isSafeInteger(seconds)||seconds<1||seconds>3600)throw problem(name,'max_tokens must be 1 to 65536 and timeout_seconds 1 to 3600');
+  try{return [name,{base_url:bumblerBase(entry.base_url),model:entry.model.trim(),max_tokens:maxTokens,timeout_ms:seconds*1000}];}catch(error){throw problem(name,error.message);}
+ })));
 }
 // Preflight says whether the model answers. Like every route, it is informational.
 export function bumblerReadiness(agent,bumbler,timeoutMs=5000){
