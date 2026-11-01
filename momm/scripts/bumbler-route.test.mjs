@@ -1,6 +1,7 @@
 // Real multi-review CLI against a local stand-in model server. No real model, credential or tailnet traffic.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {bumblerBase,loadBumblers} from './bumbler-route.mjs';
+import {inspectCompletion} from './governor.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
 const script=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
 const diff='diff --git a/sample.js b/sample.js\n--- a/sample.js\n+++ b/sample.js\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;\n';
@@ -30,10 +31,12 @@ try{
  answer=reply(JSON.stringify(review));
  const good=await run(['--reviewers','bab'],diff);assert.equal(row(good)?.status,'success',JSON.stringify(row(good)));assert.equal(row(good).verdict,'ACCEPT');
  assert.equal(seen.length,1);assert.equal(seen[0].body.model,'synthetic-open-model');assert.equal(seen[0].body.max_tokens,512);assert.equal(seen[0].headers.authorization,undefined,'this route carries no credential');assert.match(seen[0].body.messages[0].content,/const a = 2;/);
- const gate=await run(['--reviewers','bab','--min-success','1'],diff);assert.equal(row(gate)?.status,'success');assert.equal(gate.report.quorum.achieved,0,'a Bumbler finding is evidence, not a quorum vote');assert.equal(gate.code,3);
+ fs.writeFileSync(path.join(project,'change.diff'),diff);const gate=await run(['--reviewers','bab','--min-success','1','--input','change.diff'],'');assert.equal(row(gate)?.status,'success');assert.equal(gate.report.quorum.achieved,0,'a Bumbler finding is evidence, not a quorum vote');assert.equal(gate.code,3);assert.equal(row(gate).advisory,true);
+ process.env.MOMM_EVIDENCE_HOME=path.join(parent,'evidence');const recount=inspectCompletion(project,gate.report.run_id);delete process.env.MOMM_EVIDENCE_HOME;assert.equal(recount.quorum?.achieved,0,'the governor recount agrees');assert.equal(recount.quorum.met,false);
  answer=reply('This looks fine to me.');const prose=await run(['--reviewers','bab'],diff);assert.equal(row(prose)?.status,'invalid_output');
  answer=reply('{"verdict":',  'length');const cut=await run(['--reviewers','bab'],diff);assert.equal(row(cut)?.status,'error',JSON.stringify(row(cut)));
- answer=response=>{response.writeHead(503);response.end('busy');};const busy=await run(['--reviewers','bab'],diff);assert.notEqual(row(busy)?.status,'success');assert(row(busy),'a busy model is a status on the report');
+ answer=response=>{response.writeHead(503);response.end('busy');};const busy=await run(['--reviewers','bab'],diff);
+ answer=response=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(Buffer.alloc(5_000_000,32));};const huge=await run(['--reviewers','bab'],diff);assert.equal(row(huge)?.status,'error','an oversized reply is refused');assert.notEqual(row(busy)?.status,'success');assert(row(busy),'a busy model is a status on the report');
  await new Promise(resolve=>{server.closeAllConnections?.();server.close(resolve);});
  const off=await run(['--reviewers','bab'],diff);assert.notEqual(row(off)?.status,'success');assert(row(off),'a model server that is off is a status on the report');assert(off.report,'the review still reports');
  console.log(JSON.stringify({passed:true,network_calls:0,scope:'real multi-review CLI against a local stand-in model server'}));

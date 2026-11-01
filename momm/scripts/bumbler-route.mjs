@@ -22,7 +22,7 @@ export function loadBumblers(env=process.env){
   if(!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
   if(!entry||typeof entry!=='object'||Object.keys(entry).some(key=>!FIELDS.has(key)))throw problem(name,'unsupported fields');
   if(typeof entry.model!=='string'||!entry.model.trim()||entry.model.length>200)throw problem(name,'model is required');
-  const maxTokens=entry.max_tokens??2048,seconds=entry.timeout_seconds??600;
+  const maxTokens=entry.max_tokens??1024,seconds=entry.timeout_seconds??180;
   if(!Number.isSafeInteger(maxTokens)||maxTokens<1||!Number.isSafeInteger(seconds)||seconds<1)throw problem(name,'max_tokens and timeout_seconds must be positive whole numbers');
   try{return [name,{base_url:bumblerBase(entry.base_url),model:entry.model,max_tokens:maxTokens,timeout_ms:seconds*1000}];}catch(error){throw problem(name,error.message);}
  }));
@@ -30,8 +30,8 @@ export function loadBumblers(env=process.env){
 // Preflight says whether the model answers. Like every route, it is informational.
 export function bumblerReadiness(agent,bumbler,timeoutMs=5000){
  return new Promise(resolve=>{
-  const finish=(ready,note)=>resolve({agent,installed:true,version:null,ready,auth:'tailnet',modalities:['text'],...(note?{note}:{})});
-  const request=(bumbler.base_url.startsWith('https:')?https:http).get(`${bumbler.base_url}/models`,response=>{response.resume();finish(response.statusCode>=200&&response.statusCode<300,response.statusCode<300?null:`model server answered HTTP ${response.statusCode}`);});
-  request.setTimeout(timeoutMs,()=>request.destroy(Error('timeout')));request.on('error',()=>finish(false,'model server did not answer'));
+  let timer;const finish=(ready,note)=>{clearTimeout(timer);resolve({agent,installed:true,version:null,ready,auth:'none',modalities:['text'],...(note?{note}:{})});};
+  const request=(bumbler.base_url.startsWith('https:')?https:http).get(`${bumbler.base_url}/models`,response=>{response.resume();response.on('error',()=>{});finish(response.statusCode>=200&&response.statusCode<300,response.statusCode<300?null:`model server answered HTTP ${response.statusCode}`);request.destroy();});
+  timer=setTimeout(()=>request.destroy(Error('timeout')),timeoutMs);request.on('error',()=>finish(false,'model server did not answer'));
  });
 }

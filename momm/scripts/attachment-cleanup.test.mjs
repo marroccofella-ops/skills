@@ -1,4 +1,5 @@
 // Synthetic files only; no provider calls, personal media, or external network.
+import {BUILT_IN_ROUTES,loadBumblers} from './bumbler-route.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -158,7 +159,7 @@ try{
     const options={governor:'codex',reviewers:['codex'],timeoutMs:1000,maxBytes:1000,attach:[path.join(f.cwd,'synthetic.gif')]};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
-      applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
+      BUILT_IN_ROUTES,loadBumblers,applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       preparePrivateEvidence:()=>({verified:true}),resolveDispatchCapabilities:async()=>({capabilities:null,registry:null}),
       // 1.17 A7: the real resolver (default mode here: no MOMM_EVIDENCE_HOME in this stub process).
@@ -183,7 +184,7 @@ try{
     const fail=()=>{throw Error(`synthetic ${boundary} failure`);};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
-      applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
+      BUILT_IN_ROUTES,loadBumblers,applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       // This VM test targets staging ownership; native permission enforcement
       // is exercised independently by evidence-permissions-native.test.mjs.

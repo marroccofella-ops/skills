@@ -368,6 +368,9 @@ export function inspectCompletion(root, runId, options = {}) {
     const routes = new Set();
     for (const r of report.reviewers) { demand(!routes.has(r.agent), "duplicate reviewer route"); routes.add(r.agent); }
     const successful = report.reviewers.filter(r => r.agent !== report.governor && r.status === "success");
+    // A Bumbler's answer is reviewed like any other, but it is evidence and never a quorum vote.
+    const advisory = new Set(report.reviewers.filter(r => r.advisory === true).map(r => r.agent));
+    const voting = successful.filter(r => !advisory.has(r.agent));
     demand(successful.every(r => VERIFIED_CONTRACTS.has(r.review_contract) && Array.isArray(r.reviewed_scope) && r.reviewed_scope.length), "legacy/unverified reply contract; needs a fresh review");
     // 1.17 B3: covers are recounted here, never trusted. A cover must name a coverable failure of
     // another route on the same piece, stay inside the one attempt budget, and may add a quorum vote
@@ -431,7 +434,7 @@ export function inspectCompletion(root, runId, options = {}) {
       const perPiece = pieces.map(p => {
         const claimed = Object.entries(p.reviewers).filter(([agent, status]) => agent !== report.governor && status === "success").map(([agent]) => agent);
         for (const agent of claimed) if (!successful.some(r => r.agent === agent)) state.errors.push(`piece reviewer success has no successful verified row: ${p.id}: ${agent}`);
-        const ok = claimed.filter(agent => successful.some(r => r.agent === agent));
+        const ok = claimed.filter(agent => voting.some(r => r.agent === agent));
         const votes = coverVotesFor(p.id, ok);
         return { id: p.id, external_successes: ok.length + votes, met: ok.length + votes >= required, ok };
       });
@@ -451,13 +454,13 @@ export function inspectCompletion(root, runId, options = {}) {
       if (failing.length) state.errors.push(`external review quorum not met on piece(s): ${failing.join(", ")}`);
       if (report.quorum && (report.quorum.met !== state.quorum.met || (report.quorum.pieces ?? pieces.length) !== pieces.length)) state.errors.push("report quorum metadata contradicts the sealed piece structure");
       if (report.gate_policy?.strict && Array.isArray(requested)) {
-        for (const p of perPiece) for (const agent of requested) if (agent !== report.governor && !p.ok.includes(agent)) state.errors.push(`strict reviewer policy not met on ${p.id}: ${agent}`);
+        for (const p of perPiece) for (const agent of requested) if (agent !== report.governor && !advisory.has(agent) && !p.ok.includes(agent)) state.errors.push(`strict reviewer policy not met on ${p.id}: ${agent}`);
       }
     } else {
-      const votes = coverVotesFor(null, successful.map(r => r.agent));
-      state.quorum = { required, achieved: successful.length + votes, met: successful.length + votes >= required, ...(coverRows.length ? { cover_votes: votes } : {}) };
+      const votes = coverVotesFor(null, voting.map(r => r.agent));
+      state.quorum = { required, achieved: voting.length + votes, met: voting.length + votes >= required, ...(coverRows.length ? { cover_votes: votes } : {}) };
       if (!state.quorum.met) state.errors.push("external review quorum not met");
-      if (report.gate_policy?.strict && Array.isArray(requested) && requested.some(agent => agent !== report.governor && !successful.some(r => r.agent === agent))) {
+      if (report.gate_policy?.strict && Array.isArray(requested) && requested.some(agent => agent !== report.governor && !advisory.has(agent) && !voting.some(r => r.agent === agent))) {
         state.errors.push("strict reviewer policy not met");
       }
     }

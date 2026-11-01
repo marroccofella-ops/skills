@@ -1835,7 +1835,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
 
     setupComplete = true;
     // options.runProcess is a test seam only (argv binding is proven with a fake).
-    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: options.bumblers?.[agent]?.timeout_ms ?? agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
+    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: options.timeoutExplicit !== true && options.bumblers?.[agent] ? options.bumblers[agent].timeout_ms : agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
       onProgress: options.onProgress ? progress => options.onProgress(agent, progress) : null });
   } catch {
     // Unexpected filesystem/launcher exceptions are terminal route failures.
@@ -3833,6 +3833,7 @@ async function main() {
     reviewers: results.map((result) => ({
       agent: result.agent,
       status: result.status,
+      ...(options.bumblers?.[result.agent] ? { advisory: true } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
       ...(result.status === "authentication_required" ? { login_hint: LOGIN_HINTS[result.agent] ?? null } : {}),
