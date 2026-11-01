@@ -6,8 +6,9 @@ pool, a lower-powered open model the owner runs. Its route is
 and takes the same prompt, containment, validation, evidence and statuses as a
 CLI reviewer. It carries no credential, so saved addresses are limited to the
 tailnet range and loopback; an address is not application authentication, and
-review text goes to that address. Answers are advisory and count towards no
-quorum, but what they raise reaches the governor even when their quotes fail,
+review text goes to that address. A saved Bumbler joins default runs and a valid
+review counts towards quorum like any other. What it raises reaches the governor
+even when its quotes fail,
 marked `quotes_unverified`. Settings live in `bumblers.json` in the reviewer home and
 are managed in the Setup Center under Bumblers in the review pool; the Bumbler Bees
 cards are separate OAuth drafts.

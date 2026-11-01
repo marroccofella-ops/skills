@@ -3480,9 +3480,13 @@ async function main() {
   }
   if (options.selfTest) { await selfTest(options.pretty); return; }
   let reviewerSelection;
-  // Saved Bumblers are read only when a run names a route that is not built in.
+  // Saved Bumblers join a default run. A broken file stops a run only when it names a Bumbler.
   try {
     if (options.reviewers.some((route) => !BUILT_IN_ROUTES.has(route))) options.bumblers = loadBumblers();
+    else if (!options.reviewersExplicit && !options.selfTest) {
+      try { options.bumblers = loadBumblers(); }
+      catch (error) { process.stderr.write(`momm: saved Bumblers were not added: ${error.message}\n`); }
+    }
     reviewerSelection = applyReviewerSettings(options);
   }
   catch(error) { process.stderr.write(`Reviewer settings refused: ${error.message}\n`); process.exitCode=4; return; }
@@ -3581,6 +3585,8 @@ async function main() {
       options.reviewersAuto = { selected: auto.routes, per_modality: auto.perModality };
     }
   }
+  // A saved Bumbler is a reviewer in the pool unless the run names its reviewers.
+  if (!options.reviewersExplicit && options.bumblers) options.reviewers = [...options.reviewers, ...Object.keys(options.bumblers)];
   assertReviewerSelection(options, reviewerSelection);
   const uniqueReviewers = [...new Set(options.reviewers)];
   // 1.17 B1: every role brief loads from momm/roles before anything is dispatched; a missing or
@@ -3722,7 +3728,7 @@ async function main() {
         const pieceRuns = await Promise.all(uniqueReviewers.map((agent) => scheduler.schedule(agent, `${piece.id}:${agent}`, () => reviewOne(agent, piece.text, piece.id, piece))));
         const covers = await coversFor(piece.id, pieceRuns, piece.text, piece);
         const coverVotes = covers.filter((c) => c.counted_for_quorum).length;
-        const external = pieceRuns.filter((r) => r.agent !== options.governor && !options.bumblers?.[r.agent] && r.status === "success").length + coverVotes;
+        const external = pieceRuns.filter((r) => r.agent !== options.governor && r.status === "success").length + coverVotes;
         const met = external >= (options.minSuccess ?? 1);
         emitEvent(options.stream, { event: "piece.completed", piece: piece.id, external_successes: external, quorum_met: met, ...(covers.length ? { cover_votes: coverVotes, roles_covered: pieceCoverSummary(covers) } : {}) });
         return { id: piece.id, files: piece.files, bytes: piece.bytes, results: pieceRuns, covers, cover_votes: coverVotes, external_successes: external, quorum_met: met, ...(piece.lineSplit ? { line_split: { path: piece.lineSplit.path, hunk: piece.lineSplit.originalHeader.replace(/\r?\n$/, ""), part: piece.lineSplit.part, parts: piece.lineSplit.parts } } : {}), ...(piece.overCeiling ? { over_ceiling: true } : {}) };
@@ -3741,7 +3747,7 @@ async function main() {
   }
   const preflightEntries = await preflightPromise;
   const pieceQuorum = pieceResults ? splitQuorum(pieceResults, options.minSuccess ?? 1) : null;
-  const externalSuccesses = pieceQuorum ? pieceQuorum.external_successes : results.filter((result) => result.agent !== options.governor && !options.bumblers?.[result.agent] && result.status === "success").length + coverResults.filter((c) => c.counted_for_quorum).length;
+  const externalSuccesses = pieceQuorum ? pieceQuorum.external_successes : results.filter((result) => result.agent !== options.governor && result.status === "success").length + coverResults.filter((c) => c.counted_for_quorum).length;
   // Cover rows are labelled, kept out of reviewers[] (one row per route) and never presented as native.
   const coverRows = coverResults.map((c) => coverReportRow(c, { roleBrief: c.role ? roleBrief(roleBriefs[c.role]) : null }));
   for (const row of coverRows) {
@@ -3843,7 +3849,7 @@ async function main() {
       agent: result.agent,
       status: result.status,
       ...(result.unverified_answer ? { unverified_answer: result.unverified_answer } : {}),
-      ...(options.bumblers?.[result.agent] ? { advisory: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
+      ...(options.bumblers?.[result.agent] ? { bumbler: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
       ...(result.status === "authentication_required" ? { login_hint: LOGIN_HINTS[result.agent] ?? null } : {}),

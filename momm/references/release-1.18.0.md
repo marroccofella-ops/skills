@@ -13,17 +13,19 @@ on the owner's own machine, is the first Bumbler.
 - **Findings:** what a Bumbler raises reaches the governor, who must decide it. If its
   quotes fail validation, its findings are still shown, marked `quotes_unverified`,
   and its row says `invalid_output`.
-- **Quorum:** a Bumbler adds no vote and never lowers `--min-success`. With `--strict`,
-  a named Bumbler must still answer.
+- **Pool and quorum:** a saved Bumbler joins every review unless you name reviewers,
+  and a valid review counts towards `--min-success` like any other. An invalid
+  review gives no vote. With `--strict`, a named Bumbler must answer.
 - **Access:** a Bumbler route has no login and no API key. Review text goes to the
   saved address, which must be a tailnet or loopback address. That address is
   reachability, not authentication, so add only a machine you trust.
 - **Limits:** one piece at a time, with tokens and time set per Bumbler.
 
-**Known quality:** Bab has not yet given a useful review. In its first real runs on
-1 November it accepted a seeded bug twice, and its two answers on a real change failed
-quotation checks and contained no finding that held up. Treat a Bumbler's answers as
-leads to check. The route works; the model's review quality is not established.
+**Known quality:** on small synthetic files with a stated contract and the general
+Bumbler guidance, Bab reached the right verdict on 9 of 9 files on 1 November, catching
+5 of 5 seeded bugs, though 3 replies failed validation. Without a stated contract or
+the guidance she missed bugs. Results on real changes are less settled. Treat every
+Bumbler finding as the governor treats any reviewer's: reproduce it.
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.

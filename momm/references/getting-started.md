@@ -143,7 +143,10 @@ nothing else protecting it. A tailnet address is reachability, not authenticatio
 choose the machine yourself and decide what may be sent to it. Preflight only
 shows whether the server answers. A Bumbler takes one piece at a time. A slow or
 stopped model shows as a status on the report. Its answers are evidence for the
-governor and count towards no quorum, so adding one never lowers `--min-success`.
+governor. A saved Bumbler joins every review unless you name reviewers with
+`--reviewers`, and a valid review counts towards `--min-success` like any other. A
+large split review waits on the Bumbler for each piece, so name your reviewers when
+you want a faster run.
 If its quotes fail validation, its findings still reach the governor, marked
 `quotes_unverified`, and its row shows `invalid_output`. With `--strict`, a named
 Bumbler must still answer. The Bumbler Bees cards are separate OAuth drafts.
