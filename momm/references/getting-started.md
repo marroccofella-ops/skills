@@ -127,7 +127,9 @@ before content is loaded. Reading these settings never repairs permissions.
 {"bab":{"base_url":"http://100.64.0.1:8080/v1","model":"your-model-id","max_tokens":1024,"timeout_seconds":180}}
 ```
 
-The name is your choice, in lowercase, and cannot be a built-in reviewer.
+Add an optional `guidance` field, up to 4000 characters, to give one Bumbler its own
+reviewing style on top of MOMM's general guidance. The name is your choice, in
+lowercase, and cannot be a built-in reviewer.
 `base_url` is an OpenAI-compatible server ending in `/v1`, on a literal tailnet
 address in 100.64.0.0/10 or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
 to 1024 and 180; an explicit `--timeout` wins. Then name it alongside your other
