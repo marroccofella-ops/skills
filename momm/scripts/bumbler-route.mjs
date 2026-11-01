@@ -85,8 +85,8 @@ export function bumblerAnswer(text){
  const raw=String(text??'');if(raw.length>1_000_000)return null;
  // The last few object starts, newest first, so preamble braces cost nothing.
  const end=raw.lastIndexOf('}')+1;let tries=0;
- for(let at=raw.lastIndexOf('{',end);at>=0&&tries<64;at=at?raw.lastIndexOf('{',at-1):-1){
-  if(!/^\{\s*"/.test(raw.slice(at,at+40)))continue;tries++;
+ for(let at=raw.lastIndexOf('{',end);at>=0&&tries<256;at=at?raw.lastIndexOf('{',at-1):-1){
+  if(!/^\{\s*"/.test(raw.slice(at,at+400)))continue;tries++;
   let value;try{value=JSON.parse(raw.slice(at,end));}catch{continue;}
   if(!value||typeof value!=='object'||!('verdict' in value||'findings' in value))continue;
   const clip=(item,max=600)=>typeof item==='string'?item.slice(0,max):null;

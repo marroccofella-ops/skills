@@ -88,7 +88,7 @@
   }
   const showBumblers=list=>{$('bump-list').innerHTML=list.map(b=>`<p>${esc(b.name)} · ${esc(b.model)} · ${esc(b.base_url)} · ${esc(b.max_tokens)} tokens · ${esc(b.timeout_seconds)} s <button data-bump="${esc(b.name)}" class="button secondary" type="button">Remove</button></p>`).join('')||'<p>No Bumblers saved.</p>';};
   let bumblerRequest=0;
-  const bumblerStep=async(step,done='')=>{const mine=++bumblerRequest;try{const list=await step();if(mine===bumblerRequest){showBumblers(list);$('bump-status').textContent=done;}return true;}catch(error){if(mine===bumblerRequest)$('bump-status').textContent=error.message;return false;}};
+  const bumblerStep=async(step,done='')=>{const mine=++bumblerRequest;try{const list=await step();if(mine!==bumblerRequest)return false;showBumblers(list);$('bump-status').textContent=done;return true;}catch(error){if(mine===bumblerRequest)$('bump-status').textContent=error.message;return false;}};
   $('bump-panel').ontoggle=()=>{if($('bump-panel').open)bumblerStep(()=>bumblerApi());};
   $('bump-form').onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,f=form.elements;if(await bumblerStep(()=>bumblerApi({op:'save',name:f.name.value.trim(),entry:{base_url:f.base_url.value.trim(),model:f.model.value,max_tokens:Number(f.max_tokens.value),timeout_seconds:Number(f.timeout_seconds.value)}}),'Saved.'))form.reset();};
   $('bump-list').onclick=async event=>{const name=event.target?.dataset?.bump;if(!name||!await confirmChange(`Remove Bumbler ${name} from the review pool?`))return;await bumblerStep(()=>bumblerApi({op:'remove',name}),'Removed.');};

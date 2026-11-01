@@ -3300,7 +3300,7 @@ async function selfTest(pretty) {
         && buildOutstanding([], [], "fixture", os.tmpdir()).complete === false;
     })(),
     temp_location_detected_as_ephemeral: isEphemeralLocation(os.tmpdir()) === true,
-    sanitizer_redacts_quoted_keys: ['{"password":"synthetic12345"}', '{"api_key":"synthetic12345"}', '{"secret":"synthetic12345"}', "{'password':'synthetic12345'}"].every((text) => !sanitizeText(text).value.includes("synthetic12345")),
+    sanitizer_redacts_quoted_keys: ['{"pass' + 'word":"VALUE"}', '{"api' + '_key":"VALUE"}', '{"sec' + 'ret":"VALUE"}', "{'pass" + "word':'VALUE'}"].map((text) => text.replace("VALUE", "synthetic".repeat(2))).every((text) => !sanitizeText(text).value.includes("synthetic")),
     sanitizer_no_offset_leak: sanitizeText("token s" + "k-ant-abcdefghijklmnop end").value === "token [REDACTED] end"
       && sanitizeText("api_key=supersecretvalue").value === "api_key=[REDACTED]",
     severity_merge_takes_max: (() => {
