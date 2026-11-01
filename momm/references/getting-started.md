@@ -110,6 +110,37 @@ With no `--input`, MOMM reviews `git diff HEAD`. It sends the sanitized diff to 
 
 The governor then reproduces plausible findings, authors any fixes itself, runs local checks, and records an explicit disposition for every improvement suggestion. Reviewer consensus prioritizes investigation; it is never permission to edit.
 
+## Add a Bumbler reviewer
+
+A Bumbler is a lower-powered open model you run yourself, added to the pool as
+one more reviewer. Save it in `bumblers.json` in your reviewer home, which is
+`~/.momm-reviewers` unless `MOMM_REVIEWER_HOME` says otherwise. Keep this file
+out of your project:
+
+```json
+{"bab":{"base_url":"http://100.64.0.1:8080/v1","model":"your-model-id","max_tokens":1024,"timeout_seconds":180}}
+```
+
+The name is your choice, in lowercase, and cannot be a built-in reviewer.
+`base_url` is an OpenAI-compatible server ending in `/v1`, on a literal tailnet
+address or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
+to 1024 and 180; an explicit `--timeout` wins. Then name it alongside your other
+reviewers:
+
+```bash
+node scripts/multi-review.mjs --preflight --governor claude --reviewers bab
+node scripts/multi-review.mjs --governor claude --reviewers codex,antigravity,bab --min-success 2
+```
+
+This route carries no login or API key, so review text goes to that address with
+nothing else protecting it. A tailnet address is reachability, not authentication:
+choose the machine yourself and decide what may be sent to it. Preflight only
+shows whether the server answers. A Bumbler takes one piece at a time. A slow or
+stopped model shows as a status on the report. Its answers are evidence for the
+governor and count towards no quorum, so adding one never lowers `--min-success`.
+With `--strict`, a named Bumbler must still answer. The Setup Center's Bumbler
+Bees panel keeps separate drafts and does not manage this file.
+
 ## A low-stress team rollout
 
 1. Pin a reviewed MOMM version or repository commit.
