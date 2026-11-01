@@ -1,6 +1,6 @@
 // Real multi-review CLI against a local stand-in model server. No real model, credential or tailnet traffic.
 import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn} from 'node:child_process';import {fileURLToPath} from 'node:url';
-import {bumblerBase,loadBumblers} from './bumbler-route.mjs';
+import {bumblerBase,listBumblers,loadBumblers,removeBumbler,saveBumbler} from './bumbler-route.mjs';
 import {inspectCompletion} from './governor.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
 const script=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
@@ -11,6 +11,7 @@ for(const bad of ['http://8.8.8.8:8080/v1','http://example.com/v1','http://100.1
 const parent=fs.mkdtempSync(path.join(os.tmpdir(),'momm-bumbler-test-'));
 const home=path.join(parent,'reviewers'),project=path.join(parent,'project');fs.mkdirSync(home);fs.mkdirSync(project);
 const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringify(value));
+{const env={MOMM_REVIEWER_HOME:path.join(parent,'managed')};assert.deepEqual(listBumblers(env),[]);assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:' m ',max_tokens:4096,timeout_seconds:300},env)[0].model,'m');assert.equal(loadBumblers(env).bab.timeout_ms,300000,'what the dashboard saves is what a run reads');assert.throws(()=>saveBumbler('bee',{base_url:'http://8.8.8.8/v1',model:'m'},env),/Bumbler bee/);assert.throws(()=>saveBumbler('codex',{base_url:'http://100.64.0.1/v1',model:'m'},env),/reserved/);assert.throws(()=>removeBumbler('bee',env),/not saved/);assert.deepEqual(removeBumbler('bab',env),[]);}
 assert.equal(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:home})).length,0,'no saved Bumblers is not an error');assert.equal(loadBumblers({MOMM_REVIEWER_HOME:home}).constructor,undefined,'inherited names are not saved routes');
 for(const bad of [{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',timeout_seconds:3601}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',max_tokens:70000}},{codex:{base_url:'http://127.0.0.1:9/v1',model:'m'}},{bab:{base_url:'http://8.8.8.8/v1',model:'m'}},{bab:{base_url:'http://127.0.0.1:9/v1'}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',api_key:'x'}}]){save(bad);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/Bumbler /);}
 fs.writeFileSync(path.join(home,'bumblers.json'),'{not json');assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/bumblers\.json/);

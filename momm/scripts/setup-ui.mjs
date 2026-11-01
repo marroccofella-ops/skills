@@ -14,6 +14,7 @@ import { runProbes, recordProbe, windowsLauncher, runModalityProbes, generativeC
 import { rollupUsage } from "./usage.mjs";
 import { evidenceDir } from "./evidence-location.mjs";
 import {ReviewerRegistry} from './reviewer-registry.mjs';
+import {listBumblers,removeBumbler,saveBumbler} from './bumbler-route.mjs';
 
 // Windows: a bare command name (git.exe, powershell.exe, cmd.exe, a CLI version
 // probe) is looked up in the WORKING DIRECTORY before PATH, by cmd.exe and by
@@ -1641,6 +1642,21 @@ function createServer() {
     try {
       if (request.method === "GET" && Object.hasOwn(STATIC_ASSETS, requestUrl.pathname)) return serveAsset(response, ...STATIC_ASSETS[requestUrl.pathname]);
       if (requestUrl.pathname.startsWith("/api/") && !authorized(request)) return sendJson(response, 403, { error: "Use the private Setup Center launch link from your terminal.", reason:'private_session' });
+      if (requestUrl.pathname === '/api/bumblers') {
+        try {
+          if (request.method === 'GET') return sendJson(response,200,{bumblers:listBumblers()});
+          if (request.method === 'POST') {
+            if (!request.headers.origin || request.headers.origin !== `http://${request.headers.host}`) return sendJson(response,403,{error:'Use the same local dashboard origin.'});
+            const body=await readBody(request,4096);
+            if (body.op === 'save') return sendJson(response,200,{bumblers:saveBumbler(body.name,body.entry)});
+            if (body.op === 'remove') return sendJson(response,200,{bumblers:removeBumbler(body.name)});
+            return sendJson(response,400,{error:'Unsupported Bumbler operation.'});
+          }
+          return sendJson(response,405,{error:'Unsupported method.'});
+        } catch (error) {
+          return sendJson(response,400,{error:/^(Bumbler |bumblers\.json )/.test(error.message)?error.message:'Bumbler settings could not be read or saved.'});
+        }
+      }
       if (requestUrl.pathname === '/api/reviewers') {
         try {
           if (request.method === 'GET') {

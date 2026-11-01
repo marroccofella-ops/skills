@@ -7,8 +7,10 @@ and takes the same prompt, containment, validation, evidence and statuses as a
 CLI reviewer. It carries no credential, so saved addresses are limited to the
 tailnet range and loopback; an address is not application authentication, and
 review text goes to that address. Answers are advisory and count towards no
-quorum. Settings live in `bumblers.json` in the reviewer home; the dashboard's
-Bumbler Bees panel manages separate OAuth drafts and does not manage this route.
+quorum, but what they raise reaches the governor even when their quotes fail,
+marked `quotes_unverified`. Settings live in `bumblers.json` in the reviewer home and
+are managed in the Setup Center under Bumblers in the review pool; the Bumbler Bees
+cards are separate OAuth drafts.
 The signed OAuth pilot, native gate, holds, witness and physical-release work is
 not used by this route and is no longer a gate for a Bumbler reviewing. Older
 entries below describing those as release gates are history. The default native

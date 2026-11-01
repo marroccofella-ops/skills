@@ -14,19 +14,33 @@ export function bumblerBase(value){
  if(!tailnetAddress(url.hostname))throw Error('base_url must be a literal tailnet address, because this route has no credential');
  return url.toString().replace(/\/$/,'');
 }
-export function loadBumblers(env=process.env){
- const file=path.join(defaultRegistryHome(env),'bumblers.json');let text;
- try{text=fs.readFileSync(file,'utf8');}catch(error){if(error?.code==='ENOENT')return Object.create(null);throw error;}
- let saved;try{saved=JSON.parse(text.replace(/^\uFEFF/,''));}catch{throw Error('bumblers.json is not valid JSON');}if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
- return Object.assign(Object.create(null),Object.fromEntries(Object.entries(saved).map(([name,entry])=>{
-  if(!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
-  if(!entry||typeof entry!=='object'||Object.keys(entry).some(key=>!FIELDS.has(key)))throw problem(name,'unsupported fields');
-  if(typeof entry.model!=='string'||!entry.model.trim()||entry.model.length>200)throw problem(name,'model is required');
-  const maxTokens=entry.max_tokens??1024,seconds=entry.timeout_seconds??180;
-  if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>65536||!Number.isSafeInteger(seconds)||seconds<1||seconds>3600)throw problem(name,'max_tokens must be 1 to 65536 and timeout_seconds 1 to 3600');
-  try{return [name,{base_url:bumblerBase(entry.base_url),model:entry.model.trim(),max_tokens:maxTokens,timeout_ms:seconds*1000}];}catch(error){throw problem(name,error.message);}
- })));
+function checked(name,entry){
+ if(!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
+ if(!entry||typeof entry!=='object'||Array.isArray(entry)||Object.keys(entry).some(key=>!FIELDS.has(key)))throw problem(name,'unsupported fields');
+ if(typeof entry.model!=='string'||!entry.model.trim()||entry.model.length>200)throw problem(name,'model is required');
+ const maxTokens=entry.max_tokens??1024,seconds=entry.timeout_seconds??180;
+ if(!Number.isSafeInteger(maxTokens)||maxTokens<1||maxTokens>65536||!Number.isSafeInteger(seconds)||seconds<1||seconds>3600)throw problem(name,'max_tokens must be 1 to 65536 and timeout_seconds 1 to 3600');
+ try{return {base_url:bumblerBase(entry.base_url),model:entry.model.trim(),max_tokens:maxTokens,timeout_seconds:seconds};}catch(error){throw problem(name,error.message);}
 }
+function savedFile(env){return path.join(defaultRegistryHome(env),'bumblers.json');}
+function readSaved(env){
+ let text;try{text=fs.readFileSync(savedFile(env),'utf8');}catch(error){if(error?.code==='ENOENT')return {};throw error;}
+ let saved;try{saved=JSON.parse(text.replace(/^\uFEFF/,''));}catch{throw Error('bumblers.json is not valid JSON');}
+ if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
+ return Object.fromEntries(Object.entries(saved).map(([name,entry])=>[name,checked(name,entry)]));
+}
+function writeSaved(saved,env){
+ const file=savedFile(env),temporary=`${file}.${process.pid}.tmp`;fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});
+ fs.writeFileSync(temporary,JSON.stringify(saved,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);
+}
+export function loadBumblers(env=process.env){
+ const saved=readSaved(env),routes=Object.create(null);
+ for(const [name,entry] of Object.entries(saved))routes[name]={base_url:entry.base_url,model:entry.model,max_tokens:entry.max_tokens,timeout_ms:entry.timeout_seconds*1000};
+ return routes;
+}
+export function listBumblers(env=process.env){return Object.entries(readSaved(env)).map(([name,entry])=>({name,...entry}));}
+export function saveBumbler(name,entry,env=process.env){const saved=readSaved(env);saved[name]=checked(name,entry);writeSaved(saved,env);return listBumblers(env);}
+export function removeBumbler(name,env=process.env){const saved=readSaved(env);if(!Object.hasOwn(saved,name))throw problem(name,'not saved');delete saved[name];writeSaved(saved,env);return listBumblers(env);}
 // A reply that fails the quotation contract still goes to the governor: its findings join the
 // report marked quotes_unverified, and it counts as no successful review and no vote.
 // Models often think aloud before the JSON.

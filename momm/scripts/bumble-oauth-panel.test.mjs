@@ -55,6 +55,20 @@ async function sameSessionFailure(mode){
   if(mode==='malformed'){await node('bee-refresh').onclick();assert.equal(node('bee-write-ack').disabled,true,'an unusable refreshed view must not enable acknowledgement');assert.match(node('bee-status').textContent,/Settings response is invalid/);node('bee-write-ack').onclick();assert.equal(node('bee-write-warning').hidden,false);healed=true;}
   await node('bee-refresh').onclick();assert.equal(node('bee-write-ack').disabled,false);node('bee-write-ack').onclick();assert.equal(node('bee-write-warning').hidden,true);assert.equal(posts,1);
 }
-const cases={lost:()=>sessionDuringSave(null),rotated:()=>sessionDuringSave('synthetic-replacement'),transport:()=>sameSessionFailure('transport'),refresh:()=>sameSessionFailure('refresh'),refusal:()=>sameSessionFailure('refusal'),malformed:()=>sameSessionFailure('malformed'),serverText:()=>sameSessionFailure('server-text'),serverJson:()=>sameSessionFailure('server-json')};
+async function reviewPool(){
+  const nodes=new Map();let publish;const calls=[];let saved=[{name:'bab',model:'m',base_url:'http://100.64.0.1:1/v1',max_tokens:1024,timeout_seconds:180}];
+  const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',value:'',disabled:false,open:false,setAttribute(){},addEventListener(){},querySelector(){return node('submit');},showModal(){this.open=true;},close(){this.open=false;}});return nodes.get(id);};
+  const values={label:'Synthetic reviewer',kind:'bumbler',auth_mode:'oauth',connector_id:'',base_url:'',model_id:'',route:'codex',task_type:'source-check',pod_id:'',certificate:''};
+  const form=node('bee-form');form.elements=Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{value,innerHTML:''}]));form.reset=()=>{};
+  const snapshot={revision:1,total:0,profiles:[],connectors:[],baseline_excluded:[],counts:{registered:0,enabled:0,active_jobs:0}};
+  const fetch=async(url,options)=>{if(!String(url).startsWith('/api/bumblers'))return{ok:true,json:async()=>snapshot};calls.push(options.method==='POST'?JSON.parse(options.body):'GET');if(options.method==='POST'&&JSON.parse(options.body).name==='bad')return{ok:false,status:400,json:async()=>({error:'Bumbler bad: invalid or reserved name'})};if(options.method==='POST')saved=[];return{ok:true,json:async()=>({bumblers:saved})};};
+  vm.runInNewContext(source,{document:{querySelector:()=>node('root'),getElementById:node,createElement:()=>node('dialog-'+nodes.size),body:{append(){}}},window:{mommSetupSession:{subscribe:fn=>{publish=fn;}}},fetch,Promise,JSON,encodeURIComponent,Number});
+  publish('synthetic-session');await flush();assert.equal(calls.length,0,'closed panel makes no request');
+  node('bump-panel').open=true;node('bump-panel').ontoggle();await flush();assert.match(node('bump-list').innerHTML,/bab/);assert.match(node('bump-list').innerHTML,/data-bump="bab"/);
+  const f={name:{value:'bad'},base_url:{value:'x'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};let resets=0;
+  await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});assert.match(node('bump-status').textContent,/invalid or reserved/);assert.equal(resets,0,'a refused save keeps what was typed');
+  f.name.value='good';await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});assert.equal(node('bump-status').textContent,'Saved.');assert.equal(resets,1);assert.match(node('bump-list').innerHTML,/No Bumblers saved/);
+}
+const cases={pool:reviewPool,lost:()=>sessionDuringSave(null),rotated:()=>sessionDuringSave('synthetic-replacement'),transport:()=>sameSessionFailure('transport'),refresh:()=>sameSessionFailure('refresh'),refusal:()=>sameSessionFailure('refusal'),malformed:()=>sameSessionFailure('malformed'),serverText:()=>sameSessionFailure('server-text'),serverJson:()=>sameSessionFailure('server-json')};
 const selected=process.argv[2];if(selected){assert(cases[selected]);await cases[selected]();}else for(const run of Object.values(cases))await run();
 console.log(JSON.stringify({passed:true,network_calls:0,credentials_read:false,scope:'actual initializer generates an OAuth-only editor without credential input or implicit login; not a browser auth test'}));

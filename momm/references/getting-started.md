@@ -113,7 +113,8 @@ The governor then reproduces plausible findings, authors any fixes itself, runs 
 ## Add a Bumbler reviewer
 
 A Bumbler is a lower-powered open model you run yourself, added to the pool as
-one more reviewer. Save it in `bumblers.json` in your reviewer home, which is
+one more reviewer. Add it in the Setup Center under Bumblers in the review pool,
+which saves `bumblers.json`, or edit that file in your reviewer home, which is
 `~/.momm-reviewers` unless `MOMM_REVIEWER_HOME` says otherwise. Keep this file
 out of your project:
 
@@ -138,8 +139,9 @@ choose the machine yourself and decide what may be sent to it. Preflight only
 shows whether the server answers. A Bumbler takes one piece at a time. A slow or
 stopped model shows as a status on the report. Its answers are evidence for the
 governor and count towards no quorum, so adding one never lowers `--min-success`.
-With `--strict`, a named Bumbler must still answer. The Setup Center's Bumbler
-Bees panel keeps separate drafts and does not manage this file.
+If its quotes fail validation, its findings still reach the governor, marked
+`quotes_unverified`, and its row shows `invalid_output`. With `--strict`, a named
+Bumbler must still answer. The Bumbler Bees cards are separate OAuth drafts.
 
 ## A low-stress team rollout
 

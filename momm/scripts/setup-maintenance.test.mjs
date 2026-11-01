@@ -590,6 +590,16 @@ await test('an empty reviewer page parameter means absent, never zero',async()=>
   for(const query of ['?limit=&offset=','?limit=7&offset=2','?limit=-1&offset=x','?limit=0'])assert.equal((await serve({...request,url:'/api/reviewers'+query},{})).status,200);
   assert.deepEqual(seen,[[25,0],[7,2],[25,0],[0,0]]);
 });
+await test('review Bumblers need the private session and same origin, and hide internal errors',async()=>{
+  const saved=[];const stubs={listBumblers:()=>[{name:'bab'}],saveBumbler:(name,entry)=>{saved.push([name,entry]);return [];},removeBumbler:()=>{throw Error('EACCES C:/private/path');}};
+  const request={url:'/api/bumblers',socket:{},headers:{host:'127.0.0.1:1',origin:'http://127.0.0.1:1'}};const serve=body=>handler(body,true,stubs).serve;
+  assert.equal((await handler({},false,stubs).serve({...request,method:'GET'},{})).status,403);
+  const listed=await serve({})({...request,method:'GET'},{});assert.equal(listed.status,200);assert.equal(listed.value.bumblers[0].name,'bab');
+  assert.equal((await serve({op:'save',name:'bab',entry:{}})({...request,method:'POST',headers:{...request.headers,origin:'http://evil.test'}},{})).status,403);assert.equal(saved.length,0);
+  assert.equal((await serve({op:'save',name:'bab',entry:{}})({...request,method:'POST'},{})).status,200);assert.equal(saved.length,1);
+  assert.equal((await serve({op:'other'})({...request,method:'POST'},{})).status,400);assert.equal((await serve({})({...request,method:'DELETE'},{})).status,405);
+  const hidden=await serve({op:'remove',name:'bab'})({...request,method:'POST'},{});assert.equal(hidden.status,400);assert.doesNotMatch(hidden.value.error,/private/);
+});
 await test('reviewer settings enforce session, same origin, methods and structured store errors',async()=>{
   let writes=0;const store={snapshot:()=>({revision:0,profiles:[]}),command:()=>{writes++;return {revision:1};}};
   const serve=handler({},true,{reviewerRegistryStore:()=>store}).serve;
