@@ -368,7 +368,8 @@ export function inspectCompletion(root, runId, options = {}) {
     const routes = new Set();
     for (const r of report.reviewers) { demand(!routes.has(r.agent), "duplicate reviewer route"); routes.add(r.agent); }
     const successful = report.reviewers.filter(r => r.agent !== report.governor && r.status === "success");
-    const voting = successful;
+    // Development reports marked advisory carried no vote; current Bumbler rows do.
+    const voting = successful.filter(r => r.advisory !== true);
     demand(successful.every(r => VERIFIED_CONTRACTS.has(r.review_contract) && Array.isArray(r.reviewed_scope) && r.reviewed_scope.length), "legacy/unverified reply contract; needs a fresh review");
     // 1.17 B3: covers are recounted here, never trusted. A cover must name a coverable failure of
     // another route on the same piece, stay inside the one attempt budget, and may add a quorum vote

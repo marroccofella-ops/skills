@@ -1927,7 +1927,7 @@ await test('in-page Update all confirmation cancels without dispatch, then admit
   const cancel=c.core.runAllUpdates();await flush();assert.equal(dialog.open,true);assert.match(c.node('#action-confirm-copy').textContent,/synthetic codex/);assert.match(c.node('#action-confirm-copy').textContent,/synthetic copilot/);assert.doesNotMatch(c.node('#action-confirm-copy').textContent,/synthetic grok/);
   assert.equal(calls.length,0);c.node('#action-confirm-cancel').onclick();await cancel;assert.equal(calls.length,0);assert.equal(dialog.open,false);
   const accept=c.core.runAllUpdates();await flush();c.node('#action-confirm-accept').onclick();await accept;
-  same(calls,[{provider:'codex',action:'update',expected_command:'synthetic codex'},{provider:'copilot',action:'update',expected_command:'synthetic copilot'}]);
+  same(calls,[{provider:'codex',action:'update',expected_command:'synthetic codex'}],'a launch that was not accepted stops the rest of the batch');
 });
 await test('dialog Escape cancels without dispatch',async()=>{
   const c=ui();c.init(dashboardSession,dashboardMaintenance());const dialog=c.node('#action-confirm');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};let calls=0;c.setApi(async()=>{calls++;return {launched:false};});

@@ -75,7 +75,10 @@ function readSaved(env){
  const text=readBumblers(env);if(text===null)return {};
  let saved;try{saved=JSON.parse(text.replace(/^\uFEFF/,''));}catch{throw Error('bumblers.json is not valid JSON');}
  if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
- return Object.fromEntries(Object.entries(saved).map(([name,entry])=>[name,checked(name,entry)]));
+ const named=Object.entries(saved).map(([name,entry])=>[name,checked(name,entry)]),seen=new Set();
+ // One model server is one reviewer, so a second name cannot add a second vote.
+ for(const [name,entry] of named){const key=`${entry.base_url}|${entry.model}`;if(seen.has(key))throw problem(name,'repeats a model server already saved under another name');seen.add(key);}
+ return Object.fromEntries(named);
 }
 function writeSaved(saved,env){
  const file=savedFile(env),temporary=`${file}.${process.pid}.tmp`;preparePrivateEvidence(path.dirname(file));
@@ -88,7 +91,7 @@ export function loadBumblers(env=process.env){
  return routes;
 }
 export function listBumblers(env=process.env){return Object.entries(readSaved(env)).map(([name,entry])=>({name,...entry}));}
-export function saveBumbler(name,entry,env=process.env){const saved=readSaved(env);saved[name]=checked(name,entry);writeSaved(saved,env);return listBumblers(env);}
+export function saveBumbler(name,entry,env=process.env){const saved=readSaved(env),next=checked(name,entry);for(const [other,value] of Object.entries(saved))if(other!==name&&value.base_url===next.base_url&&value.model===next.model)throw problem(name,'repeats a model server already saved under another name');saved[name]=next;writeSaved(saved,env);return listBumblers(env);}
 export function removeBumbler(name,env=process.env){const saved=readSaved(env);if(!Object.hasOwn(saved,name))throw problem(name,'not saved');delete saved[name];writeSaved(saved,env);return listBumblers(env);}
 // A reply that fails the quotation contract still goes to the governor: its findings join the
 // report marked quotes_unverified. Like any invalid review it is not a success and gives no vote.

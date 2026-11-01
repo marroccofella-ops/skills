@@ -1175,7 +1175,7 @@ async function runBatchUpdate(agents = null) {
   batchProgress = {total:runnable.length,processed:0,phase:'Starting confirmed commands.'};
   updateBatchButton();
   renderOperation();
-  const outcomes = [];
+  const outcomes = [], completedAgents = [];
   try {
     for (const item of runnable) {
       const before = item.current;
@@ -1187,7 +1187,7 @@ async function runBatchUpdate(agents = null) {
         batchProgress.phase = `Waiting for ${providerLabel(item.agent)} version evidence, not estimated installation progress.`;
         renderMaintenance(); renderOperation();
         const after = await waitForVersionChange(item.agent, before);
-        attempt.observed = Boolean(after);
+        attempt.observed = Boolean(after); if (after) completedAgents.push(item.agent);
         attempt.message = after ? `Detected ${before || "unknown"} → ${after}. Verify connection again.` : "No version change observed. Finish in the terminal, then Check everything.";
         outcomes.push(`${providerLabel(item.agent)} ${after ? `${before || "?"} → ${after}` : "not verified"}`);
         batchProgress.processed += 1;
@@ -1197,13 +1197,14 @@ async function runBatchUpdate(agents = null) {
         batchProgress.processed += 1;
         if (!receipt) { batchProgress.phase='Stopped: action not launched; remaining commands were not launched.'; break; }
         if (['launch_unconfirmed','launching'].includes(receipt.status)) { batchProgress.phase='Stopped: launch unconfirmed; remaining commands were not launched.'; break; }
+        if (receipt.status !== 'launch_requested') { batchProgress.phase='Stopped: action was not confirmed; remaining commands were not launched.'; break; }
       }
       renderMaintenance();
     }
     if (batchProgress.processed === batchProgress.total && !batchProgress.phase.startsWith('Stopped')) batchProgress.phase = 'All action outcomes recorded. Check versions and verify connections separately.';
   } finally {
     batchRunning = false;
-    for (const item of runnable.slice(0,batchProgress.processed)) batchSelected.delete(item.agent);
+    for (const agent of completedAgents) batchSelected.delete(agent);
     renderMaintenance(); render();
   }
   showToast(`Batch action results. ${outcomes.join(" · ")}`);

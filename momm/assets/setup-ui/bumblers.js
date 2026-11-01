@@ -81,8 +81,10 @@
   }catch(error){if(error.code!=='session_changed')status(error.message);}});
   async function bumblerApi(body){
     if(!token)throw Error('Reopen the private dashboard launch link.');
-    const response=await fetch('/api/bumblers',{method:body?'POST':'GET',headers:{'X-MOMM-Token':token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const sentToken=token;
+    const response=await fetch('/api/bumblers',{method:body?'POST':'GET',headers:{'X-MOMM-Token':sentToken,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
     let value=null;try{value=await response.json();}catch{/* the status below still decides */}
+    if(token!==sentToken)throw Error('The dashboard session changed. Check saved Bumblers before repeating a change.');
     if(!response.ok||!Array.isArray(value?.bumblers))throw Error(typeof value?.error==='string'?value.error:'Bumbler settings request refused.');
     return value.bumblers;
   }

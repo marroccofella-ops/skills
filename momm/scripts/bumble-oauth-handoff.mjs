@@ -28,15 +28,15 @@ export function sealBumbleOAuthHandoff(job,options,config,privateInput,authorize
  const approval_sha256=H(JSON.stringify(approval));
  if(!closed(privateInput,['access_token','certificate']))fail('invalid_private_fields');
  if(!(privateInput.access_token instanceof Uint8Array)||privateInput.access_token.length<8||privateInput.access_token.length>4096||!(privateInput.certificate instanceof Uint8Array)||privateInput.certificate.length<1||privateInput.certificate.length>32768)fail('invalid_private_material');
- // Work only on an owned token copy; the vault still owns the caller's buffer.
- const token=Buffer.from(privateInput.access_token);let bytes;
+ // Hash and encode owned private-byte copies; leave caller buffers untouched.
+ const token=Buffer.from(privateInput.access_token),certificate=Buffer.from(privateInput.certificate);let bytes;
  try{
   if([...token].some(b=>!((b>=48&&b<=57)||(b>=65&&b<=90)||(b>=97&&b<=122)||'-._~+/='.includes(String.fromCharCode(b))))||!/^[-A-Za-z0-9._~+/]+=*$/.test(token.toString('ascii')))fail('invalid_bearer_material');
-  if(H(privateInput.certificate)!==config.certificate_sha256)fail('certificate_binding_changed');
+  if(H(certificate)!==config.certificate_sha256)fail('certificate_binding_changed');
   if(H(prepared.request_body)!==request_sha256||H(JSON.stringify(job.task))!==task_sha256)fail('public_frame_changed');
-  const frame={schema:'momm-bumble-oauth-private-frame/1',authentication:'oauth-bearer',task:job.task,model_id,base_url:config.base_url,server_name:config.server_name,certificate_base64:Buffer.from(privateInput.certificate).toString('base64'),access_token_base64:token.toString('base64'),request_body_base64:prepared.request_body.toString('base64'),request_sha256,config_sha256,task_sha256,scope_binding:config.scope_binding,baseline_report_sha256:config.baseline_report_sha256,approval_sha256,deadline:prepared.deadline,response_bytes:job.task.budget.response_bytes,max_tokens:prepared.max_tokens};
+  const frame={schema:'momm-bumble-oauth-private-frame/1',authentication:'oauth-bearer',task:job.task,model_id,base_url:config.base_url,server_name:config.server_name,certificate_base64:certificate.toString('base64'),access_token_base64:token.toString('base64'),request_body_base64:prepared.request_body.toString('base64'),request_sha256,config_sha256,task_sha256,scope_binding:config.scope_binding,baseline_report_sha256:config.baseline_report_sha256,approval_sha256,deadline:prepared.deadline,response_bytes:job.task.budget.response_bytes,max_tokens:prepared.max_tokens};
   bytes=Buffer.from(JSON.stringify(frame));if(bytes.length>100000){bytes.fill(0);fail('complete_handoff_byte_budget');}
- }finally{token.fill(0);}
+ }finally{token.fill(0);certificate.fill(0);}
  if(wallNow()>=prepared.deadline){bytes.fill(0);fail('handoff_expired');}
  const value=Object.freeze({schema:'momm-bumble-owned-oauth-handoff/1',task_id:job.task.task_id,attempt_id:job.task.attempt_id,request_sha256,task_sha256,config_sha256,frame_sha256:H(bytes),frame_bytes:bytes.length,deadline:prepared.deadline,credentials_read:true,request_sent:false,model_calls:0,permission_granted:false,transport_qualified:false,quorum_votes:0,completion:false});
  frames.set(value,{bytes,sha256:value.frame_sha256,consumed:false,created_at:actualNow,created_mono:creationMono,maximum_elapsed:Math.max(0,Math.min(300000,prepared.deadline-actualNow)),deadline:prepared.deadline,authorize,query,approval_sha256,approvalFields});return value;

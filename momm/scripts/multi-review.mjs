@@ -3512,7 +3512,7 @@ async function main() {
   if (options.versions || options.expectVersion) throw new Error("--versions and --expect belong to --doctor: use --doctor --versions [--expect <version>]");
   if (options.doctor) { await doctor(options.pretty); return; }
   if (options.preflight) {
-    const entries = await preflightCheck(options.reviewers, options.governor, options.bumblers);
+    const entries = await preflightCheck(!options.reviewersExplicit && options.bumblers ? [...options.reviewers, ...Object.keys(options.bumblers)] : options.reviewers, options.governor, options.bumblers);
     process.stdout.write(`${JSON.stringify({ policy: "oauth-only", model_calls_made: false, routes: entries, caveat: "presence evidence does not prove a live session; a route can still fail closed at dispatch" }, null, options.pretty ? 2 : 0)}\n`);
     if (process.stderr.isTTY) {
       const color = process.env.NO_COLOR ? (_c, t) => t : (c, t) => `${c}${t}${ANSI.reset}`;
