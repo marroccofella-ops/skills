@@ -87,6 +87,7 @@ jobs:
           node momm/scripts/bumble-immutable-file.test.mjs
           node momm/scripts/bumble-immutable-boundary-probes.test.mjs
           node momm/scripts/bumble-publication-followup.test.mjs
+          node momm/scripts/bumbler-route.test.mjs
           node momm/scripts/bumblers-ui.test.mjs
           node momm/scripts/bumble-hardening.test.mjs
           node momm/scripts/registry-hardening.test.mjs

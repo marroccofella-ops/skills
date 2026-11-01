@@ -21,6 +21,7 @@ import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./at
 import { resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
+import { BUILT_IN_ROUTES, BUMBLER_CLIENT, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
 import { ROLE_NAMES, loadRole, loadAllRoles, roleBrief, roleSection, roleGuidanceLayer, staleBriefNotices } from "./roles.mjs";
 import { ATTEMPT_BUDGET, COVERABLE_STATUSES, MODEL_FAMILIES, runPieceCovers, coverSection, coverReportRow, pieceCoverSummary } from "./cover.mjs";
 import { runSecondLook } from "./second-look.mjs";
@@ -1639,7 +1640,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // Stdin-based routes must not inherit the governor's project/evidence root
   // as their working directory. This limits ambient project discovery; it is
   // not an OS boundary against a process running as the same account.
-  if (["gemini", "codex", "claude"].includes(agent)) {
+  if (["gemini", "codex", "claude"].includes(agent) || options.bumblers?.[agent]) {
     temporaryDirectory = (options.runProcess && options.testWorkspace ? options.testWorkspace : createEvidenceWorkspace)("momm-review-");
     cwd = temporaryDirectory;
   }
@@ -1822,13 +1823,19 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     // switches turn that off for MOMM's runs only; the user's own Grok setup is unchanged.
     // One definition shared with the probe and the generation runner (route-isolation.mjs, 1.17 A10).
     routeEnv = grokIsolationEnv();
+  } else if (options.bumblers?.[agent]) {
+    // A Bumbler is one more reviewer: same prompt, containment, validation and evidence.
+    const bumbler = options.bumblers[agent];
+    command = process.execPath;
+    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens)];
+    input = assemblePrompt(contract, options.guidanceRoutes?.[agent] ?? "", artifact);
   } else {
     return { agent, status: "unsupported", detail: "no reviewed adapter exists" };
   }
 
     setupComplete = true;
     // options.runProcess is a test seam only (argv binding is proven with a fake).
-    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
+    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: options.bumblers?.[agent]?.timeout_ms ?? agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
       onProgress: options.onProgress ? progress => options.onProgress(agent, progress) : null });
   } catch {
     // Unexpected filesystem/launcher exceptions are terminal route failures.
@@ -2348,10 +2355,11 @@ function authEvidence(agent) {
 // Zero model calls: version probes plus auth evidence for every requested
 // route, so a user sees exactly which reviewers will join and what to run to
 // bring the missing ones online — before any tokens are spent.
-async function preflightCheck(reviewers, governor) {
+async function preflightCheck(reviewers, governor, bumblers = {}) {
   const knownAdapters = new Set(["codex", "gemini", "claude", "antigravity", "copilot", "grok"]);
   return Promise.all([...new Set(reviewers)].map(async (agent) => {
     if (agent === governor) return { agent, role: "governor", ready: false, note: "self-excluded (governor never reviews its own work)" };
+    if (bumblers[agent]) return bumblerReadiness(agent, bumblers[agent]);
     // Only probe adapters we ship: an arbitrary --reviewers name must never
     // become a command execution, even of "<name> --version".
     if (!knownAdapters.has(agent)) return { agent, installed: false, ready: false, auth: "n/a", note: "no reviewed adapter exists" };
@@ -3469,6 +3477,8 @@ async function main() {
   }
   if (options.selfTest) { await selfTest(options.pretty); return; }
   let reviewerSelection;
+  // Saved Bumblers are read only when a run names a route that is not built in.
+  if (options.reviewers.some((route) => !BUILT_IN_ROUTES.has(route))) options.bumblers = loadBumblers();
   try { reviewerSelection = applyReviewerSettings(options); }
   catch(error) { process.stderr.write(`Reviewer settings refused: ${error.message}\n`); process.exitCode=4; return; }
   if (options.capabilitiesMatrix) {
@@ -3493,7 +3503,7 @@ async function main() {
   if (options.versions || options.expectVersion) throw new Error("--versions and --expect belong to --doctor: use --doctor --versions [--expect <version>]");
   if (options.doctor) { await doctor(options.pretty); return; }
   if (options.preflight) {
-    const entries = await preflightCheck(options.reviewers, options.governor);
+    const entries = await preflightCheck(options.reviewers, options.governor, options.bumblers);
     process.stdout.write(`${JSON.stringify({ policy: "oauth-only", model_calls_made: false, routes: entries, caveat: "presence evidence does not prove a live session; a route can still fail closed at dispatch" }, null, options.pretty ? 2 : 0)}\n`);
     if (process.stderr.isTTY) {
       const color = process.env.NO_COLOR ? (_c, t) => t : (c, t) => `${c}${t}${ANSI.reset}`;
@@ -3615,7 +3625,7 @@ async function main() {
   // with synchronous launch work (permission audits, path resolution) and every route read
   // "timeout" in every report, while a standalone --preflight answers in about a second. It stays
   // informational (routes still fail closed on their own) and its own timers keep it bounded.
-  const preflightFirst = await preflightCheck(uniqueReviewers, options.governor);
+  const preflightFirst = await preflightCheck(uniqueReviewers, options.governor, options.bumblers);
   for (const entry of preflightFirst) emitEvent(options.stream, { event: "preflight", ...entry });
   ui.preflight(preflightFirst);
   // 1.17.1 R1: a remembered CLI/model mismatch is said before any route is asked. The route still
@@ -3646,7 +3656,8 @@ async function main() {
       if (!options.stream) process.stderr.write(`momm split: ${split.pieces.length} pieces at a ${Math.round(ceilingBytes / 1024)} KB ceiling${cappedFor.length ? ` (capped from ${Math.round(requestedBytes / 1024)} KB for ${cappedFor.join(", ")})` : ""}${split.stats.overCeilingPieces ? `, ${split.stats.overCeilingPieces} over the ceiling (a change block kept whole)` : ""}${split.stats.lineSplitHunks ? `, ${split.stats.lineSplitHunks} large hunk(s) divided at line boundaries` : ""}${split.oversize.length ? `, ${split.oversize.length} oversize hunk(s) for the governor` : ""}\n`);
     }
   }
-  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, uniqueReviewers.length * (split ? 2 : 1)) });
+  // A Bumbler runs on modest hardware, so it takes one piece at a time.
+  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, uniqueReviewers.length * (split ? 2 : 1)), perRoute: Object.fromEntries(Object.keys(options.bumblers ?? {}).map((name) => [name, 1])) });
   const runId = `rev_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 12)}`;
   const attemptEvidence = [];
   const reviewOne = async (agent, artifactText, pieceId, piece = null, cover = null) => {
@@ -3705,7 +3716,7 @@ async function main() {
         const pieceRuns = await Promise.all(uniqueReviewers.map((agent) => scheduler.schedule(agent, `${piece.id}:${agent}`, () => reviewOne(agent, piece.text, piece.id, piece))));
         const covers = await coversFor(piece.id, pieceRuns, piece.text, piece);
         const coverVotes = covers.filter((c) => c.counted_for_quorum).length;
-        const external = pieceRuns.filter((r) => r.agent !== options.governor && r.status === "success").length + coverVotes;
+        const external = pieceRuns.filter((r) => r.agent !== options.governor && !options.bumblers?.[r.agent] && r.status === "success").length + coverVotes;
         const met = external >= (options.minSuccess ?? 1);
         emitEvent(options.stream, { event: "piece.completed", piece: piece.id, external_successes: external, quorum_met: met, ...(covers.length ? { cover_votes: coverVotes, roles_covered: pieceCoverSummary(covers) } : {}) });
         return { id: piece.id, files: piece.files, bytes: piece.bytes, results: pieceRuns, covers, cover_votes: coverVotes, external_successes: external, quorum_met: met, ...(piece.lineSplit ? { line_split: { path: piece.lineSplit.path, hunk: piece.lineSplit.originalHeader.replace(/\r?\n$/, ""), part: piece.lineSplit.part, parts: piece.lineSplit.parts } } : {}), ...(piece.overCeiling ? { over_ceiling: true } : {}) };
@@ -3724,7 +3735,7 @@ async function main() {
   }
   const preflightEntries = await preflightPromise;
   const pieceQuorum = pieceResults ? splitQuorum(pieceResults, options.minSuccess ?? 1) : null;
-  const externalSuccesses = pieceQuorum ? pieceQuorum.external_successes : results.filter((result) => result.agent !== options.governor && result.status === "success").length + coverResults.filter((c) => c.counted_for_quorum).length;
+  const externalSuccesses = pieceQuorum ? pieceQuorum.external_successes : results.filter((result) => result.agent !== options.governor && !options.bumblers?.[result.agent] && result.status === "success").length + coverResults.filter((c) => c.counted_for_quorum).length;
   // Cover rows are labelled, kept out of reviewers[] (one row per route) and never presented as native.
   const coverRows = coverResults.map((c) => coverReportRow(c, { roleBrief: c.role ? roleBrief(roleBriefs[c.role]) : null }));
   for (const row of coverRows) {

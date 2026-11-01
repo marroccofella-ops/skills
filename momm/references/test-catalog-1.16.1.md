@@ -255,6 +255,7 @@ their own first statement is what is exercised.
 - `momm/scripts/bumble-transmission-recovery.test.mjs`
 - `momm/scripts/bumble-transport.test.mjs`
 - `momm/scripts/bumble-worker-binding.test.mjs`
+- `momm/scripts/bumbler-route.test.mjs`
 - `momm/scripts/bumblers-behavior.test.mjs`
 - `momm/scripts/bumblers-boundaries.test.mjs`
 - `momm/scripts/bumblers-ui.test.mjs`

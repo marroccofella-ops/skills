@@ -378,6 +378,10 @@ jobs:
         if: ${{ !cancelled() }}
         timeout-minutes: 2
         run: node momm/scripts/bumble-publication-followup.test.mjs
+      - name: Test Bumbler reviewer route
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: node momm/scripts/bumbler-route.test.mjs
       - name: Bumbler frontend safety invariants
         if: ${{ !cancelled() }}
         timeout-minutes: 2
