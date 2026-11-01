@@ -1,5 +1,33 @@
 # MOMM 1.18.0 — development build, not released
 
+## What 1.18 is
+
+MOMM 1.18 adds Bumblers to the review pool. A Bumbler is a lower-powered, usually
+open-source model you run yourself. It joins a review by name, for example
+`--reviewers codex,antigravity,bab`, and goes through the same prompt, process
+containment, validation, evidence and statuses as every other reviewer. Bab, a model
+on the owner's own machine, is the first Bumbler.
+
+- **Setup:** add one in the Setup Center under Bumblers in the review pool, or in
+  `bumblers.json` in your reviewer home. See [getting started](getting-started.md).
+- **Findings:** what a Bumbler raises reaches the governor, who must decide it. If its
+  quotes fail validation, its findings are still shown, marked `quotes_unverified`,
+  and its row says `invalid_output`.
+- **Quorum:** a Bumbler adds no vote and never lowers `--min-success`. With `--strict`,
+  a named Bumbler must still answer.
+- **Access:** a Bumbler route has no login and no API key. Review text goes to the
+  saved address, which must be a tailnet or loopback address. That address is
+  reachability, not authentication, so add only a machine you trust.
+- **Limits:** one piece at a time, with tokens and time set per Bumbler.
+
+**Known quality:** Bab has not yet given a useful review. In its first real runs on
+1 November it accepted a seeded bug twice, and its two answers on a real change failed
+quotation checks and contained no finding that held up. Treat a Bumbler's answers as
+leads to check. The route works; the model's review quality is not established.
+
+The older signed OAuth pilot, witness and release-proof work below is development
+history. It is not used by this route and does not gate it.
+
 29 October qualification update: the 28 October Windows/Node 24.22.1 offline
 pack completed all 179 commands with 177 passes and two failures; its 518-file
 selected text/code/document manifest was unchanged. The stale timeout-message
