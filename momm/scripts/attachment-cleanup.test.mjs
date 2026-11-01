@@ -39,13 +39,14 @@ const leftovers=dir=>{
 };
 async function test(name,fn){try{await fn();checks.push({name,passed:true});}catch(e){checks.push({name,passed:false,error:e.message});}}
 function actual(f,extra,{expectedStatus=1,expectedError=null,json=false}={}){
-  const started=Date.now();
+  // Include cumulative Windows privacy-audit/report startup, while remaining bounded.
+  const timeoutMs=process.platform==='win32'?90000:30000,started=Date.now();
   const result=spawnSync(process.execPath,[dispatcher,'--governor','codex','--reviewers','codex','--input','artifact.js','--no-ui',...extra],{
-    cwd:f.cwd,windowsHide:true,timeout:30000,maxBuffer:500000,
+    cwd:f.cwd,windowsHide:true,timeout:timeoutMs,maxBuffer:500000,
     env:{...process.env,TEMP:f.temporary,TMP:f.temporary,TMPDIR:f.temporary,HOME:path.join(f.cwd,'home'),USERPROFILE:path.join(f.cwd,'home'),
       MULTI_LLM_REVIEW_DEPTH:'0',NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1'},
   });
-  const diagnostic={status:result.status,signal:result.signal,error:result.error?.code??null,elapsed_ms:Date.now()-started,timeout_ms:30000,
+  const diagnostic={status:result.status,signal:result.signal,error:result.error?.code??null,elapsed_ms:Date.now()-started,timeout_ms:timeoutMs,
     stdout_bytes:Buffer.byteLength(result.stdout??''),stderr_bytes:Buffer.byteLength(result.stderr??'')};
   // Count the original buffers, then decode privately. Never include raw child
   // output in an assertion or JSON parser error, including ordinary exits.
