@@ -3,12 +3,14 @@
 // containment owns the deadline, so this sets no timer of its own.
 import http from 'node:http';import https from 'node:https';
 import {bumblerBase} from './bumbler-route.mjs';
-const [baseUrl,model,maxTokens]=process.argv.slice(2);
+import {REVIEW_JSON_SCHEMA} from './review-contract-schema.mjs';
+const [baseUrl,model,maxTokens,settings='{}']=process.argv.slice(2);
 const stop=(message,code=1)=>{process.stderr.write(`${message}\n`);process.exit(code);};
 const MAX_REPLY_BYTES=4_000_000;
 try{bumblerBase(baseUrl);}catch{stop('Bumbler address refused');}
 const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);
-const body=Buffer.from(JSON.stringify({model,messages:[{role:'user',content:Buffer.concat(chunks).toString('utf8')}],max_tokens:Number(maxTokens),temperature:0,stream:false,response_format:{type:'json_object'}}));
+const {system,user}=JSON.parse(Buffer.concat(chunks).toString('utf8')),{frequency_penalty:frequencyPenalty,json_schema:useSchema}=JSON.parse(settings);
+const body=Buffer.from(JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],max_tokens:Number(maxTokens),temperature:0,stream:false,...(frequencyPenalty?{frequency_penalty:frequencyPenalty}:{}),response_format:useSchema?{type:'json_schema',json_schema:{name:'momm_review',schema:REVIEW_JSON_SCHEMA}}:{type:'json_object'}}));
 const request=(baseUrl.startsWith('https:')?https:http).request(`${baseUrl}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Content-Length':body.length}},response=>{
  const reply=[];let bytes=0;response.on('data',chunk=>{bytes+=chunk.length;if(bytes>MAX_REPLY_BYTES)stop('Bumbler reply was too large');reply.push(chunk);});response.on('error',()=>stop('Bumbler connection failed during the reply'));
  response.on('end',()=>{

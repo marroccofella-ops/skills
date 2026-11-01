@@ -18,7 +18,7 @@ import { createProcessScope, executableOutside } from "./process-scope.mjs";
 import { parseUsage, inputEstimate, rollupUsage } from "./usage.mjs";
 import { readMedia } from "./media-bytes.mjs";
 import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./attempts.mjs";
-import { resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
+import { ARTIFACT_DELIMITER, resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
 import { BUILT_IN_ROUTES, BUMBLER_CLIENT, BUMBLER_GUIDANCE, bumblerAnswer, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
@@ -1828,8 +1828,10 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     // A Bumbler is one more reviewer: same prompt, containment, validation and evidence.
     const bumbler = options.bumblers[agent];
     command = process.execPath;
-    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens)];
-    input = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, [bumbler.guidance ? `## This Bumbler's own guidance, from its owner\n${sanitizeText(bumbler.guidance).value}` : "", options.guidanceRoutes?.[agent] ?? ""].filter(Boolean).join("\n\n"), artifact);
+    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens), JSON.stringify({ frequency_penalty: bumbler.frequency_penalty, json_schema: bumbler.json_schema })];
+    const prompt = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, [bumbler.guidance ? `## This Bumbler's own guidance, from its owner\n${sanitizeText(bumbler.guidance).value}` : "", options.guidanceRoutes?.[agent] ?? ""].filter(Boolean).join("\n\n"), artifact), boundary = prompt.indexOf(`\n\n${ARTIFACT_DELIMITER}`);
+    // The rules go in the system role, the untrusted artifact stays in the user message.
+    input = JSON.stringify({ system: prompt.slice(0, boundary), user: prompt.slice(boundary + 2) });
   } else {
     return { agent, status: "unsupported", detail: "no reviewed adapter exists" };
   }
