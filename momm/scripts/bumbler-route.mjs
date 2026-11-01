@@ -15,7 +15,7 @@ export function bumblerBase(value){
  return url.toString().replace(/\/$/,'');
 }
 function checked(name,entry){
- if(!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
+ if(typeof name!=='string'||!NAME.test(name)||BUILT_IN_ROUTES.has(name))throw problem(name,'invalid or reserved name');
  if(!entry||typeof entry!=='object'||Array.isArray(entry)||Object.keys(entry).some(key=>!FIELDS.has(key)))throw problem(name,'unsupported fields');
  if(typeof entry.model!=='string'||!entry.model.trim()||entry.model.length>200)throw problem(name,'model is required');
  const maxTokens=entry.max_tokens??1024,seconds=entry.timeout_seconds??180;
@@ -31,7 +31,8 @@ function readSaved(env){
 }
 function writeSaved(saved,env){
  const file=savedFile(env),temporary=`${file}.${process.pid}.tmp`;fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});
- fs.writeFileSync(temporary,JSON.stringify(saved,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);
+ try{fs.writeFileSync(temporary,JSON.stringify(saved,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);}
+ catch(error){fs.rmSync(temporary,{force:true});throw error;}
 }
 export function loadBumblers(env=process.env){
  const saved=readSaved(env),routes=Object.create(null);
@@ -46,8 +47,11 @@ export function removeBumbler(name,env=process.env){const saved=readSaved(env);i
 // Models often think aloud before the JSON.
 export function bumblerAnswer(text){
  const raw=String(text??'');if(raw.length>1_000_000)return null;
- for(let at=raw.indexOf('{');at>=0;at=raw.indexOf('{',at+1)){
-  let value;try{value=JSON.parse(raw.slice(at,raw.lastIndexOf('}')+1));}catch{continue;}
+ // The last few object starts, newest first, so preamble braces cost nothing.
+ const end=raw.lastIndexOf('}')+1;let tries=0;
+ for(let at=raw.lastIndexOf('{',end);at>=0&&tries<64;at=at?raw.lastIndexOf('{',at-1):-1){
+  if(!/^\{\s*"/.test(raw.slice(at,at+40)))continue;tries++;
+  let value;try{value=JSON.parse(raw.slice(at,end));}catch{continue;}
   if(!value||typeof value!=='object'||!('verdict' in value||'findings' in value))continue;
   const clip=(item,max=600)=>typeof item==='string'?item.slice(0,max):null;
   return {verdict:clip(value.verdict,20),summary:clip(value.summary),findings:(Array.isArray(value.findings)?value.findings:[]).slice(0,20).filter(f=>typeof f?.issue==='string'&&f.issue.trim()),suggestions:(Array.isArray(value.suggested_improvements)?value.suggested_improvements:[]).slice(0,10).map(s=>clip(s)).filter(Boolean)};
