@@ -28,7 +28,7 @@ const manifestNow=JSON.parse(fs.readFileSync(new URL('../versions.json',import.m
 const catalogueNow=JSON.parse(fs.readFileSync(new URL('../momm/references/release-history.json',import.meta.url),'utf8'));
 const publishedNow=catalogueNow.some(r=>r.version===manifestNow.momm&&r.kind==='release'&&r.tag&&r.published_date);
 assert.equal(home.includes('CURRENT STABLE'),publishedNow,'home banner must match the catalogue publication state');
-if(!publishedNow)assert(home.includes(manifestNow.momm_development?'LOCAL DEVELOPMENT · NOT RELEASED':'CHECK PUBLICATION'),'an unpublished checkout must say so on the home page');
+if(!publishedNow)assert(home.includes(manifestNow.momm_development?'PUBLICATION NOT RECORDED':'CHECK PUBLICATION'),'an unpublished checkout must say so on the home page');
 assert(home.includes('id="walkthrough"'));
 const acceptedTour=tourSection({...tour,status:'accepted'},tour.version);
 assert(acceptedTour.includes('<video controls'));

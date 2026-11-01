@@ -1195,7 +1195,8 @@ async function runBatchUpdate(agents = null) {
       } else {
         outcomes.push(`${providerLabel(item.agent)}: ${ACTION_REASONS[receipt?.reason] || ACTION_LABELS[receipt?.status] || 'not launched'}`);
         batchProgress.processed += 1;
-        if (!receipt || ['launch_unconfirmed','launching'].includes(receipt.status)) { batchProgress.phase='Stopped: launch unconfirmed; remaining commands were not launched.'; break; }
+        if (!receipt) { batchProgress.phase='Stopped: action not launched; remaining commands were not launched.'; break; }
+        if (['launch_unconfirmed','launching'].includes(receipt.status)) { batchProgress.phase='Stopped: launch unconfirmed; remaining commands were not launched.'; break; }
       }
       renderMaintenance();
     }

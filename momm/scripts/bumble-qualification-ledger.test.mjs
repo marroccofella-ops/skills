@@ -20,6 +20,8 @@ try{
   assert.throws(()=>qualifyBumbleWithLedger({...params,observations:observations.map((o,i)=>i===0?{...o,attempt_id:'fabricated'}:o)},{ledger,scope_binding:scope}));
   assert.throws(()=>qualifyBumbleWithLedger(params,{ledger,scope_binding:H('different')}));
   assert.throws(()=>qualifyBumbleWithLedger(params,{ledger:{summary:()=>ledger.summary()},scope_binding:scope}));
+  assert.throws(()=>qualifyBumbleWithLedger({...params,observations:[{...observations[0],get [Symbol('unchecked')](){return 1;}},observations[1]]},{ledger,scope_binding:scope}),/plain owned data/,'a symbol-keyed getter is not plain owned data');
+  assert.throws(()=>qualifyBumbleWithLedger({...params,observations:[{...observations[0],[Symbol('unchecked')]:1},observations[1]]},{ledger,scope_binding:scope}),/plain owned data/,'a symbol-keyed value is not plain owned data');
   assert.equal(qualificationStatusWithLedger(result,{ledger,scope_binding:scope,identity,policy,now:110}).reason,'expired');
   assert.equal(qualificationStatusWithLedger({...result,ledger_binding:{...result.ledger_binding,journal_sha256:H('wrong')}},{ledger,scope_binding:scope,identity,policy,now:11}).eligible,false);
   const restart=new BumbleFixtureLedger(options);

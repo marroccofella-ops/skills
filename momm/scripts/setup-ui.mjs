@@ -1429,9 +1429,10 @@ function readBody(request, limit = 4096) {
     const chunks = [];
     let bytes = 0, failed = false;
     request.on("data", (chunk) => {
-      if (failed) return;
       const buffer = Buffer.from(chunk); bytes += buffer.length;
-      if (bytes > limit) { failed=true; chunks.length=0; reject(Object.assign(new Error("Request body too large"),{code:'request_body_too_large'})); request.destroy(); return; }
+      // Keep discarding a bounded excess so a client still writing can read the 413.
+      if (failed) { if (bytes > limit + 1_048_576) request.destroy(); return; }
+      if (bytes > limit) { failed=true; chunks.length=0; reject(Object.assign(new Error("Request body too large"),{code:'request_body_too_large'})); return; }
       chunks.push(buffer);
     });
     request.on("end", () => {
@@ -1643,7 +1644,7 @@ function createServer() {
       if (requestUrl.pathname === '/api/reviewers') {
         try {
           if (request.method === 'GET') {
-            const number=(name,fallback)=>{const value=Number(requestUrl.searchParams.get(name)??fallback);return Number.isSafeInteger(value)&&value>=0?value:fallback;};
+            const number=(name,fallback)=>{const raw=requestUrl.searchParams.get(name);if(!raw)return fallback;const value=Number(raw);return Number.isSafeInteger(value)&&value>=0?value:fallback;};
             return sendJson(response,200,reviewerRegistryStore().snapshot({query:requestUrl.searchParams.get('q')||'',state:requestUrl.searchParams.get('state')||'visible',offset:number('offset',0),limit:number('limit',25)}));
           }
           if (request.method === 'POST') {

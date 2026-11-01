@@ -555,7 +555,8 @@ await test('request body decodes split UTF-8 once and closes oversize streams',a
   const request=new EventEmitter();const promise=read(request);const bytes=Buffer.from('{"text":"😀"}');
   for(const byte of bytes) request.emit('data',Buffer.from([byte]));request.emit('end');assert.equal((await promise).text,'😀');
   const oversized=new EventEmitter();let destroyed=false;oversized.destroy=()=>{destroyed=true;};const pending=read(oversized);
-  oversized.emit('data',Buffer.alloc(5000));await assert.rejects(pending);assert.equal(destroyed,true);
+  oversized.emit('data',Buffer.alloc(5000));await assert.rejects(pending);assert.equal(destroyed,false,'a client still writing must be able to read the 413');
+  oversized.emit('data',Buffer.alloc(1_100_000));assert.equal(destroyed,true,'the excess after refusal stays bounded');
 });
 await test('reviewer settings malformed JSON is not misreported as a private-store failure',async()=>{
   const a=source.indexOf('function readBody('),b=source.indexOf('function authorized(',a);
@@ -567,6 +568,27 @@ await test('reviewer settings malformed JSON is not misreported as a private-sto
   const h=handler({},true,{readBody:async()=>{throw error;}});
   const response=await h.serve({method:'POST',url:'/api/reviewers',headers:{origin:'http://127.0.0.1:1',host:'127.0.0.1:1'},socket:{}},{});
   assert.equal(response.status,400);assert.equal(response.value.code,'invalid_request_json');
+});
+await test('an oversized reviewer save reads a complete 413 over real HTTP, not a reset',async()=>{
+  const a=source.indexOf('function readBody('),b=source.indexOf('function authorized(',a);
+  const read=vm.runInNewContext(source.slice(a,b)+';readBody',{Buffer});let writes=0;
+  const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+  const server=handler({},true,{http,crypto,readBody:read,sendJson:json,reviewerRegistryStore:()=>({command(){writes++;return {};}})}).serve;
+  try {
+    await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+    const port=server.address().port,result=await new Promise((resolve,reject)=>{
+      const req=http.request({hostname:'127.0.0.1',port,path:'/api/reviewers',method:'POST',headers:{origin:`http://127.0.0.1:${port}`,'Content-Length':60_000}},res=>{
+        let body='';res.setEncoding('utf8');res.on('data',b=>{body+=b;});res.on('error',reject);res.on('end',()=>resolve({status:res.statusCode,value:JSON.parse(body)}));
+      });req.on('error',reject);req.setTimeout(5000,()=>req.destroy(new Error('Synthetic HTTP deadline')));req.end(Buffer.alloc(60_000,97));
+    });
+    assert.equal(result.status,413);assert.equal(result.value.code,'request_body_too_large');assert.equal(writes,0);
+  } finally {server.closeAllConnections?.();if(server.listening)await new Promise(resolve=>server.close(resolve));}
+});
+await test('an empty reviewer page parameter means absent, never zero',async()=>{
+  const seen=[];const serve=handler({},true,{reviewerRegistryStore:()=>({snapshot(query){seen.push([query.limit,query.offset]);return {revision:0,profiles:[]};}})}).serve;
+  const request={method:'GET',socket:{},headers:{host:'127.0.0.1:1',origin:'http://127.0.0.1:1'}};
+  for(const query of ['?limit=&offset=','?limit=7&offset=2','?limit=-1&offset=x','?limit=0'])assert.equal((await serve({...request,url:'/api/reviewers'+query},{})).status,200);
+  assert.deepEqual(seen,[[25,0],[7,2],[25,0],[0,0]]);
 });
 await test('reviewer settings enforce session, same origin, methods and structured store errors',async()=>{
   let writes=0;const store={snapshot:()=>({revision:0,profiles:[]}),command:()=>{writes++;return {revision:1};}};
@@ -1047,7 +1069,7 @@ await test('probe generation needs consent and the exact disclosure, skips block
   const {c,written}=capabilitiesSlice({matrix:capMatrix});
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'momm-cap-home-'));
   const calls=[];
-  const exec=async(command,args,options)=>{calls.push(args);if(args[0]==='--version')return {code:0,stdout:'9.9.9',stderr:''};const blob=[...args,options.input].filter(v=>typeof v==='string').join('\n');const png=/This is a capability probe/.test(blob)?blob.match(/(\S*probe\.png)\b/)?.[1]:null;if(png)return {code:0,stdout:JSON.stringify({text:colourOf(png)}),stderr:''};if(/capability probe/.test(blob))return {code:0,stdout:JSON.stringify({text:'a page'}),stderr:''};const dir=path.join(home,'.grok','sessions','s','images');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'1.jpg'),(await import('./media-fixtures.mjs')).JPEG);return {code:0,stdout:JSON.stringify({text:'written'}),stderr:''};};
+  const exec=async(command,args,options)=>{calls.push(args);if(args[0]==='--version')return {code:0,stdout:'9.9.9',stderr:''};const blob=[...args,options.input].filter(v=>typeof v==='string').join('\n');const png=/This is a capability probe/.test(blob)?blob.match(/View the image file at ([^\r\n]+?probe\.png) with your file or image tool/)?.[1]:null;if(png)return {code:0,stdout:JSON.stringify({text:colourOf(png)}),stderr:''};if(/capability probe/.test(blob))return {code:0,stdout:JSON.stringify({text:'a page'}),stderr:''};const dir=path.join(home,'.grok','sessions','s','images');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'1.jpg'),(await import('./media-fixtures.mjs')).JPEG);return {code:0,stdout:JSON.stringify({text:'written'}),stderr:''};};
   const deps={home,installedVersions:{grok:'9.9.9'},exec};
   try{
     const snap=await c.snapshot(deps);const disclosure=snap.value.generation.grok.disclosure;
@@ -1868,6 +1890,16 @@ await test('a batch transport error is fixed-field uncertainty and never echoes 
   const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);
   c.setApi(async()=>{throw Error('PRIVATE_OAUTH_MARKER');});await c.core.runBatchUpdate();
   assert.doesNotMatch(visibleText(c),/PRIVATE_OAUTH_MARKER/);assert.match(c.node('#maintenance-grid').innerHTML,/unconfirmed|could not be confirmed/i);
+});
+await test('a live-check guard stops a batch as not launched, never as an uncertain launch',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;
+  const requests=[];c.setApi(async(p)=>{requests.push(p);if(p==='/api/test')return new Promise(()=>{});return {launched:false};});
+  c.core.runTest('codex');await flush();
+  await c.core.runBatchUpdate(['codex','copilot']);
+  assert.equal(requests.filter(p=>p==='/api/action').length,0,'neither guarded provider nor the remaining batch may launch');
+  assert.match(c.node('#batch-progress').textContent,/Stopped:.*not launched/i);
+  assert.doesNotMatch(c.node('#batch-progress').textContent,/launch unconfirmed/i);
+  assert(c.toasts.some(t=>/live connection check/.test(t)),'the guard still explains why no launch was sent');
 });
 await test('a stalled batch launch has a bounded observation deadline and stops the remaining queue',async()=>{
   const timers=fakeTimers(),c=ui(timers);c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);c.core.toggleBatch('copilot',true);

@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     # The safety workflow spreads these suites over fifteen parallel jobs (a fourteen-cell matrix and one
     # Linux job); this job runs all of them
-    # in sequence. The 167-command local Windows pack took 70m44s on19 October2026;
-    # the former45-minute budget no longer fits even that observed offline run.
+    # in sequence. The 167-command local Windows pack took 70m44s on 19 October 2026;
+    # the former 45-minute budget no longer fits even that observed offline run.
     # Two hours bounds the full pack plus setup/signing/publication headroom.
     # Hosted/platform success and exact-commit approval remain separate gates.
     timeout-minutes: 120

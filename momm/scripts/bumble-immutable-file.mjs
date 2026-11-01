@@ -25,7 +25,7 @@ function owned(file,identity,links){
  return stat;
 }
 export function publishImmutableBytes(root,file,bytes){
- if(typeof root!=='string'||typeof file!=='string'||!path.isAbsolute(root)||!path.isAbsolute(file)||path.dirname(file)!==root||!Buffer.isBuffer(bytes)||bytes.length>MAX_BYTES||!/^[A-Za-z0-9_.-]{1,180}$/.test(path.basename(file))||/\.tmp$/i.test(path.basename(file)))throw Error('Invalid bounded immutable publication.');
+ if(typeof root!=='string'||typeof file!=='string'||!path.isAbsolute(root)||!path.isAbsolute(file)||path.dirname(file)!==root||!Buffer.isBuffer(bytes)||bytes.length>MAX_BYTES||!/^[A-Za-z0-9_.-]{1,180}$/.test(path.basename(file))||/\.tmp$/i.test(path.basename(file))||/^\.+$/.test(path.basename(file)))throw Error('Invalid bounded immutable publication.');
  // No ACL repair. An existing ambiguous linked store remains refused.
  requirePrivateEvidence(root);
  if(fs.realpathSync.native(root)!==root)throw Error('Immutable root must use its real private path.');

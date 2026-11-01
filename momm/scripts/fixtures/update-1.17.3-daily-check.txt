@@ -1,0 +1,36 @@
+export async function dailyCheck(installed, { stream = false, root, env = process.env, fetcher = fetch, now = Date.now() } = {}) {
+  if (stream || updateCheckDisabled(env)) return null;
+  let claim, fd;
+  try {
+    const cacheDir = root ? stateDir(root) : path.join(os.homedir(), ".cache", "momm");
+    directory(cacheDir);
+    if (root && readLock(root, false)?.channel === "pinned") return null;
+    claim = path.join(cacheDir, "version-check.active");
+    if (regular(claim, true)) {
+      let owner;
+      try { owner = readJSON(claim); } catch {}
+      if (Number.isInteger(owner?.pid) && owner.pid > 0) {
+        try { process.kill(owner.pid, 0); }
+        catch (e) { if (e.code === "ESRCH") fs.unlinkSync(claim); }
+      } else if (Date.now() - fs.statSync(claim).mtimeMs > 60_000) {
+        // Recover the legacy empty claim, or a crash between creation and
+        // writing its owner. Never steal a recently created or live claim.
+        fs.unlinkSync(claim);
+      }
+    }
+    try { fd = fs.openSync(claim, "wx", 0o600); }
+    catch { return null; }
+    fs.writeFileSync(fd, JSON.stringify({ pid: process.pid }));
+    const cache = path.join(cacheDir, "version-check.json");
+    if (regular(cache, true)) {
+      const c = readJSON(cache);
+      // Cache stores notice delivery too: no repeated line on each invocation.
+      if (now - c.checked_at < 864e5 && c.installed === installed) return null;
+    }
+    // Claim the day's check before the request, so concurrent runs do not chatter.
+    writeJSON(cache, { checked_at: now, installed });
+    const m = await manifest(fetcher);
+    return newer(m.momm, installed) ? m.momm : null;
+  } catch { return null; }
+  finally { if (fd !== undefined) { fs.closeSync(fd); try { fs.unlinkSync(claim); } catch {} } }
+}

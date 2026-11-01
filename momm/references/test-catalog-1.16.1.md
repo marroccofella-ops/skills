@@ -6,13 +6,13 @@ version gate. The selection is 180 commands; the earlier 179-command result is
 historical and is not a pass for this expanded selection.
 
 This is the living inventory of offline suites: it keeps its 1.16.1 name (pinned by CONTRIBUTING and
-the workflow tests) and also lists every suite added in 1.17.
+the workflow tests) and also lists every suite added in 1.17 and 1.18.
 
-The existing workflow-contract suite now also checks the measured local167-command
-pack against explicit100-minute safety/120-minute release job ceilings and three
+The existing workflow-contract suite now also checks the measured local 167-command
+pack against explicit 100-minute safety/120-minute release job ceilings and three
 bounded offline-step timing floors. Its failing-before/passing-after evidence is
-separate from hosted CI. Command selection is unchanged at167; the19October
-167/167 snapshot is historical after the22October workflow/test/document edits.
+separate from hosted CI. Command selection is unchanged at 167; the 19 October
+167/167 snapshot is historical after the 22 October workflow/test/document edits.
 
 The local 1.18 development selection also runs the governor-authored boundary
 probes directly, with no provider calls:

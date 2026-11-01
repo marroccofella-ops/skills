@@ -67,26 +67,26 @@ service identity, storage/rollback guarantees, backend physical completion,
 historical hold reconciliation and one genuine BAB review remain release gates.
 These source repairs are not a full-pack pass, live activation or release.
 
-27 October20:08 development checkpoint: the separate OAuth discovery/code-exchange
-transport now has24 mocked checks, and the canonical worker has32 mocked/in-process
+27 October 20:08 development checkpoint: the separate OAuth discovery/code-exchange
+transport now has 24 mocked checks, and the canonical worker has 32 mocked/in-process
 integration checks plus corrected exception/stdin controls. Both source scopes
-received2/2 usable peer responses, explicit dispositions and byte-bound local
+received 2/2 usable peer responses, explicit dispositions and byte-bound local
 completion receipts. These are component receipts, not native/BAB qualification.
 The owner-approved narrow redaction repair passes its failing-before/passing-after
-control and752 synthetic preservation cases. The broader dispatcher review has
-only1/2 usable responses; its numeric, JPEG-header/bounds and repeated-finding-ID
+control and 752 synthetic preservation cases. The broader dispatcher review has
+only 1/2 usable responses; its numeric, JPEG-header/bounds and repeated-finding-ID
 regressions were reproduced and repaired. Its quorum remains open.
 No real OAuth issuer/consent host, native caller/supervisor activation, authoritative
 backend/physical-release observer or historical-hold reconciliation has been
-qualified. No real BAB review or fresh complete pack is claimed. Stable1.17.3 and
+qualified. No real BAB review or fresh complete pack is claimed. Stable 1.17.3 and
 installed settings/permissions remain unchanged;1.18 is unreleased.
 
-27 October18:46 continuation: native entry now receives the owning project/run
+27 October 18:46 continuation: native entry now receives the owning project/run
 identity after original report persistence (same dispatcher-fragment test fails
 before and passes after). A separate OAuth peer worker consumes original private
 frames without a service-key file, checks canonical request/schema/system bytes,
 uses a numeric Tailscale socket with separately pinned TLS identity, and retains
-unknown5xx/disconnect/deadline outcomes. Mocked HTTPS controls cover its new frame
+unknown 5xx/disconnect/deadline outcomes. Mocked HTTPS controls cover its new frame
 budget and closed standalone entry. No native policy, trusted host broker,
 issuer/consent deployment, backend observer or live inference is activated.
 
@@ -142,13 +142,13 @@ The bounded pilot now has a zero-dependency in-process authorization-code/S256
 issuer core, compatible with the existing MOMM PKCE client. It requires an
 external authenticated consent host, exact client/redirect/resource/scope/model
 bindings, single-use short-lived codes, five-minute opaque tokens, revocation
-and one inference admission capped at1,024 output tokens and180seconds.
+and one inference admission capped at 1,024 output tokens and 180 seconds.
 It has no API-key adapter, listener, browser login, backend invocation or native
 activation. Restart invalidates grants, not backend reservations. Its local
 cryptographic exchange tests are not a real BAB review or a release gate.
 SB2 deployment, authenticated consent/TLS transport, protected native host,
 authoritative backend observation and independent source quorum remain open.
-Historical167-command packs cover their recorded bytes, not this new module.
+Historical 167-command packs cover their recorded bytes, not this new module.
 Governor-authored mutation controls now check scope/model defensive copying,
 the advertised token lifetime and explicit refusal codes. The test summary no
 longer presents uninstrumented zero counters as observed safety evidence. These
@@ -156,20 +156,20 @@ are local test-quality changes, not deployment or native-review qualification.
 
 ### 22 October 2026: measured offline CI budgets (unreleased)
 
-The19October frozen WindowsNode22.16 pack completed167/167, exit0, without
-timeout, and its494 selected text/code/doc source hashes matched before/after.
-That is distinct from the older166-pass/interrupted attempt and isolated rerun;
+The 19 October frozen Windows Node 22.16 pack completed 167/167, exit 0, without
+timeout, and its 494 selected text/code/doc source hashes matched before/after.
+That is distinct from the older 166-pass/interrupted attempt and isolated rerun;
 it does not qualify hosted CI, other platforms, native BAB or a release.
 
 An actual failing-first workflow regression reproduced a further blocker: the
-25-minute safety job and45-minute sequential release job could not fit the
-measured70m44s pack. Their explicit development budgets are now100 and120minutes,
+25-minute safety job and 45-minute sequential release job could not fit the
+measured 70m44s pack. Their explicit development budgets are now 100 and 120 minutes,
 respectively. Three offline step budgets cover measured slower generation,
-unsent-recovery and result-adoption tests with25% plus30seconds of headroom.
+unsent-recovery and result-adoption tests with 25% plus 30 seconds of headroom.
 The regression retains finite upper bounds and every existing suite; no inference
 deadline, reservation rule, runtime containment or release approval is changed.
 These workflow/test/doc edits need fresh source review and a new full pack;
-the historical167/167 does not automatically qualify the changed tree.
+the historical 167/167 does not automatically qualify the changed tree.
 
 ### 19 October 2026: lifecycle integration and narrower signed budgets (unreleased)
 
@@ -191,8 +191,8 @@ ceiling, and records the exact smaller attempt/token budget in shared accounting
 An existing authorization cannot be widened by re-signing changed terms. New
 focused controls cover the real before failure, one-request accounting/replay,
 invalid ceilings and excess fixtures. All ten focused controls pass after the
-actual failing-before run. Current-tree executor17/17, coordinator11/11 and full
-broker36/36 suites pass with unchanged bound sources; broker responses are
+actual failing-before run. Current-tree executor 17/17, coordinator 11/11 and full
+broker 36/36 suites pass with unchanged bound sources; broker responses are
 synthetic and the executor/coordinator use generated local children. This is not
 real model quality or backend-release proof.
 No owner authority, old allowance reconciliation, signer or physical release is
@@ -261,16 +261,16 @@ broker bytes, expiry and capacity configuration before one-shot publication of
 each request claim. Restart, a replaced approval or a different payload under
 the same authorization cannot silently grant a replay or refund charges.
 Qualification is in progress; this is not a finished normal/native coordinator.
-The current generated-signature broker suite passes26 controls; seven targeted
+The current generated-signature broker suite passes 26 controls; seven targeted
 controls fail for the intended reasons before and pass after narrower fixes.
-Current shadow29,peer-contract30 and closed-native checks also pass. The two-route
-whole-file review met quorum and has22 rulings:5applied/modified,14rejected,
-3deferred around complete executable/dependency custody. A final rehash detects
+Current shadow 29, peer-contract 30 and closed-native checks also pass. The two-route
+whole-file review met quorum and has 22 rulings: 5 applied/modified, 14 rejected,
+3 deferred around complete executable/dependency custody. A final rehash detects
 an admission-window change but is not atomic launch protection. Two applied
 findings also remain uncertified by the local validator because the reviewer
 named a nonexistent shorthand file; neither reports nor paths are forged to
 close that coverage limitation. No completion receipt is claimed.
-At that earlier checkpoint the canonical broker suite made the catalogue165 commands; no fresh
+At that earlier checkpoint the canonical broker suite made the catalogue 165 commands; no fresh
 165-command pass is claimed. A malformed sibling-step indentation was reproduced
 and corrected in the test workflow; both workflows parse with the existing local
 YAML parser. Historical scratch packaging still fails the prospective hygiene
@@ -298,10 +298,10 @@ same controls pass after local-path spelling checks, first-wins cleanup and an
 expiry recheck before launch. A separate failing-first identity control now refuses
 overlong run IDs before reservation. The localhost test substitutes only the socket
 address; it is not the real Tailscale route, remote authentication or qualification.
-Both fresh whole-file reviews met two-route quorum and all36 items now have
+Both fresh whole-file reviews met two-route quorum and all 36 items now have
 individual rulings (6 modified,30 rejected). Matching current-source local
-completion validators pass for these two files only. Expanded canonical worker32,
-shadow29,peer-contract30 and closed-native checks pass; separate real owned
+completion validators pass for these two files only. Expanded canonical worker 32,
+shadow 29, peer-contract 30 and closed-native checks pass; separate real owned
 localhost TLS controls also pass. This is not a second independent review of the
 corrected bytes, a new full-pack pass or native/backend qualification.
 The snapshot's running pack is not a frozen test of this development tree.
@@ -319,7 +319,7 @@ directions, acceptance controls, dependencies, scope recommendation and correcti
 to the supplied competitive claims are in [the 1.19 preplan](references/plan-1.19.md).
 [The research dossier](references/research-1.19.md) distinguishes selected pinned
 source inspection from documentation-only comparisons. Two whole-file planning
-reviews met two-route quorum; all25 items have rulings(20modified,5rejected), and
+reviews met two-route quorum; all 25 items have rulings(20 modified, 5 rejected), and
 the corrected document bytes passed local completion checks. These scoped records
 are not a second peer review of the corrected bytes, a release promise, native
 Bumbler qualification or permission to activate connectors. Existing 1.18
@@ -354,7 +354,7 @@ but quarantined, reconstruct only an absent result matching the original input
 and result hashes at the original time, and close an unverified lock descriptor
 without deleting its lock. No partial existing record is overwritten. The expanded
 ten-case recovery suite and the existing admission/transmission/evidence boundary
-investigations pass. All22 stage-review items have individual rulings and the
+investigations pass. All 22 stage-review items have individual rulings and the
 current-source local validator passes for this one file. The two expanded test
 files subsequently received separate whole-file quorum and individual rulings;
 a fresh integrated pack remains required. These are scoped local records, not
@@ -370,8 +370,8 @@ controls require the intended terminal-refusal error and remove unmeasured activ
 counters. A mirrored-origin ENOENT was reproduced and fixed by resolving the
 canonical scripts directory in both contexts. Earlier faulty stdin-launch probes
 are retained as setup failures, not intended reproductions. Refreshed proofs use
-the final harness bytes. One added evidence suite makes the selection164 commands;
-the previous163/163 checkpoint is unchanged historical evidence, not this pack.
+the final harness bytes. One added evidence suite makes the selection 164 commands;
+the previous 163/163 checkpoint is unchanged historical evidence, not this pack.
 The added evidence suite also has failing-first controls rejecting an unrelated
 child failure and an empty success object. It now requires the injected refusal
 to execute and positively identifies the selected case and its result counts.
@@ -380,9 +380,9 @@ is preserved separately from any later current-source review. Every receipt must
 be revalidated after a test-byte change; old proof references are retained with
 explicit corrections, never silently promoted to current evidence.
 Full current integrated/hosted and broader source-graph gates remain open.
-The first fresh164 attempt found a missing first-statement evidence-home reset
+The first fresh 164 attempt found a missing first-statement evidence-home reset
 in the added suite:45 commands passed, one hygiene command failed, the active
-47th command was intentionally interrupted, and117 remained unstarted. The owned
+47th command was intentionally interrupted, and 117 remained unstarted. The owned
 offline process tree was stopped only after exact identity verification; the
 wrapper saved terminal failure with captured source unchanged. The same hygiene
 check failed before and passed after the required reset was added. This is not a
@@ -393,10 +393,10 @@ closes its descriptor while retaining the unverified lock name; Undo refuses
 missing/invalid/future archive times and restores only disabled metadata; settings
 authentication failures invalidate the session even with non-JSON bodies; and an
 editor refuses a missing saved connection instead of silently editing a detached
-draft. The expanded registry12-case and production-client11-case suites pass.
+draft. The expanded registry 12-case and production-client 11-case suites pass.
 The earlier two source reviews failed quorum on another route timeout and remain
 failed; current-source alternate review and a complete pack are separate gates.
-The next two frozen164 attempts remain partial, not pooled passes:79 commands
+The next two frozen 164 attempts remain partial, not pooled passes:79 commands
 passed before the registry/UI defects above were independently reproduced, and
 31 passed in the following attempt before a later UI session-race reproduction.
 Their owned offline children were intentionally stopped and each wrapper saved
@@ -406,11 +406,11 @@ cannot rebind a new wording dialog; null refusal bodies have a safe diagnostic;
 accepted malformed write replies remain outcome-unknown/no-retry; CLI conversion
 explicitly posts OAuth; advanced connection metadata cannot be silently discarded;
 and a wording target leaving the view gets an explicit recovery refusal. The
-production-client boundary suite now has15 cases; the existing9-case behavior
+production-client boundary suite now has 15 cases; the existing 9-case behavior
 suite also passes. These are synthetic client controls, not real browser/native
-qualification. Alternate registry review failed1/2 quorum; UI review met2/2 but
+qualification. Alternate registry review failed 1/2 quorum; UI review met 2/2 but
 still has an explicit missing-connection repair-workflow deferral. Its independent
-second look confirmed that gap. All35 alternate-review items have individual
+second look confirmed that gap. All 35 alternate-review items have individual
 rulings:7 modified,18 rejected,10 deferred across those two source files. Full
 persisted-state validation, bounded archive-recovery/lifecycle work, current full
 pack/source-graph review and protected native broker gates remain open.
@@ -420,12 +420,12 @@ no-op Next and stale-decision paths can no longer pass without the expected page
 transition or precise visible refusal; JSON authentication loss clears a populated
 snapshot; and missing-connection tests exercise the actual caught click path.
 Selected-case reports distinguish executed from available cases and report measured
-mock fetches separately from unavailable real transport instrumentation. All14
-test-review items have individual rulings(9modified,5rejected). These controlled
+mock fetches separately from unavailable real transport instrumentation. All 14
+test-review items have individual rulings(9 modified, 5 rejected). These controlled
 in-memory mutations do not qualify real browsers, sockets or backend releases;
 final byte-bound validation and the new complete pack remain separate gates.
-The following complete164-command run executed every command on Windows/Node22.16:
-163 passed and one legacy adoption-test expectation failed, with all481 captured
+The following complete 164-command run executed every command on Windows/Node 22.16:
+163 passed and one legacy adoption-test expectation failed, with all 481 captured
 text/code/doc hashes unchanged. That failed run is preserved, never backfilled.
 The old assertion expected exact missing-result reconstruction to throw, contrary
 to the reviewed recovery contract. Its corrected case verifies original input,
@@ -435,7 +435,7 @@ was not changed. The corrected test received independent whole-file quorum;
 six item-bound controls fail before and pass after exact error-path matching,
 preserved test/cleanup causes, inherited-selector refusal and exact conservative
 charge assertions. Import-sentinel and read-only qualification investigations and
-all four canonical cases pass. All13 review items have rulings(6modified,7rejected).
+all four canonical cases pass. All 13 review items have rulings(6 modified, 7 rejected).
 A fresh full pack is required on these bytes; none of this releases a real job,
 qualifies the native broker or closes the separate production/source/platform gates.
 Unknown admission/transmission still cannot clear a reservation or grant a resend;

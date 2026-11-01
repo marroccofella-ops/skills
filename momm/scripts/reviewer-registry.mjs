@@ -19,7 +19,7 @@ function fields(value,keys){if(!plain(value)||Object.keys(value).some(key=>!keys
 function text(value,max=200){if(typeof value!=='string'||!value.trim()||value.length>max||/[\x00-\x08\x0b-\x1f]/.test(value))throw fault('invalid_configuration','Invalid text field.');return value.trim();}
 export function normalizeEndpoint(value){
   if(typeof value==='string'&&/[?#]/.test(value))throw fault('invalid_endpoint','Use an HTTPS API base without query or fragment delimiters.');
-  const url=new URL(text(value,2048));
+  const raw=text(value,2048);let url;try{url=new URL(raw);}catch{throw fault('invalid_endpoint','Use a valid HTTPS API base URL.');}
   if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||!/^\/[A-Za-z0-9/_-]*$/.test(url.pathname))throw fault('invalid_endpoint','Use an HTTPS API base with no credentials, query or fragment.');
   const host=url.hostname.replace(/^\[|\]$/g,'').replace(/\.$/,'').toLowerCase();
   if(!host||host.endsWith('.'))throw fault('invalid_endpoint','Use a valid endpoint host with at most one DNS root dot.');

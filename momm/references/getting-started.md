@@ -71,7 +71,7 @@ OAuth presence is only local evidence, not proof that a session is live. The Set
 
 ### Setup action feedback (1.17.4)
 
-A sign-in click leaves a receipt on its card for the lifetime of that tab, rather than only a
+A sign-in click leaves a receipt on its card until that tab reloads, rather than only a
 temporary notification. **Launch request accepted** means the terminal process was admitted;
 the page cannot observe completion inside a detached terminal, prove that a browser opened,
 or certify the login. Finish the provider's login yourself, then choose **Verify after login**.

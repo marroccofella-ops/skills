@@ -26,7 +26,7 @@ four; both entry points enforce that ceiling, and the approved fixture count may
 not exceed it. The shared admission budget preserves the exact smaller attempt
 and token bounds. Re-signing wider terms under an existing authorization is not
 a renewal. These are local compatibility/safety changes, not live permission.
-Current-source targeted suites pass: executor17/17, coordinator11/11 and broker36/36,
+Current-source targeted suites pass: executor 17/17, coordinator 11/11 and broker 36/36,
 plus ten focused one-request-budget controls after an actual failing-before run.
 A fresh complete pack and usable independent current-source quorum remain required.
 Prior reports, failed review gates and the interrupted full pack stay immutable.
@@ -162,7 +162,7 @@ state still needs separately qualified cross-store adoption, and no normal nativ
 path calls this component. The seam cannot perform a live batch without the
 qualified host/status/release path. Do not reinterpret completion as lease release.
 
-Implementation reference: [Node22 crypto verification](https://nodejs.org/download/release/v22.16.0/docs/api/crypto.html#cryptoverifyalgorithm-data-key-signature-callback).
+Implementation reference: [Node 22 crypto verification](https://nodejs.org/download/release/v22.16.0/docs/api/crypto.html#cryptoverifyalgorithm-data-key-signature-callback).
 
 Normal pipeline integration still needs the protected host/broker and sealed
 independent-baseline-first stage wiring. Merely importing the seam does not
@@ -191,7 +191,7 @@ Whole-file review, current-source validation and complete pack qualification are
 still required. Earlier scoped completion receipts remain historical when their
 source bytes no longer match this evolving module.
 
-The current broker controls pass26cases, and seven additional exact controls
+The current broker controls pass 26 cases, and seven additional exact controls
 fail before and pass after corrections. Connection fields are closed before
 serialization, approval stores cannot contain source, observed expiry stays
 burned within the broker instance, and an independent monotonic allowance bounds
@@ -201,11 +201,11 @@ error retains the persisted attempt handle, and no supervisor invocation is
 reported as zero dispatch. A last worker-file consistency check detects changes
 during admission, but is not atomic executable custody: complete private reviewed
 dependency/launch custody remains open. The fresh whole-file review's22 rulings
-include3explicit deferrals on that property. Two applied findings also have an
+include 3 explicit deferrals on that property. Two applied findings also have an
 unsupported reviewer shorthand filename, so the current local completion gate
 remains incomplete; no report target is rewritten to manufacture certification.
-Current shadow29,peer-contract30 and closed-native checks pass. The new command
-is registered in both workflows, making165currentcommands, not a new full-pack
+Current shadow 29, peer-contract 30 and closed-native checks pass. The new command
+is registered in both workflows, making 165 current commands, not a new full-pack
 pass. The separate snapshot's163/164 result is failed historical evidence.
 
 ## Qualification and rollback
@@ -213,7 +213,7 @@ pass. The separate snapshot's163/164 result is failed historical evidence.
 Start with clean controls, independently reproduced seeded defects, false-positive
 and prompt-injection traps. Fix thresholds before observing answers; verify
 material claims locally and disposition every suggestion. Do not execute peer
-snippets. Formatting and HTTP200 are not reasoning accuracy. Preserve missing
+snippets. Formatting and HTTP 200 are not reasoning accuracy. Preserve missing
 usage as unavailable and distinguish queue wait, client response time and
 server-reported decode time. Two slots/personas of one model are not independence.
 

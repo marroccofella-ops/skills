@@ -29,8 +29,7 @@ assert.equal([...hub.matchAll(/data-momm-version/g)].length, 1, 'hub needs one g
 assert(hub.includes(`<span data-momm-version>${expectedVersion}</span>`), 'hub must show the exact manifest version');
 const sitemap = fs.readFileSync(path.join(root, 'docs/sitemap.xml'), 'utf8');
 assert(!sitemap.includes('<lastmod>2026-09-04</lastmod>'), 'do not reuse the historical evidence date as current page modification time');
-const developmentMetadata=JSON.parse(fs.readFileSync(path.join(root,'versions.json'))).momm_development;
-for (const page of ['start.html', 'updates.html', 'reference.html', 'technical.html', 'watch/overview.html', 'watch/setup.html', 'watch/trailer.html', ...(developmentMetadata?[]:[`releases/${expectedVersion}.html`]), 'releases/upgrade.html'])
+for (const page of ['start.html', 'updates.html', 'reference.html', 'technical.html', 'watch/overview.html', 'watch/setup.html', 'watch/trailer.html', `releases/${expectedVersion}.html`, 'releases/upgrade.html'])
   assert(sitemap.includes(`https://marroccofella.github.io/skills/momm/${page}`), `sitemap omits ${page}`);
 const files = ["index.html", "start.html", "updates.html", "evidence.html", "technical.html", "reference.html", "data/index.html"];
 let localLinks = 0;

@@ -19,14 +19,14 @@ Pushing this development branch does not install or release version 1.18.
 five connection/broker controls, and the budget test requires its exact rejection
 instead of accepting an unrelated scripting error. Both defects were reproduced
 before repair and passed the same controls afterward. Antigravity returned this
-scoped test review; Claude timed out. Its two-reviewer quorum remains unmet, and
+scoped test review; Claude timed out. That scoped review's two-reviewer quorum remains unmet, and
 this is not whole-candidate review closure.
 
 27 October working scope: the installed protocol and current BAB qualification
 route remain OAuth-only, without an API-key fallback. The new private OAuth frame,
 peer worker and discovery/code-exchange transport are development components tested
 with mocks; they do not activate a native connector, real consent/TLS host or
-backend physical-release observer. Stable1.17.3 is unchanged and1.18 is unreleased.
+backend physical-release observer. Stable 1.17.3 is unchanged and 1.18 is unreleased.
 
 Current authentication policy: OAuth/account sessions only, with no API-key
 fallback. Earlier optional-key design proposals are not the current operating
@@ -59,7 +59,7 @@ logging/disclosure policy in addition to transport/role qualification.
 ## Development evidence — not release closure
 
 The frozen 15 October checkpoint passed all 163 canonical commands on Windows
-x64/Node22.16, with its 474 captured source hashes unchanged. It precedes later
+x64/Node 22.16, with its 474 captured source hashes unchanged. It precedes later
 review-driven corrections and is not a current integrated final-pack claim.
 Planner restoration now journals admission time and investigation success/halt,
 replays per-event admission limits, and refuses version-one undated history rather
@@ -80,7 +80,7 @@ times; a missing old admission intent stays inspectable and quarantined. Exact
 missing-result reconstruction makes no model request, new send permit or physical
 release. Existing partial records are never overwritten. The ten canonical
 recovery controls and existing admission/transmission/evidence boundary
-investigations pass; all22 stage-file review items have individual rulings and its
+investigations pass; all 22 stage-file review items have individual rulings and its
 file-specific current-source local validator passes. Independent review of the
 two expanded test files subsequently met separate whole-file quorum with
 individual rulings and file-specific local validation. A fresh integrated pack
@@ -96,56 +96,56 @@ with a positive control, intended terminal-error checking and honest unavailable
 instrumentation metadata. The harness resolves canonical scripts in both mirrored
 contexts; the workflow mirror/catalogue contract passes. A faulty initial stdin
 invocation is retained as failed setup, not a reproduction. The new registered
-evidence suite makes164 selected commands. Current-byte proof refresh and a complete
-integrated164 pack are still separate from the historical163 pass, hosted platforms,
+evidence suite makes 164 selected commands. Current-byte proof refresh and a complete
+integrated 164 pack are still separate from the historical 163 pass, hosted platforms,
 protected broker/coordinator, real backend evidence and actual BAB qualification.
 The evidence suite itself was tightened after failing-first controls showed that
 an unrelated failure object or an empty success object could satisfy weak checks.
 It now requires execution of the injected refusal and positive case/result shape.
 Its initial review failed quorum on a route timeout; no later vote is pooled into
 that attempt. Final source/test-byte binding remains mandatory after each change.
-The first fresh164 pack was stopped after a confirmed new-suite isolation omission
-(45pass,1hygiene failure,1interrupted,117unstarted); it is retained as failed/partial.
+The first fresh 164 pack was stopped after a confirmed new-suite isolation omission
+(45 pass, 1 hygiene failure, 1 interrupted, 117 unstarted); it is retained as failed/partial.
 The same hygiene test failed before and passed after the first-statement caller
 evidence-home reset. A fresh complete pack is required; no result is backfilled.
 Subsequent frozen-source investigation reproduced initial registry-lock handle
 cleanup, invalid archive-time Undo, non-JSON auth invalidation and missing saved
 connection editing defects. Seven item-specific pairs failed before and passed
-after the narrow corrections; the expanded registry12 and client11 suites pass.
+after the narrow corrections; the expanded registry 12 and client 11 suites pass.
 Unknown locks remain retained, Undo restores only disabled metadata, and native
 operations remain blocked. The original two source reviews failed quorum on a
 route timeout; neither corrections nor local tests replace fresh source quorum.
-Two subsequent164 attempts are also retained as partial:79 and31 commands passed
+Two subsequent 164 attempts are also retained as partial:79 and 31 commands passed
 before independently reproduced source defects prompted exact owned-offline-tree
 stops. Both terminal wrappers preserved their unchanged captured source; neither
 is a complete pack or a timeout-based restart. Seven further UI item checks fail
 before and pass after session-epoch response ownership, bounded null/malformed
 reply classification, explicit CLI OAuth conversion, refusal of discarded advanced
-fields and a precise hidden-wording-target recovery message. All15 production-
-client boundary controls and the existing9 behavior controls pass synthetically.
+fields and a precise hidden-wording-target recovery message. All 15 production-
+client boundary controls and the existing 9 behavior controls pass synthetically.
 An accepted malformed write reply is unknown/no-retry, not an invented refusal or
-release. The alternate registry review failed1/2 quorum. The UI review met2/2 but
+release. The alternate registry review failed 1/2 quorum. The UI review met 2/2 but
 its explicit missing-connection repair workflow remains deferred, independently
-confirmed in a one-claim second look. Individual rulings cover all35 items across
+confirmed in a one-claim second look. Individual rulings cover all 35 items across
 those two reviews:7 modified,18 rejected,10 deferred. Full persisted metadata
 validation, archive recovery, lifecycle consistency, protected broker/coordinator,
 fresh full pack and broader source/platform/release gates are still open.
-Independent whole-file review of the expanded client test met2/2 quorum; all14
-items have rulings(9modified,5rejected). Nine exact test-adequacy controls fail
-before and pass after the corrected oracles. Paging must reach a distinct page25
+Independent whole-file review of the expanded client test met 2/2 quorum; all 14
+items have rulings(9 modified, 5 rejected). Nine exact test-adequacy controls fail
+before and pass after the corrected oracles. Paging must reach a distinct page 25
 before clamping; stale decisions need the precise visible refusal with no POST;
 JSON auth loss clears an already populated snapshot; and the missing-connector
 case runs the caught production click path. Selected executions count one case,
 not every available case. Mock fetch counts are measured, while actual transport
 instrumentation is explicitly unavailable. This is synthetic test-quality evidence,
 not native or real-browser qualification or a complete current full-pack claim.
-A later full164-command run completed163pass/1fail with481captured source hashes
+A later full 164-command run completed 163 pass/1 fail with 481 captured source hashes
 unchanged. Its failure was the old adoption-test expectation that exact missing-
 result recovery must throw. The original failed report is preserved. The corrected
 case retains original hashes/time, attempts and conservative charges, keeps the
 physical hold and refuses to overwrite an existing partial result; runtime bytes
-are unchanged. Whole-file independent quorum and13individual rulings(6modified,
-7rejected), six failing-before/passing-after evidence controls, two current-source
+are unchanged. Whole-file independent quorum and 13 individual rulings(6 modified,
+7 rejected), six failing-before/passing-after evidence controls, two current-source
 investigations and all four canonical cases are recorded. A fresh full pack on the
 new test bytes is still a separate gate. This does not qualify real backend release,
 the protected broker/coordinator or broader source/platform/lifecycle publication.
@@ -273,7 +273,7 @@ documented remote status/release adapter are still unqualified; this is not a li
 Real-click testing on an isolated empty dashboard verified first-use Add/save, personal
 wording save and exact-hash approval, with a clean browser console. The fixture stayed disabled
 and unqualified; no real Bab settings, accounts or keys were used. The original frozen full
-run was111/114,exit1; subsequent targeted fixes are not substituted for that result.
+run was 111/114, exit 1; subsequent targeted fixes are not substituted for that result.
 
 Four supplementary-stage review claims have actual failing-before/passing-after observations:
 qualification age is anchored to original journal terminal time while preserving adjudication

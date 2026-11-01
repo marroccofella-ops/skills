@@ -36,7 +36,7 @@ assert(visible.includes('href="../sitemap.xml"'),'project sitemap linked from ho
 for(const word of ['governor','reviewer','quorum','Install in one line']) assert(visible.includes(word),`${word} available without JS or video`);
 assert(home.includes('<meta name="robots" content="index,follow">'));
 const sitemap=read('docs/sitemap.xml');
-for(const page of ['', 'install.html','start.html','reference.html','evidence.html',...(manifest.momm_development?[]:[`releases/${version}.html`])]) assert(sitemap.includes(`<loc>https://marroccofella.github.io/skills/momm/${page}</loc>`));
+for(const page of ['', 'install.html','start.html','reference.html','evidence.html',`releases/${version}.html`]) assert(sitemap.includes(`<loc>https://marroccofella.github.io/skills/momm/${page}</loc>`));
 if(manifest.momm_development){
   const developmentVersion=manifest.momm_development.version;
   assert(!sitemap.includes(`/releases/${developmentVersion}.html`),'unpublished development is not a public sitemap record');

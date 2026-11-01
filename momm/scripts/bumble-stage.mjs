@@ -454,7 +454,7 @@ export class BumbleStage {
     return this.#locked(()=>{
       const {state,plan}=this.#read();
       if(state.investigations.includes(candidate_key))return {admitted:false,reason:'already_investigated',quorum_votes:0};
-      const candidates=state.attempts.filter(a=>a.state==='terminal').flatMap(a=>JSON.parse(this.#regularBytes(path.join(this.#root,`result-${a.reservation_id}.json`))).candidates||[]);
+      const candidates=state.attempts.filter(a=>a.state==='terminal').flatMap(a=>JSON.parse(this.#regularBytes(this.#resultPath(a))).candidates||[]);
       if(!candidates.some(c=>c.key===candidate_key))throw Error('Candidate is not in an original supplementary result.');
       if(!plan.investigate()){state.plan=plan.snapshot();this.#save(state);return {admitted:false,reason:'investigation_budget',quorum_votes:0};}
       state.investigations.push(candidate_key);state.plan=plan.snapshot();this.#save(state);return {admitted:true,quorum_votes:0};
