@@ -1052,7 +1052,7 @@ function sanitizeText(text) {
     /\b(?:sk-ant-|sk-proj-|xai-|ghp_|gho_|ghu_|ghs_|github_pat_)[A-Za-z0-9._-]{12,}\b/g,
     /\bsk-[A-Za-z0-9]{20,}\b/g,
     /\bAKIA[0-9A-Z]{16}\b/g,
-    /((?:api[_-]?key|password|secret|bearer)\s*[:=]\s*["']?)[^\s"']{8,}/gi,
+    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=]\s*["']?)[^\s"']{8,}/gi,
     /\b(bearer[ \t]+)[A-Za-z0-9._~+\/-]{8,}=*/gi,
   ];
   let value = text;
@@ -3300,6 +3300,7 @@ async function selfTest(pretty) {
         && buildOutstanding([], [], "fixture", os.tmpdir()).complete === false;
     })(),
     temp_location_detected_as_ephemeral: isEphemeralLocation(os.tmpdir()) === true,
+    sanitizer_redacts_quoted_keys: ['{"password":"synthetic12345"}', '{"api_key":"synthetic12345"}', '{"secret":"synthetic12345"}', "{'password':'synthetic12345'}"].every((text) => !sanitizeText(text).value.includes("synthetic12345")),
     sanitizer_no_offset_leak: sanitizeText("token s" + "k-ant-abcdefghijklmnop end").value === "token [REDACTED] end"
       && sanitizeText("api_key=supersecretvalue").value === "api_key=[REDACTED]",
     severity_merge_takes_max: (() => {
