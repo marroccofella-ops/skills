@@ -21,7 +21,7 @@ import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./at
 import { resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
-import { BUILT_IN_ROUTES, BUMBLER_CLIENT, bumblerAnswer, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
+import { BUILT_IN_ROUTES, BUMBLER_CLIENT, BUMBLER_GUIDANCE, bumblerAnswer, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
 import { ROLE_NAMES, loadRole, loadAllRoles, roleBrief, roleSection, roleGuidanceLayer, staleBriefNotices } from "./roles.mjs";
 import { ATTEMPT_BUDGET, COVERABLE_STATUSES, MODEL_FAMILIES, runPieceCovers, coverSection, coverReportRow, pieceCoverSummary } from "./cover.mjs";
 import { runSecondLook } from "./second-look.mjs";
@@ -1829,7 +1829,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     const bumbler = options.bumblers[agent];
     command = process.execPath;
     args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens)];
-    input = assemblePrompt(contract, options.guidanceRoutes?.[agent] ?? "", artifact);
+    input = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, options.guidanceRoutes?.[agent] ?? "", artifact);
   } else {
     return { agent, status: "unsupported", detail: "no reviewed adapter exists" };
   }
