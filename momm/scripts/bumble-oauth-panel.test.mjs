@@ -81,6 +81,19 @@ async function reviewPoolOrder(){
   const f={name:{value:'new'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){}}});await flush();
   release();await flush();assert.match(node('bump-list').innerHTML,/new/,'a slow older read cannot replace a newer result');assert.doesNotMatch(node('bump-list').innerHTML,/old/);
 }
-const cases={pool:reviewPool,poolOrder:reviewPoolOrder,lost:()=>sessionDuringSave(null),rotated:()=>sessionDuringSave('synthetic-replacement'),transport:()=>sameSessionFailure('transport'),refresh:()=>sameSessionFailure('refresh'),refusal:()=>sameSessionFailure('refusal'),malformed:()=>sameSessionFailure('malformed'),serverText:()=>sameSessionFailure('server-text'),serverJson:()=>sameSessionFailure('server-json')};
+async function reviewPoolEdit(){
+  const nodes=new Map();let publish,release;
+  const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',value:'',disabled:false,open:false,setAttribute(){},addEventListener(){},querySelector(){return node('submit');},showModal(){this.open=true;},close(){this.open=false;}});return nodes.get(id);};
+  const values={label:'Synthetic reviewer',kind:'bumbler',auth_mode:'oauth',connector_id:'',base_url:'',model_id:'',route:'codex',task_type:'source-check',pod_id:'',certificate:''};
+  const form=node('bee-form');form.elements=Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{value,innerHTML:''}]));form.reset=()=>{};
+  const snapshot={revision:1,total:0,profiles:[],connectors:[],baseline_excluded:[],counts:{registered:0,enabled:0,active_jobs:0}};
+  const fetch=async(url,options)=>{if(!String(url).startsWith('/api/bumblers'))return{ok:true,json:async()=>snapshot};return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({bumblers:[]})});});};
+  vm.runInNewContext(source,{document:{querySelector:()=>node('root'),getElementById:node,createElement:()=>node('dialog-'+nodes.size),body:{append(){}}},window:{mommSetupSession:{subscribe:fn=>{publish=fn;}}},fetch,Promise,JSON,encodeURIComponent,Number});
+  publish('synthetic-session');await flush();
+  const f={name:{value:'one'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};let resets=0;
+  const pending=node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});await flush();f.name.value='two';release();await pending;await flush();assert.equal(resets,0,'newer typing survives a slow save');
+  const again=node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});await flush();release();await again;assert.equal(resets,1,'an unchanged form still resets');
+}
+const cases={pool:reviewPool,poolEdit:reviewPoolEdit,poolOrder:reviewPoolOrder,lost:()=>sessionDuringSave(null),rotated:()=>sessionDuringSave('synthetic-replacement'),transport:()=>sameSessionFailure('transport'),refresh:()=>sameSessionFailure('refresh'),refusal:()=>sameSessionFailure('refusal'),malformed:()=>sameSessionFailure('malformed'),serverText:()=>sameSessionFailure('server-text'),serverJson:()=>sameSessionFailure('server-json')};
 const selected=process.argv[2];if(selected){assert(cases[selected]);await cases[selected]();}else for(const run of Object.values(cases))await run();
 console.log(JSON.stringify({passed:true,network_calls:0,credentials_read:false,scope:'actual initializer generates an OAuth-only editor without credential input or implicit login; not a browser auth test'}));
