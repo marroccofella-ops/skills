@@ -380,7 +380,9 @@ jobs:
         run: node momm/scripts/bumble-publication-followup.test.mjs
       - name: Test Bumbler reviewer route
         if: ${{ !cancelled() }}
-        timeout-minutes: 2
+        # Private Windows inspection includes PowerShell startup. The independent
+        # clean-head integration took 366s; keep a finite startup-inclusive bound.
+        timeout-minutes: ${{ matrix.os == 'windows-latest' && 10 || 2 }}
         run: node momm/scripts/bumbler-route.test.mjs
       - name: Bumbler recipient configuration controls
         if: ${{ !cancelled() }}
