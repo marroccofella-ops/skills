@@ -37,14 +37,15 @@
     if(!response.ok&&[401,403].includes(response.status))window.mommSetupSession?.invalidate?.(sentToken);
     let value;try{value=await response.json();}catch{
       if(sentEpoch!==sessionEpoch||token!==sentToken)throw obsoleteSession();
-      throw Object.assign(Error(body&&response.ok?'Settings write outcome is unknown; do not retry. Refresh and reconcile the saved settings.':'Settings request refused.'),{uncertain_write:Boolean(body&&(response.ok||response.status>=500))});
+      throw Object.assign(Error(body&&(response.ok||response.status>=500)?'Settings write outcome is unknown; do not retry. Refresh and reconcile the saved settings.':'Settings request refused.'),{uncertain_write:Boolean(body&&(response.ok||response.status>=500))});
     }
     if(sentEpoch!==sessionEpoch||token!==sentToken)throw obsoleteSession();
-    if(!response.ok){const error=Error(typeof value?.error==='string'?value.error:'Settings request refused.');error.code=value?.code;error.uncertain_write=Boolean(body&&response.status>=500);throw error;}
+    if(!response.ok){const error=Error(body&&response.status>=500?'Settings write outcome is unknown; do not retry. Refresh and reconcile the saved settings.':typeof value?.error==='string'?value.error:'Settings request refused.');error.code=value?.code;error.uncertain_write=Boolean(body&&response.status>=500);throw error;}
     if(!value||typeof value!=='object'||Array.isArray(value))throw Object.assign(Error(body?'Settings write outcome is unknown; do not retry. Refresh and reconcile the saved settings.':'Settings response is invalid. Reopen the private dashboard.'),{uncertain_write:Boolean(body)});
     return value;
   }
-  async function refresh(){const epoch=++generation;try{const next=await api();if(epoch!==generation)return false;const lastOffset=Math.max(0,Math.floor((next.total-1)/PAGE_SIZE)*PAGE_SIZE);if(offset>lastOffset){offset=lastOffset;return refresh();}snapshot=next;completedReadGeneration=epoch;render();return true;}catch(error){if(epoch===generation)status(error.message);return false;}}
+  const usableSnapshot=value=>Number.isSafeInteger(value?.revision)&&Number.isSafeInteger(value?.total)&&Array.isArray(value?.profiles)&&Array.isArray(value?.connectors)&&Array.isArray(value?.baseline_excluded)&&Boolean(value?.counts)&&typeof value.counts==='object';
+  async function refresh(){const epoch=++generation;try{const next=await api();if(epoch!==generation)return false;if(!usableSnapshot(next))throw Error('Settings response is invalid. Reopen the private dashboard.');const lastOffset=Math.max(0,Math.floor((next.total-1)/PAGE_SIZE)*PAGE_SIZE);if(offset>lastOffset){offset=lastOffset;return refresh();}const previous=snapshot;snapshot=next;try{render();}catch(error){snapshot=previous;throw error;}completedReadGeneration=epoch;renderUncertainty();return true;}catch(error){if(epoch===generation)status(error.message);return false;}}
   function render(){
     $('bee-add').disabled=false;
     $('bee-form').querySelector('[type="submit"]').disabled=busy||!token||!snapshot||uncertainWrite;
