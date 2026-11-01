@@ -3753,7 +3753,10 @@ async function main() {
   // With pieces, corroboration runs over every piece result (same route may
   // appear once per piece); header-only quotes never corroborate.
   // A successful cover's findings join the pool under its own route name (sources never double-count a route).
-  const findings = rationalize(pieceResults ? pieceResults.flatMap((piece) => [...piece.results, ...piece.covers.map((c) => c.result)].map((r) => ({ ...r, piece: piece.id }))) : [...results, ...coverResults.map((c) => c.result)], { prose, artifact: sanitized.value })
+  const reviewedRows = pieceResults ? pieceResults.flatMap((piece) => [...piece.results, ...piece.covers.map((c) => c.result)].map((r) => ({ ...r, piece: piece.id }))) : [...results, ...coverResults.map((c) => c.result)];
+  // What a Bumbler raised reaches the governor even when its quotes failed. Its row keeps the true status.
+  const bumblerOpinions = reviewedRows.filter((r) => r.unverified_answer).map((r) => ({ agent: r.agent, status: "success", ...(r.piece ? { piece: r.piece } : {}), review: { findings: normalizeReview(r.agent, { findings: r.unverified_answer.findings }).findings.map((f) => ({ ...f, quotes_unverified: true })) } }));
+  const findings = rationalize([...reviewedRows, ...bumblerOpinions], { prose, artifact: sanitized.value })
     .map((f) => ({ ...f, sources: [...new Set(f.sources)], ...(f.quote && headerOnlyQuote(f.quote) ? { header_only_quote: true } : {}) }));
   // Join key linking this report, the run log, and governor dispositions.
   const guidanceSidecar = { written: false, path: null, error: null };
