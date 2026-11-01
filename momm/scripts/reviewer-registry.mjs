@@ -124,7 +124,21 @@ export class ReviewerRegistry {
         if(digest(existing)!==sha256){
           // A strict prefix of these exact bytes is an interrupted write of this archive.
           if(existing.length>=bytes.length||!bytes.subarray(0,existing.length).equals(existing))throw fault('invalid_store','An original settings-history archive changed.');
-          const writer=fs.openSync(file,'r+');try{fs.writeSync(writer,bytes,existing.length,bytes.length-existing.length,existing.length);fs.fsyncSync(writer);}finally{fs.closeSync(writer);}
+          const remaining=bytes.length-existing.length;
+          if(stored+remaining>MAX_AUDIT_BYTES)throw fault('storage_budget','Private settings history budget reached. Original files retained.');
+          const writer=fs.openSync(file,'r+');
+          try{
+            let offset=existing.length;
+            while(offset<bytes.length){
+              const written=fs.writeSync(writer,bytes,offset,bytes.length-offset,offset);
+              if(!Number.isSafeInteger(written)||written<1||written>bytes.length-offset)throw fault('invalid_store','Private settings history write did not complete.');
+              offset+=written;
+            }
+            fs.fsyncSync(writer);
+            // Explicit-position writes leave this newly opened descriptor at zero.
+            if(fs.fstatSync(writer).size!==bytes.length||digest(fs.readFileSync(writer))!==sha256)throw fault('invalid_store','Private settings history write did not verify.');
+          }finally{fs.closeSync(writer);}
+          stored+=remaining;
         }
       }
       if(!state.event_archives.some(a=>a.sha256===sha256))state.event_archives.push({sha256,count:events.length,bytes:bytes.length});

@@ -8,6 +8,7 @@ import {ReviewerRegistry,normalizeEndpoint} from './reviewer-registry.mjs';
 import {applyReviewerSettings} from './reviewer-selection.mjs';
 import * as selection from './reviewer-selection.mjs';
 import {chooseSecondLookRoute} from './second-look.mjs';
+import {archiveRecoveryControls} from './reviewer-archive-recovery-controls.mjs';
 delete process.env.MOMM_EVIDENCE_HOME;
 function selectionInspectionControls(){
  const source=fs.readFileSync(new URL('./reviewer-selection.mjs',import.meta.url),'utf8'),script=source.replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'')+'\n;globalThis.apply=applyReviewerSettings;',root=path.join(os.tmpdir(),'synthetic-reviewer-settings-not-read');
@@ -108,6 +109,7 @@ try {
    store.command({op:'exclude_cli',route:'grok',revision:store.read().revision});const archive=store.read().event_archives.at(-1),file=path.join(home,'events-'+archive.sha256+'.json');assert.equal(fs.statSync(file).size,archive.bytes,'the partial file is completed');
    const bad=Buffer.alloc(40,97);fs.writeFileSync(file,bad);assert.throws(()=>store.mutate(store.read().revision,state=>{state.events=Array.from({length:501},(_,n)=>({id:'e'+n,at:'2026-10-10T00:00:00.000Z',action:'x',profile_id:'p'}));}),{code:'invalid_store'},'a changed archive still refuses');
   });
+  test('archive recovery verifies writes and physical budget',()=>archiveRecoveryControls(fixture));
   test('unsupported migration retains original bytes',()=>{const original=fs.readFileSync(registry.file);const data=JSON.parse(original);data.schema='unsupported/99';fs.writeFileSync(registry.file,JSON.stringify(data));const unsupported=fs.readFileSync(registry.file);assert.throws(()=>registry.read(),/Unsupported registry/);assert.deepEqual(fs.readFileSync(registry.file),unsupported);fs.writeFileSync(registry.file,original);});
   console.log(JSON.stringify({passed:true,checks:count,network_calls:0,live_fleet:false}));
 }finally{assert(path.resolve(fixture).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-registry-test-'));fs.rmSync(fixture,{recursive:true,force:true});}
