@@ -370,6 +370,16 @@ export function inspectCompletion(root, runId, options = {}) {
     const successful = report.reviewers.filter(r => r.agent !== report.governor && r.status === "success");
     // Development reports marked advisory carried no vote; current Bumbler rows do.
     const voting = successful.filter(r => r.advisory !== true);
+    const independentVotes = rows => {
+      const identities = new Set();
+      return rows.filter(row => {
+        if(row.bumbler !== true)return true;
+        if(!/^[a-f0-9]{64}$/.test(row.endpoint_sha256)||typeof row.model!=='string'||!row.model.trim()){state.errors.push('Bumbler quorum vote lacks a bound backend identity');return false;}
+        const key=JSON.stringify([row.endpoint_sha256,row.model]);
+        if(identities.has(key)){state.errors.push('Bumbler quorum votes repeat one backend identity');return false;}
+        identities.add(key);return true;
+      });
+    };
     demand(successful.every(r => VERIFIED_CONTRACTS.has(r.review_contract) && Array.isArray(r.reviewed_scope) && r.reviewed_scope.length), "legacy/unverified reply contract; needs a fresh review");
     // 1.17 B3: covers are recounted here, never trusted. A cover must name a coverable failure of
     // another route on the same piece, stay inside the one attempt budget, and may add a quorum vote
@@ -433,7 +443,7 @@ export function inspectCompletion(root, runId, options = {}) {
       const perPiece = pieces.map(p => {
         const claimed = Object.entries(p.reviewers).filter(([agent, status]) => agent !== report.governor && status === "success").map(([agent]) => agent);
         for (const agent of claimed) if (!successful.some(r => r.agent === agent)) state.errors.push(`piece reviewer success has no successful verified row: ${p.id}: ${agent}`);
-        const ok = claimed.filter(agent => voting.some(r => r.agent === agent));
+        const ok = independentVotes(claimed.map(agent => voting.find(row => row.agent === agent)).filter(Boolean)).map(row => row.agent);
         const votes = coverVotesFor(p.id, ok);
         return { id: p.id, external_successes: ok.length + votes, met: ok.length + votes >= required, ok, answered: claimed.filter(agent => successful.some(r => r.agent === agent)) };
       });
@@ -456,8 +466,9 @@ export function inspectCompletion(root, runId, options = {}) {
         for (const p of perPiece) for (const agent of requested) if (agent !== report.governor && !p.answered.includes(agent)) state.errors.push(`strict reviewer policy not met on ${p.id}: ${agent}`);
       }
     } else {
-      const votes = coverVotesFor(null, voting.map(r => r.agent));
-      state.quorum = { required, achieved: voting.length + votes, met: voting.length + votes >= required, ...(coverRows.length ? { cover_votes: votes } : {}) };
+      const independent = independentVotes(voting);
+      const votes = coverVotesFor(null, independent.map(r => r.agent));
+      state.quorum = { required, achieved: independent.length + votes, met: independent.length + votes >= required, ...(coverRows.length ? { cover_votes: votes } : {}) };
       if (!state.quorum.met) state.errors.push("external review quorum not met");
       if (report.gate_policy?.strict && Array.isArray(requested) && requested.some(agent => agent !== report.governor && !successful.some(r => r.agent === agent))) {
         state.errors.push("strict reviewer policy not met");

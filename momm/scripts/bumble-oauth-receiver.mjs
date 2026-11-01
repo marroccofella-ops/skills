@@ -19,23 +19,25 @@ export async function openBumbleOAuthReceiver(options){
  const selection=selectBumbleOAuthCallback(assessment,{host,port:1}),profile=assessment.profile;
  function approval(){let value;try{value=authorize({operation:'open_callback_receiver',scope_binding,profile_sha256:selection.profile_sha256,deadline,now:Date.now()});}catch{fault('owner_approval_unavailable');}
   if(!closed(value,['schema','scope_binding','profile_sha256','policy_sha256','disclosure_sha256','logging_sha256','valid_until'])||value.schema!=='momm-bumble-receiver-approval/1'||value.scope_binding!==scope_binding||value.profile_sha256!==selection.profile_sha256||![value.policy_sha256,value.disclosure_sha256,value.logging_sha256].every(v=>SHA.test(v))||!Number.isSafeInteger(value.valid_until)||value.valid_until<deadline||value.valid_until<=Date.now()||value.valid_until-Date.now()>86400000)fault('owner_approval_required');return H(value);}
- const approval_binding=approval();let armed=null,settled=false,terminal=null,timer=null,requests=0,metadata=null;
+ const approval_binding=approval();let armed=null,settled=false,terminal=null,timer=null,requests=0,metadata=null,callbackResponse=null;
  const sockets=new Set();let resolveOutcome;const outcome=new Promise(resolve=>{resolveOutcome=resolve;});
  const server=http.createServer({maxHeaderSize:8192},(req,res)=>{
   const reply=(status,text)=>{res.writeHead(status,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'",Connection:'close'});res.end(text);};
-  if(settled){reply(410,'Callback closed.');return;}
-  requests++;if(requests>8){reply(429,'Callback budget exhausted.');res.once('finish',()=>finish({status:'request_budget'}));return;}
+  const finishReply=result=>{if(callbackResponse===null||callbackResponse===res)finish(result);};
+  if(settled||callbackResponse!==null){reply(410,'Callback closed.');return;}
+  requests++;if(requests>8){reply(429,'Callback budget exhausted.');res.once('finish',()=>finishReply({status:'request_budget'}));return;}
   if(req.method!=='GET'){reply(405,'Request refused.');return;}
   const hostCount=req.rawHeaders.filter((_,i)=>i%2===0&&req.rawHeaders[i].toLowerCase()==='host').length;
   if(!armed||hostCount!==1||req.headers.host!==new URL(metadata.redirect_uri).host||typeof req.url!=='string'||req.url.length>16000||!req.url.startsWith('/')||req.url.split('?')[0]!=='/momm/oauth/callback'||req.headers['transfer-encoding']||Number(req.headers['content-length']??0)!==0){reply(400,'Request refused.');return;}
-  if(Date.now()>=deadline){reply(410,'Callback expired.');res.once('finish',()=>finish({status:'timeout'}));return;}
-  try{if(approval()!==approval_binding)fault('owner_approval_changed');}catch{reply(403,'Approval unavailable.');res.once('finish',()=>finish({status:'approval_revoked'}));return;}
+  if(Date.now()>=deadline){reply(410,'Callback expired.');res.once('finish',()=>finishReply({status:'timeout'}));return;}
+  try{if(approval()!==approval_binding)fault('owner_approval_changed');}catch{reply(403,'Approval unavailable.');res.once('finish',()=>finishReply({status:'approval_revoked'}));return;}
   let material;try{material=consumeBumbleOAuthCallback(armed,metadata.redirect_uri+req.url.slice('/momm/oauth/callback'.length),{now:Date.now()});}catch(error){
    reply(400,'Callback refused.');
-   if(['authorization_refused','ambiguous_callback','invalid_code','expired_or_consumed'].includes(error.code))res.once('finish',()=>finish({status:'callback_refused'}));return;
+   if(['authorization_refused','ambiguous_callback','invalid_code','expired_or_consumed'].includes(error.code))res.once('finish',()=>finishReply({status:'callback_refused'}));return;
   }
+  callbackResponse=res;
   const result={status:'callback_received',private_material:true,exchange_material:material,listener_verified:true,login_verified:false,quorum_votes:0,completion:false,toJSON(){throw Error('Private callback material is not serializable.');}};
-  reply(200,'Callback received. You may close this tab.');res.once('finish',()=>finish(Object.freeze(result)));
+  reply(200,'Callback received. You may close this tab.');res.once('finish',()=>finishReply(Object.freeze(result)));
  });
  server.maxConnections=4;server.maxRequestsPerSocket=1;server.headersTimeout=5000;server.requestTimeout=10000;server.keepAliveTimeout=1000;
  server.on('connection',socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});

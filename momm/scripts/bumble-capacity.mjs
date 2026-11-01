@@ -79,12 +79,14 @@ export class BumbleCapacity {
   }
   #locked(fn){
     requirePrivateEvidence(this.#root);const lock=path.join(this.#root,'writer.lock');let fd;
-    try{fd=fs.openSync(lock,'wx',0o600);}catch{throw Error('Global capacity is busy; no stale lock is removed automatically.');}
-    const own=fs.fstatSync(fd,{bigint:true});let value,error;try{value=fn();}catch(e){error=e;}
-    let cleanup=false;
-    try{const stat=fs.lstatSync(lock,{bigint:true});if(stat.ino!==own.ino||(process.platform!=='win32'&&stat.dev!==own.dev)||stat.nlink!==1n||stat.isSymbolicLink())throw Error('Lock changed.');fs.unlinkSync(lock);}catch{cleanup=true;}
-    try{fs.closeSync(fd);}catch{cleanup=true;}
-    if(error)throw error;if(cleanup)throw Error('Global capacity write requires reconciliation.');return value;
+    const reconciliation=(cause,cleanup_error)=>{const error=Object.assign(new Error('Global capacity write requires reconciliation.',{cause}),{code:'MOMM_CAPACITY_LOCK_RECONCILIATION_REQUIRED',reconciliation_required:true});if(cause?.publication_possible===true)error.publication_possible=true;if(cleanup_error)Object.defineProperty(error,'cleanup_error',{value:cleanup_error});return error;};
+    try{fd=fs.openSync(lock,'wx',0o600);}catch(cause){if(cause?.code==='EEXIST')throw Error('Global capacity is busy; no stale lock is removed automatically.');throw Object.assign(new Error('Global capacity lock unavailable; no new work admitted.',{cause}),{code:'MOMM_CAPACITY_LOCK_UNAVAILABLE'});}
+    let own;try{own=fs.fstatSync(fd,{bigint:true});}catch(cause){let cleanup_error;try{fs.closeSync(fd);}catch(error){cleanup_error=error;}throw reconciliation(cause,cleanup_error);}
+    let value,error;try{value=fn();}catch(cause){error=cause;}
+    let cleanup_error;
+    try{const stat=fs.lstatSync(lock,{bigint:true});if(stat.ino!==own.ino||(process.platform!=='win32'&&stat.dev!==own.dev)||stat.nlink!==1n||stat.isSymbolicLink())throw Error('Lock changed.');fs.unlinkSync(lock);}catch(cause){cleanup_error=cause;}
+    try{fs.closeSync(fd);}catch(cause){cleanup_error??=cause;}
+    if(cleanup_error)throw reconciliation(error??cleanup_error,error?cleanup_error:undefined);if(error)throw error;return value;
   }
   #readMarker(){
     const stat=fs.lstatSync(this.#marker);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||stat.size<1||stat.size>4096)throw Error('Capacity initialization refused.');

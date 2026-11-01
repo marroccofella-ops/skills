@@ -1829,7 +1829,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     const bumbler = options.bumblers[agent];
     command = process.execPath;
     args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens)];
-    input = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}${bumbler.guidance ? `\n\n## This Bumbler's own guidance, from its owner\n${bumbler.guidance}` : ""}`, options.guidanceRoutes?.[agent] ?? "", artifact);
+    input = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, [bumbler.guidance ? `## This Bumbler's own guidance, from its owner\n${sanitizeText(bumbler.guidance).value}` : "", options.guidanceRoutes?.[agent] ?? ""].filter(Boolean).join("\n\n"), artifact);
   } else {
     return { agent, status: "unsupported", detail: "no reviewed adapter exists" };
   }

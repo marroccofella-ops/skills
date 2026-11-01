@@ -1654,6 +1654,7 @@ function createServer() {
           }
           return sendJson(response,405,{error:'Unsupported method.'});
         } catch (error) {
+          if(error?.uncertain_write===true)return sendJson(response,500,{error:'Bumbler settings may have been saved. Refresh and check saved Bumblers before repeating a change.',uncertain_write:true});
           return sendJson(response,400,{error:/^(Bumbler |bumblers\.json )/.test(error.message)?error.message:'Bumbler settings could not be read or saved.'});
         }
       }

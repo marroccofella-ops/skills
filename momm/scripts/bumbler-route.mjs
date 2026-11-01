@@ -78,6 +78,8 @@ function readSaved(env){
  if(!saved||typeof saved!=='object'||Array.isArray(saved))throw Error('bumblers.json must be an object of named Bumblers');
  return Object.fromEntries(Object.entries(saved).map(([name,entry])=>[name,checked(name,entry)]));
 }
+function unconfirmedBumblerWrite(){return Object.assign(Error('Bumbler settings may have been saved. Refresh and check saved Bumblers before repeating a change.'),{code:'BUMBLER_WRITE_UNCONFIRMED',uncertain_write:true});}
+function listAfterBumblerWrite(env){try{return listBumblers(env);}catch{throw unconfirmedBumblerWrite();}}
 function writeSaved(saved,env){
  const file=savedFile(env),temporary=`${file}.${process.pid}.tmp`;preparePrivateEvidence(path.dirname(file));
  try{fs.writeFileSync(temporary,JSON.stringify(saved,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);}
@@ -90,8 +92,8 @@ export function loadBumblers(env=process.env){
  return routes;
 }
 export function listBumblers(env=process.env){return Object.entries(readSaved(env)).map(([name,entry])=>({name,...entry}));}
-export function saveBumbler(name,entry,env=process.env){const saved=readSaved(env),next=checked(name,entry);for(const [other,value] of Object.entries(saved))if(other!==name&&value.base_url===next.base_url&&value.model===next.model)throw problem(name,'repeats a model server already saved under another name');saved[name]=next;writeSaved(saved,env);return listBumblers(env);}
-export function removeBumbler(name,env=process.env){const saved=readSaved(env);if(!Object.hasOwn(saved,name))throw problem(name,'not saved');delete saved[name];writeSaved(saved,env);return listBumblers(env);}
+export function saveBumbler(name,entry,env=process.env){const saved=readSaved(env),next=checked(name,entry);for(const [other,value] of Object.entries(saved))if(other!==name&&value.base_url===next.base_url&&value.model===next.model)throw problem(name,'repeats a model server already saved under another name');saved[name]=next;writeSaved(saved,env);return listAfterBumblerWrite(env);}
+export function removeBumbler(name,env=process.env){const saved=readSaved(env);if(!Object.hasOwn(saved,name))throw problem(name,'not saved');delete saved[name];writeSaved(saved,env);return listAfterBumblerWrite(env);}
 // A reply that fails the quotation contract still goes to the governor: its findings join the
 // report marked quotes_unverified. Like any invalid review it is not a success and gives no vote.
 // Models often think aloud before the JSON.

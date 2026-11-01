@@ -65,7 +65,7 @@ async function reviewPool(){
   vm.runInNewContext(source,{document:{querySelector:()=>node('root'),getElementById:node,createElement:()=>node('dialog-'+nodes.size),body:{append(){}}},window:{mommSetupSession:{subscribe:fn=>{publish=fn;}}},fetch,Promise,JSON,encodeURIComponent,Number});
   publish('synthetic-session');await flush();assert.equal(calls.length,0,'closed panel makes no request');
   node('bump-panel').open=true;node('bump-panel').ontoggle();await flush();assert.match(node('bump-list').innerHTML,/bab/);assert.match(node('bump-list').innerHTML,/data-bump="bab"/);
-  const f={name:{value:'bad'},base_url:{value:'x'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};let resets=0;
+  const f={name:{value:'bad'},base_url:{value:'x'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'},guidance:{value:''}};let resets=0;
   await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});assert.match(node('bump-status').textContent,/invalid or reserved/);assert.equal(resets,0,'a refused save keeps what was typed');
   f.name.value='good';await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});assert.equal(node('bump-status').textContent,'Saved.');assert.equal(resets,1);assert.match(node('bump-list').innerHTML,/No Bumblers saved/);
 }
@@ -78,7 +78,7 @@ async function reviewPoolOrder(){
   const fetch=async(url,options)=>{if(!String(url).startsWith('/api/bumblers'))return{ok:true,json:async()=>snapshot};if(options.method==='GET')return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({bumblers:[{name:'old',model:'m',base_url:'u',max_tokens:1,timeout_seconds:1}]})});});return{ok:true,json:async()=>({bumblers:[{name:'new',model:'m',base_url:'u',max_tokens:1,timeout_seconds:1}]})};};
   vm.runInNewContext(source,{document:{querySelector:()=>node('root'),getElementById:node,createElement:()=>node('dialog-'+nodes.size),body:{append(){}}},window:{mommSetupSession:{subscribe:fn=>{publish=fn;}}},fetch,Promise,JSON,encodeURIComponent,Number});
   publish('synthetic-session');await flush();node('bump-panel').open=true;node('bump-panel').ontoggle();await flush();
-  const f={name:{value:'new'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){}}});await flush();
+  const f={name:{value:'new'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'},guidance:{value:''}};await node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){}}});await flush();
   release();await flush();assert.match(node('bump-list').innerHTML,/new/,'a slow older read cannot replace a newer result');assert.doesNotMatch(node('bump-list').innerHTML,/old/);
 }
 async function reviewPoolEdit(){
@@ -90,7 +90,7 @@ async function reviewPoolEdit(){
   const fetch=async(url,options)=>{if(!String(url).startsWith('/api/bumblers'))return{ok:true,json:async()=>snapshot};return new Promise(resolve=>{release=()=>resolve({ok:true,json:async()=>({bumblers:[]})});});};
   vm.runInNewContext(source,{document:{querySelector:()=>node('root'),getElementById:node,createElement:()=>node('dialog-'+nodes.size),body:{append(){}}},window:{mommSetupSession:{subscribe:fn=>{publish=fn;}}},fetch,Promise,JSON,encodeURIComponent,Number});
   publish('synthetic-session');await flush();
-  const f={name:{value:'one'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'}};let resets=0;
+  const f={name:{value:'one'},base_url:{value:'u'},model:{value:'m'},max_tokens:{value:'1'},timeout_seconds:{value:'1'},guidance:{value:''}};let resets=0;
   const pending=node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});await flush();f.name.value='two';release();await pending;await flush();assert.equal(resets,0,'newer typing survives a slow save');
   const again=node('bump-form').onsubmit({preventDefault(){},currentTarget:{elements:f,reset(){resets++;}}});await flush();release();await again;assert.equal(resets,1,'an unchanged form still resets');
 }

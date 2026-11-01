@@ -7,7 +7,7 @@ import {readSealedReport,recoverArtifact} from './second-look.mjs';
 const H=b=>crypto.createHash('sha256').update(b).digest('hex'),SHA=/^[a-f0-9]{64}$/,owned=new WeakMap();
 const fail=code=>{throw Object.assign(Error('Bumble baseline refused: '+code),{code});};
 const routes=new Set(['codex','claude','antigravity','copilot','grok','gemini']);
-function closed(v,keys){if(!v||typeof v!=='object'||Array.isArray(v)||![Object.prototype,null].includes(Object.getPrototypeOf(v)))return false;const d=Object.getOwnPropertyDescriptors(v),k=Reflect.ownKeys(d);return k.length===keys.length&&k.every(x=>typeof x==='string'&&keys.includes(x)&&d[x].enumerable&&Object.hasOwn(d[x],'value'));}
+function closed(v,keys){if(!v||typeof v!=='object'||Array.isArray(v)||![Object.prototype,null].includes(Object.getPrototypeOf(v)))return false;const d=Object.getOwnPropertyDescriptors(v),k=Reflect.ownKeys(d);return k.length===keys.length&&k.every(x=>typeof x==='string'&&keys.includes(x)&&d[x].enumerable&&Object.hasOwn(d[x],'value'))?Object.fromEntries(k.map(x=>[x,d[x].value])):null;}
 function verifySources(root,snapshot){
  if(snapshot?.complete!==true||!Array.isArray(snapshot.files)||!snapshot.files.length||snapshot.files.length>2000)fail('source_snapshot_required');
  const seen=new Set();
@@ -27,11 +27,12 @@ function verifyQuorum(r){
  return required;
 }
 export function openBumbleBaseline(options){
- if(!closed(options,['project_root','run_id'])||typeof options.project_root!=='string'||!path.isAbsolute(options.project_root)||typeof options.run_id!=='string'||!/^rev_[A-Za-z0-9_]{1,200}$/.test(options.run_id))fail('invalid_baseline_request');
- const root=fs.realpathSync.native(options.project_root),dir=evidenceDir({cwd:root,env:process.env});requirePrivateEvidence(dir);
- const sealed=readSealedReport(root,options.run_id),r=sealed.report,required=verifyQuorum(r);
+ const request=closed(options,['project_root','run_id']);
+ if(!request||typeof request.project_root!=='string'||!path.isAbsolute(request.project_root)||typeof request.run_id!=='string'||!/^rev_[A-Za-z0-9_]{1,200}$/.test(request.run_id))fail('invalid_baseline_request');
+ const root=fs.realpathSync.native(request.project_root),dir=evidenceDir({cwd:root,env:process.env});requirePrivateEvidence(dir);
+ const sealed=readSealedReport(root,request.run_id),r=sealed.report,required=verifyQuorum(r);
  if(Object.hasOwn(r,'bumble_candidates'))fail('baseline_contains_supplementary_candidates');
- verifySources(root,r.source_snapshot);const artifact=recoverArtifact({root,report:r}),bytes=fs.readFileSync(path.join(dir,'reports',options.run_id+'.json'));
+ verifySources(root,r.source_snapshot);const artifact=recoverArtifact({root,report:r}),bytes=fs.readFileSync(path.join(dir,'reports',request.run_id+'.json'));
  if(H(bytes)!==sealed.reportSha256||H(artifact.text)!==r.input_sha256)fail('original_seal_changed');
  const value=Object.freeze({schema:'momm-bumble-owned-baseline/1',run_id:r.run_id,report_sha256:sealed.reportSha256,input_sha256:r.input_sha256,source_files:r.source_snapshot.files.length,quorum_required:required,permission_granted:false,worker_qualification_granted:false,quorum_votes:0,completion:false});
  owned.set(value,{root,run_id:r.run_id,report_sha256:sealed.reportSha256,input_sha256:r.input_sha256,snapshot:r.source_snapshot,source:artifact.text});return value;
