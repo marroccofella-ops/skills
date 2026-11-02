@@ -61,6 +61,23 @@ recorded ruling; none changed code, and refactors and further tests are kept for
 governor validator returned complete with no errors or unresolved items, and the receipt was
 recorded.
 
+## Release audit and follow-up review
+
+Codex's release audit of the fixes reproduced that a quoted secret inside a call or arrow in a
+declaration named `password`, `secret`, `api_key` or `bearer` still reached reviewers, for
+example `const password = identityFunction("...")`. 1.17.3 had the same gap; it was not a
+regression, but the first fix claimed more than it covered. A further sanitizer pattern now
+redacts a quoted literal of eight or more characters mixing letters and digits further along
+such a statement. Follow-up run `rev_20261102184704_8fce240dccfd` (Codex, Antigravity, Copilot,
+Grok) reviewed that change and found that a secret after a quoted first argument still leaked;
+that was fixed with a failing-before, passing-after check, and the governor recorded the run
+complete. A false CRITICAL arose because MOMM redacts its own review input, so reviewers saw
+the test fixtures already masked.
+
+Known limit: a quoted secret made only of letters, or assigned under a name other than those
+four, is not redacted. Redaction is a safeguard, not a guarantee; do not review files that hold
+live credentials.
+
 ## Independent testing
 
 Hal, on his own machine (Windows, Node 24.19), ran the full pack on `6bac6af`: 182 of 182

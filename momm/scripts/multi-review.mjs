@@ -1056,7 +1056,8 @@ function sanitizeText(text) {
     /\b(bearer[ \t]+)[A-Za-z0-9._~+\/-]{8,}=*/gi,
     // A quoted secret further along the same statement, such as an argument or arrow body:
     // eight or more characters mixing letters and digits inside quotes after a key name.
-    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=][^\n"';]*["'])(?=[^"'\n]*\d)(?=[^"'\n]*[A-Za-z])[^"'\n]{8,}(?=["'])/gi,
+    // Earlier quoted arguments are stepped over, so a secret in a later argument is still found.
+    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=](?:[^\n"';]|"[^"\n]*"|'[^'\n]*')*?["'])(?=[^"'\n]*\d)(?=[^"'\n]*[A-Za-z])[^"'\n]{8,}(?=["'])/gi,
   ];
   let value = text;
   for (const [patternIndex, pattern] of patterns.entries()) {
@@ -3049,7 +3050,7 @@ async function selfTest(pretty) {
       const bearer = ['Authorization: Bearer ', 'synthetic'.repeat(3)].join('');
       // A secret written in place inside a call or arrow is still a secret.
       const leaks = ["const secret = abcdefgh(Zk9sUperSecret1)", "const password = decrypt(Zk9sUperSecret1)", "const api_key = wrap(N3vErSeEnK3yValue99)", "let apiKey = (x)=>Zk9sUperSecret1",
-        'const password = identityFunction("SYNTHETICabc123456789");', "const secret = ()=>'SYNTHETICabc123456789';", 'const apiKey = load(profile, "N3vErSeEnK3yValue99");'];
+        'const password = identityFunction("SYNTHETICabc123456789");', "const secret = ()=>'SYNTHETICabc123456789';", 'const apiKey = load(profile, "N3vErSeEnK3yValue99");', 'const apiKey = load("profile", "N3vErSeEnK3yValue99");'];
       return code.every(line => sanitizeText(line).value === line) && leaks.every(line => /\[REDACTED\]/.test(sanitizeText(line).value))
         && sanitizeText(quoted).value === 'secret = "[REDACTED]"'
         && sanitizeText('api_key=' + 'synthetic'.repeat(3)).value === 'api_key=[REDACTED]'
