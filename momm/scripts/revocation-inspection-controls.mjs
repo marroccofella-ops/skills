@@ -1,0 +1,17 @@
+// Actual private read methods evaluated with synthetic metadata and record bytes.
+// No protector, filesystem credential record, native crypto or network is used.
+import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+export function verifyRevocationInspection(kind){
+ assert(['oauth','legacy'].includes(kind));const oauth=kind==='oauth',name=oauth?'bumble-oauth-vault.mjs':'bumble-secret-store.mjs',source=fs.readFileSync(new URL('./'+name,import.meta.url),'utf8'),start=source.indexOf('#read(ref,'),end=source.indexOf('async store(',start);assert(start>=0&&end>start,'actual private read method must be present');
+ const method=source.slice(start,end),helper=source.match(/function revocationPresent\([^]*?\r?\n\}/)?.[0]??'',reference='00000000-0000-4000-8000-000000000001',binding='a'.repeat(64),bytes=Buffer.from('synthetic encrypted fixture'),H=value=>crypto.createHash('sha256').update(value).digest('hex'),record=oauth?{schema:'momm-bumble-protected-oauth-session/1',reference,scope_binding:binding,protection:'synthetic-protection',expires_at:10000,identity_binding:'b'.repeat(64),ciphertext:bytes.toString('base64'),ciphertext_sha256:H(bytes)}:{schema:'momm-protected-credential/1',reference,scope_binding:binding,protection:'synthetic-protection',ciphertext:bytes.toString('base64'),ciphertext_sha256:H(bytes)},results=[];
+ for(const mode of ['EACCES','EPERM','EIO','present','dangling','missing']){
+  let recordReads=0;const recordFile='/synthetic-vault/record.json',read=()=>{recordReads++;return Buffer.from(JSON.stringify(record));},isMarker=file=>String(file).includes(oauth?'oauth-revoked-':'revoked-');
+  const fakeFS={existsSync:file=>isMarker(file)?mode==='present':true,lstatSync(file){if(!isMarker(file))return{isFile:()=>true,isSymbolicLink:()=>false,nlink:1,size:1000};if(mode==='missing'||['EACCES','EPERM','EIO'].includes(mode))throw Object.assign(Error('Synthetic metadata refusal'),{code:mode==='missing'?'ENOENT':mode});return{isSymbolicLink:()=>mode==='dangling'};},readFileSync:read};
+  const context={fs:fakeFS,path:path.posix,Buffer,reference,binding,H,hash:H,clock:value=>Number.isSafeInteger(value)&&value>=0,SHA:{test:value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)},closed:(value,keys)=>value&&Object.keys(value).sort().join(',')===[...keys].sort().join(','),parseBumbleJSON:JSON.parse,requirePrivateEvidence:()=>{},credentialScope:()=>binding,fail:code=>{throw Object.assign(Error(code),{code});},readRecord:read};
+  const Reader=vm.runInNewContext(helper+'\n(class Reader{#root="/synthetic-vault";#protector={kind:"synthetic-protection"};#file(){return '+JSON.stringify(recordFile)+';}#regular(){return readRecord();}\n'+method+'\nread(){return this.#read(reference,'+(oauth?'binding':'{}')+');}})',context),reader=new Reader();
+  if(mode==='missing'){assert.equal(reader.read().reference,reference);assert.equal(recordReads,1,'verified absence permits one synthetic record read');}
+  else{assert.throws(()=>reader.read(),error=>/locally_revoked|locally revoked|revocation.*inspect|inspect.*revocation/i.test(String(error?.code??'')+' '+String(error?.message??'')),kind+' '+mode+' must refuse');assert.equal(recordReads,0,'revoked or uninspectable metadata must refuse before record bytes');}
+  results.push({mode,passed:true});
+ }
+ return{kind,passed:true,results,scope:'Actual read-method and revocation-helper source with synthetic filesystem/protector context; no real credential, key or native operation'};
+}

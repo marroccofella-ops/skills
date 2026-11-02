@@ -38,8 +38,10 @@ function realLocation(p, win) {
   let cursor = p;
   for (;;) {
     try { return path.join(realOf(cursor, win), ...tail); }
-    catch {
-      try { fs.lstatSync(cursor); return null; } catch { /* absent: resolve its parent */ }
+    catch (error) {
+      if (error?.code !== 'ENOENT') return null;
+      try { fs.lstatSync(cursor); return null; }
+      catch (inspection) { if (inspection?.code !== 'ENOENT') return null; }
       const parent = path.dirname(cursor);
       if (parent === cursor) return null;
       tail.unshift(path.basename(cursor));
@@ -52,6 +54,27 @@ const within = (base, candidate, win) => {
   const rel = path.relative(key(base), key(candidate));
   return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel));
 };
+
+// POSIX realpath need not normalize case. Compare existing ancestor identities
+// as well as path spellings; absence alone may ascend, unreadable identity refuses.
+function physicalAncestor(project, candidate) {
+  const identity = fs.statSync(project, { bigint: true });
+  if (!identity.isDirectory() || typeof identity.dev !== 'bigint' || typeof identity.ino !== 'bigint' || identity.ino <= 0n) throw Error('Project directory identity unavailable');
+  let cursor = candidate;
+  for (let depth = 0; depth < 1024; depth++) {
+    let stat;
+    try { stat = fs.statSync(cursor, { bigint: true }); }
+    catch (error) { if (error?.code !== 'ENOENT') throw error; }
+    if (stat) {
+      if (!stat.isDirectory() || typeof stat.dev !== 'bigint' || typeof stat.ino !== 'bigint' || stat.ino <= 0n) throw Error('Evidence ancestor identity unavailable');
+      if (stat.dev === identity.dev && stat.ino === identity.ino) return true;
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor) return false;
+    cursor = parent;
+  }
+  throw Error('Evidence ancestor depth exceeded');
+}
 
 export const projectKey = (projectRealPath) => createHash('sha256').update(String(projectRealPath)).digest('hex').slice(0, 32);
 
@@ -69,7 +92,13 @@ export function evidenceLocation({ cwd = process.cwd(), env = process.env, home 
   const dir = path.join(base, projectKey(projectReal));
   const dirReal = realLocation(dir, win);
   if (!dirReal) throw fail(`The evidence home ${dir} could not be resolved: a link on that path leads nowhere, or the folder cannot be reached. ${REMEDY}`, 'unresolvable');
-  if ([project, projectReal].some((p) => within(p, dir, win) || within(p, dirReal, win))) {
+  const lexicalInside = [project, projectReal].some((p) => within(p, dir, win) || within(p, dirReal, win));
+  let physicalInside = false;
+  if (!win && !lexicalInside) {
+    try { physicalInside = physicalAncestor(projectReal, dirReal); }
+    catch { throw fail('The evidence home directory identities could not be inspected. '+REMEDY, 'unresolvable'); }
+  }
+  if (lexicalInside || physicalInside) {
     throw fail(`The evidence home must lie outside the project: ${dir}${dirReal !== dir ? ` (real path ${dirReal})` : ''} is inside the project ${project}${projectReal !== project ? ` (real path ${projectReal})` : ''}. ${REMEDY}`, 'inside_project');
   }
   return { dir, home: base, project: projectReal };
@@ -79,9 +108,20 @@ export const evidenceDir = (options) => evidenceLocation(options).dir;
 // A logical reference: '.ensemble_reviews/...' belongs to the evidence folder, anything else to the
 // project. Returns the base the reference is walked from and the parts to walk, so callers can keep
 // refusing links on every step exactly as they did from the project root.
+// Private evidence uses portable segments. Ordinary source files may have
+// device-like basenames; on Windows route those through the literal namespace.
+// Consumers still inspect links, regular-file identity, size and content hashes.
+// The returned source base can be namespaced: textual inequality with root is
+// not proof that it names a different physical directory.
 export function evidenceReference(relative, { root, dir }) {
-  const project = path.resolve(root), parts = String(relative).split('/');
-  if (parts[0] !== EVIDENCE_FOLDER || path.resolve(dir) === path.join(project, EVIDENCE_FOLDER)) return { base: project, parts };
+  if(typeof relative!=='string'||!relative||/[\\:\x00-\x1f\x7f]/.test(relative)||path.posix.isAbsolute(relative)||path.win32.isAbsolute(relative))throw Object.assign(new Error('Unsafe evidence reference; use a project-relative forward-slash path.'),{code:'MOMM_UNSAFE_EVIDENCE_REFERENCE'});
+  const project = path.resolve(root), parts = relative.split('/');
+  const privateReference=parts[0]===EVIDENCE_FOLDER,deviceLike=parts.some(part=>/^(?:conin\$|conout\$|con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]) *(?:\.|$)/i.test(part));
+  if((parts[0].toLowerCase()===EVIDENCE_FOLDER&&!privateReference)||parts.some(part=>!part||part==='.'||part==='..'||/[ .]$|[<>"|?*]/.test(part))||(privateReference&&deviceLike))throw Object.assign(new Error('Unsafe evidence reference; traversal and ambiguous filename aliases are refused.'),{code:'MOMM_UNSAFE_EVIDENCE_REFERENCE'});
+  const defaultDir=path.join(project,EVIDENCE_FOLDER),actualDir=path.resolve(dir);
+  const isDefault=process.platform==='win32'?actualDir.toLowerCase()===defaultDir.toLowerCase():actualDir===defaultDir;
+  if (!privateReference) return { base: process.platform==='win32'&&deviceLike?path.toNamespacedPath(project):project, parts };
+  if (isDefault) return { base: project, parts };
   return { base: path.resolve(dir), parts: parts.slice(1) };
 }
 export function evidenceFile(relative, options) {

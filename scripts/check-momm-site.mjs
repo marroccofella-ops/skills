@@ -113,8 +113,21 @@ for(const name of ['index','upgrade',...releases.map(r=>r.version)]){
   }
 }
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'versions.json')));
-assert(releases.some(r=>r.version===manifest.momm),'current version missing from archive');
-for(const entry of releases)assert(manifest.momm_releases.some(r=>r.version===entry.version),'missing changelog entry '+entry.version);
+if(manifest.momm_development){
+  const dev=manifest.momm_development;
+  assert.equal(dev.stable,manifest.momm);
+  assert(!fs.existsSync(path.join(root,`docs/momm/releases/${dev.version}.html`)),'unpublished local notes do not belong in deployable public HTML');
+  assert(!releases.some(r=>r.version===dev.version),'unfinished development must not be inserted into public history');
+}else assert(releases.some(r=>r.version===manifest.momm),'current version missing from archive');
+for(const entry of releases){
+  // A sealed release candidate is the one exception: the updater version, with its release entry and seal.
+  const sealed=entry.kind==='version-notes'&&entry===releases.at(-1)&&entry.version===manifest.momm&&!manifest.momm_development
+    &&manifest.momm_releases.some(r=>r.version===entry.version&&/^[a-f0-9]{64}$/.test(r.sha256??'')&&r.hash_covers==='git-tree-blobs-excluding-versions/1');
+  if(entry.kind==='version-notes'&&!sealed){
+    assert.notEqual(entry.version,manifest.momm,'candidate notes must not select the stable updater version');
+    assert(!manifest.momm_releases.some(r=>r.version===entry.version),'candidate notes must not appear as an updater release');
+  }else assert(manifest.momm_releases.some(r=>r.version===entry.version),'missing changelog entry '+entry.version);
+}
 assert.equal(s.log_successes, s.stored_successes + s.summary_only_successes);
 assert.equal(s.dispositions, Object.values(s.decisions).reduce((a, b) => a + b, 0));
 assert.deepEqual(canonical({ z: [{ b: 2, a: 1 }], a: 0 }), { a: 0, z: [{ a: 1, b: 2 }] });

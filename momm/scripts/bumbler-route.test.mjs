@@ -1,0 +1,115 @@
+// Real multi-review CLI against a local stand-in model server. No real model, credential or tailnet traffic.
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+import {bumblerAnswer,bumblerBase,bumblerRest,BUMBLER_CLIENT,busyWait,listBumblers,loadBumblers,removeBumbler,saveBumbler} from './bumbler-route.mjs';
+import {inspectCompletion} from './governor.mjs';
+import {privateTestFixture} from './private-test-fixture.mjs';
+delete process.env.MOMM_EVIDENCE_HOME;
+const script=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
+const diff='diff --git a/sample.js b/sample.js\n--- a/sample.js\n+++ b/sample.js\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;\n';
+const review={review_status:'complete',verdict:'ACCEPT',confidence:0.8,summary:'Synthetic Bumbler review.',reviewed_scope:[{quote:'const a = 2;',assessment:'Synthetic change inspected.'}],findings:[],suggested_improvements:[]};
+for(const good of ['http://127.0.0.1:9/v1','http://100.64.0.1:8080/v1','https://100.127.255.1:8080/v1'])assert.equal(bumblerBase(good),good);
+for(const bad of ['http://8.8.8.8:8080/v1','http://example.com/v1','http://100.128.0.1/v1','http://100.64.0.1:8080/v2','http://user:pw@100.64.0.1/v1','http://100.64.0.1/v1?x=1','http://100.64.0.1:8080/v1?','http://100.64.0.1:8080/v1#','not a url'])assert.throws(()=>bumblerBase(bad),undefined,bad);
+const parent=fs.realpathSync.native(privateTestFixture('momm-bumbler-test-'));
+const home=path.join(parent,'reviewers'),project=path.join(parent,'project');fs.mkdirSync(home,{mode:0o700});fs.mkdirSync(project,{mode:0o700});
+const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringify(value),{mode:0o600});
+{const env={MOMM_REVIEWER_HOME:path.join(parent,'managed')};assert.deepEqual(listBumblers(env),[]);assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:' m ',max_tokens:4096,timeout_seconds:300},env)[0].model,'m');assert.equal(loadBumblers(env).bab.timeout_ms,300000,'what the dashboard saves is what a run reads');{const stale=path.join(parent,'managed','bumblers.json.'+process.pid+'.tmp');fs.writeFileSync(stale,'left by a crashed save',{mode:0o600});saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m'},env);assert.equal(fs.readFileSync(stale,'utf8'),'left by a crashed save','a save neither fails on nor deletes a temp file it did not create');fs.rmSync(stale);}assert.throws(()=>saveBumbler('bee',{base_url:'http://8.8.8.8/v1',model:'m'},env),/Bumbler bee/);assert.throws(()=>saveBumbler('codex',{base_url:'http://100.64.0.1/v1',model:'m'},env),/reserved/);assert.throws(()=>removeBumbler('bee',env),/not saved/);assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',guidance:' Speak your mind. '},env)[0].guidance,'Speak your mind.');assert.equal(loadBumblers(env).bab.guidance,'Speak your mind.');assert.throws(()=>saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',guidance:'x'.repeat(4001)},env),/guidance/);assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',rest_seconds:90},env)[0].rest_seconds,90);assert.equal(loadBumblers(env).bab.rest_ms,90000);assert.equal(loadBumblers(env).bab.parallel,1);assert.equal(loadBumblers(env).bab.wait_when_busy,true);assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',wait_when_busy:false},env)[0].wait_when_busy,false);assert.equal(loadBumblers(env).bab.wait_when_busy,false);assert.throws(()=>saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',wait_when_busy:'no'},env),/wait_when_busy/);
+{const now=Date.parse('2026-11-02T12:00:00Z'),none=()=>0,most=()=>0.999;
+ assert.equal(busyWait('120',0,now,none),120000,'a stated wait in seconds is honoured in full');
+ assert.equal(busyWait(new Date(now+45000).toUTCString(),0,now,none),45000,'a stated HTTP date is honoured');
+ for(const header of ['0','','   ',undefined,'soon',new Date(now-5000).toUTCString(),'-3','1.5'])assert.equal(busyWait(header,0,now,none),2000,`no usable wait in ${JSON.stringify(header)} falls back to a positive pause`);
+ assert.deepEqual([0,1,2,3,4,9].map(n=>busyWait('',n,now,none)),[2000,4000,8000,16000,30000,30000],'the fallback grows to a ceiling');
+ assert(busyWait('120',0,now,most)>120000&&busyWait('120',0,now,most)<=121250,'jitter only adds, and only a little');}
+// Rest counts from the latest answer, even one that arrives while a piece is already resting.
+{const last=new Map([['bab',0]]);let clock=1000;const slept=[];
+ await bumblerRest(last,'bab',7000,()=>clock,async ms=>{slept.push(ms);clock+=ms;if(slept.length===1)last.set('bab',4000);});
+ assert.deepEqual(slept,[6000,4000],'woke at 7000, saw the answer at 4000, waited until 11000');assert.equal(clock,11000);
+ clock=20000;slept.length=0;await bumblerRest(last,'bab',7000,()=>clock,async ms=>{slept.push(ms);});assert.deepEqual(slept,[],'no wait once rested');
+ await bumblerRest(new Map(),'bab',7000,()=>clock,async ms=>{slept.push(ms);});assert.deepEqual(slept,[],'no wait before a first answer');}
+// The client sends nothing once its deadline has passed.
+{let hits=0;const late=http.createServer((request,response)=>{hits++;response.writeHead(200);response.end('{}');});await new Promise(r=>late.listen(0,'127.0.0.1',r));
+ const child=spawnSync(process.execPath,[BUMBLER_CLIENT,`http://127.0.0.1:${late.address().port}/v1`,'m','16',String(Date.now()-1),'1'],{input:JSON.stringify({system:'s',user:'u'}),encoding:'utf8',windowsHide:true});
+ late.close();assert.notEqual(child.status,0);assert.match(child.stderr,/time limit/);assert.equal(hits,0,'no request after the deadline');}assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',parallel:4},env)[0].parallel,4);assert.equal(loadBumblers(env).bab.parallel,4);for(const parallel of [0,9,1.5,'2'])assert.throws(()=>saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',parallel},env),/parallel/);for(const rest of [-1,1.5,3601,'9'])assert.throws(()=>saveBumbler('bab',{base_url:'http://100.64.0.1:8080/v1',model:'m',rest_seconds:rest},env),/rest_seconds/);assert.deepEqual(removeBumbler('bab',env),[]);
+ saveBumbler('bab',{base_url:'http://100.64.0.1/v1',model:'m'},env);assert.throws(()=>saveBumbler('alias',{base_url:'http://100.64.0.1/v1',model:'m'},env),/repeats a model server/,'one server is one vote');removeBumbler('bab',env);
+ assert.throws(()=>saveBumbler(['bab'],{base_url:'http://100.64.0.1/v1',model:'m'},env),/Bumbler/,'a name must be a string');
+ const rename=fs.renameSync;fs.renameSync=()=>{throw Error('Synthetic rename failure');};try{assert.throws(()=>saveBumbler('bab',{base_url:'http://100.64.0.1/v1',model:'m'},env));}finally{fs.renameSync=rename;}assert.equal(saveBumbler('bab',{base_url:'http://100.64.0.1/v1',model:'m'},env).length,1,'a failed save does not block the next');
+ const answer={verdict:'MODIFY',summary:'s',findings:[]};assert.equal(bumblerAnswer('thinking {a} and {b}\n'+JSON.stringify(answer)).verdict,'MODIFY','a preamble brace does not hide the answer');assert.equal(bumblerAnswer(JSON.stringify({verdict:'ACCEPT',findings:[]})+'\nthen '+JSON.stringify(answer)).verdict,'MODIFY','the last answer wins');assert.equal(bumblerAnswer(JSON.stringify(answer)+'\n}').verdict,'MODIFY','one stray closing brace does not lose the answer');{const many=[...Array.from({length:20},()=>({issue:' '})),...Array.from({length:25},(_,n)=>({id:'f'+n,issue:'Issue '+n}))];assert.equal(bumblerAnswer(JSON.stringify({verdict:'MODIFY',findings:many})).findings.length,25,'blank entries do not crowd out real findings, up to the contract limit');}
+ assert.equal(bumblerAnswer(JSON.stringify({verdict:'REJECT',findings:Array.from({length:50},(_,n)=>({id:'f'+n,severity:'WARNING',issue:'x',nested:{a:{b:1}}}))})).verdict,'REJECT','a large valid answer is found');
+ const started=Date.now();assert.equal(bumblerAnswer('{'.repeat(900000)+'}'),null);assert(Date.now()-started<2000,'many braces stay cheap');}
+{
+ // A home other people can read holds nothing to trust until a settings file is there.
+ const open=path.join(parent,'open-home');fs.mkdirSync(open,{mode:0o700});
+ if(process.platform==='win32'){const granted=spawnSync('icacls',[open,'/grant','*S-1-1-0:(OI)(CI)R'],{encoding:'utf8',windowsHide:true});assert.equal(granted.status,0,granted.stdout);}else fs.chmodSync(open,0o755);
+ assert.deepEqual(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:open})),[],'an open home with no settings file does not stop a run');
+ fs.writeFileSync(path.join(open,'bumblers.json'),'{}',{mode:0o600});assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:open}),/private reviewer home/,'settings in an open home are refused');
+ if(process.platform!=='win32'&&process.getuid()!==0){
+  const link=path.join(parent,'linked');fs.symlinkSync(parent,link);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:path.join(link,'reviewers')}),/private reviewer home/,'a link the user owns is refused');
+  fs.symlinkSync(home,path.join(parent,'home-link'));assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:path.join(parent,'home-link')}),/private reviewer home/,'the home itself cannot be a link');
+ }
+ // macOS reaches its temp folder through /var -> /private/var, a link the system owns.
+ if(process.platform==='darwin'){const system=fs.mkdtempSync(path.join(os.tmpdir(),'momm-system-link-'));try{assert.notEqual(fs.realpathSync.native(system),system);assert.deepEqual(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:system})),[],'a system link above the home is not refused');}finally{fs.rmSync(system,{recursive:true,force:true});}}
+}
+assert.equal(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:home})).length,0,'no saved Bumblers is not an error');assert.equal(loadBumblers({MOMM_REVIEWER_HOME:home}).constructor,undefined,'inherited names are not saved routes');
+for(const bad of [{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',timeout_seconds:3601}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',max_tokens:70000}},{codex:{base_url:'http://127.0.0.1:9/v1',model:'m'}},{bab:{base_url:'http://8.8.8.8/v1',model:'m'}},{bab:{base_url:'http://127.0.0.1:9/v1'}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',api_key:'x'}}]){save(bad);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/Bumbler /);}
+fs.writeFileSync(path.join(home,'bumblers.json'),'{not json');assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/bumblers\.json/);
+if(process.platform==='win32'){
+ // A short 8.3 name for the project must not pass as a home outside it.
+ const short=spawnSync('cmd.exe',['/d','/s','/c',`"for %I in ("${project}") do @echo %~sI"`],{encoding:'utf8',windowsHide:true,windowsVerbatimArguments:true}).stdout.trim().split(/\r?\n/).at(-1),cwd=process.cwd();
+ if(short&&short.toLowerCase()!==project.toLowerCase()&&fs.existsSync(short)){process.chdir(project);try{for(const inner of [path.join(short,'inner'),path.join(project,'inner')])assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:inner}),/outside the project/,inner);}finally{process.chdir(cwd);}}
+}
+const run=(args,input)=>new Promise(resolve=>{
+ const env={...process.env,MOMM_REVIEWER_HOME:home,MOMM_EVIDENCE_HOME:path.join(parent,'evidence'),NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1'};
+ const child=spawn(process.execPath,[script,'--governor','claude','--no-ui',...args],{cwd:project,env,windowsHide:true,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';child.stdout.setEncoding('utf8');child.stdout.on('data',b=>{stdout+=b;});child.stderr.setEncoding('utf8');child.stderr.on('data',b=>{stderr+=b;});child.stdin.end(input);
+ child.on('close',code=>{let report=null;try{report=JSON.parse(stdout);}catch{}resolve({code,report,stderr});});
+});
+{const file=path.join(home,'bumblers.json'),bad=fs.readFileSync(file);fs.rmSync(file);const inherited=await run(['--preflight','--reviewers','constructor'],'');fs.writeFileSync(file,bad,{mode:0o600});assert.equal(inherited.code,0,inherited.stderr);assert.doesNotMatch(inherited.stderr,/TypeError/);}
+const broken=await run(['--reviewers','bab'],diff);assert.equal(broken.code,4,'a broken settings file is a clean refusal');assert.match(broken.stderr,/bumblers\.json/);
+let answer,seen=[],active=0,peak=0,delay=20;
+const server=http.createServer((request,response)=>{
+ if(request.method==='GET'){response.writeHead(200,{'Content-Type':'application/json'});response.end('{"data":[]}');return;}
+ const chunks=[];request.on('data',b=>chunks.push(b));request.on('end',async()=>{seen.push({at:Date.now(),headers:request.headers,body:JSON.parse(Buffer.concat(chunks).toString('utf8'))});active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,delay));active--;answer(response);seen.at(-1).done=Date.now();});
+});
+const reply=(content,finish='stop')=>response=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(JSON.stringify({choices:[{finish_reason:finish,message:{content}}]}));};
+try{
+ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30,guidance:'Speak your mind in colourful language.'}});
+ const row=result=>result.report?.reviewers?.find(r=>r.agent==='bab');
+ answer=reply(JSON.stringify(review));
+ const good=await run(['--reviewers','bab'],diff);assert.equal(row(good)?.status,'success',JSON.stringify(row(good)));assert.equal(row(good).verdict,'ACCEPT');
+ assert.equal(seen.length,1);assert.equal(seen[0].body.model,'synthetic-open-model');assert.equal(seen[0].body.max_tokens,512);assert.equal(seen[0].headers.authorization,undefined,'this route carries no credential');assert.equal(seen[0].body.messages[0].role,'system','MOMM rules arrive as a system message');assert.equal(seen[0].body.messages[1].role,'user');assert.doesNotMatch(seen[0].body.messages[0].content,/const a = 2;/,'the artifact stays out of the system message');assert.match(seen[0].body.messages[1].content,/const a = 2;/);assert.match(seen[0].body.messages[0].content,/How to review as a Bumbler/);assert.match(seen[0].body.messages[0].content,/Speak your mind in colourful language\./);assert.equal(seen[0].body.response_format.type,'json_object');
+ fs.writeFileSync(path.join(project,'change.diff'),diff);const gate=await run(['--reviewers','bab','--min-success','1','--input','change.diff'],'');assert.equal(row(gate)?.status,'success');assert.equal(gate.report.quorum.achieved,1,'a Bumbler that completes a valid review is a genuine reviewer and its vote counts');assert.equal(gate.code,0);assert.equal(row(gate).credential,'none');assert.equal(row(gate).model,'synthetic-open-model');assert.equal(row(gate).max_tokens,512);assert.equal(row(gate).timeout_ms,30000);assert.equal(row(gate).base_url,undefined,'reports reach the public evidence export, so the address stays out');assert.equal(row(gate).endpoint_sha256,createHash('sha256').update(`http://127.0.0.1:${server.address().port}/v1`).digest('hex'));assert(!JSON.stringify(gate.report).includes(`127.0.0.1:${server.address().port}`));
+ process.env.MOMM_EVIDENCE_HOME=path.join(parent,'evidence');const recount=inspectCompletion(project,gate.report.run_id);delete process.env.MOMM_EVIDENCE_HOME;assert.equal(recount.quorum?.achieved,1,'the governor recount agrees');assert.equal(recount.quorum.met,true);
+ const preflight=await run(['--preflight'],'');assert(preflight.report.routes.some(route=>route.agent==='bab'),'preflight lists every default recipient');
+ assert.equal(peak,1,'one request at a time');
+ // Sustained load slows a small GPU, so a Bumbler can rest between the pieces of one review.
+ {const lines=name=>Array.from({length:150},(_,n)=>`+const ${name}${n} = ${n}; // padding padding padding padding`).join('\n');
+ fs.writeFileSync(path.join(project,'two.diff'),['a','b'].map(name=>`diff --git a/${name}.js b/${name}.js\n--- a/${name}.js\n+++ b/${name}.js\n@@ -0,0 +1,150 @@\n${lines(name)}\n`).join(''));
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30,rest_seconds:8}});seen=[];
+ await run(['--reviewers','bab','--split','4','--input','two.diff'],'');assert(seen.length>1,'the review reached the model in pieces');for(let n=1;n<seen.length;n++)assert(seen[n].at-seen[n-1].done>=8000,'the Bumbler rests after each answer');}
+ // Many people can share one model server, so a Bumbler can take several pieces at once.
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30,parallel:2}});seen=[];peak=0;delay=3000;
+ await run(['--reviewers','bab','--split','4','--input','two.diff'],'');delay=20;assert(seen.length>1,'the review reached the model in pieces');assert.equal(peak,2,'two pieces at once on a server with two slots');
+ // A busy shared server asks callers to wait; the Bumbler waits and asks again within its time.
+ {let calls=0;answer=response=>{if(++calls===1){response.writeHead(429,{'Retry-After':'1'});response.end('{"error":"busy"}');return;}reply(JSON.stringify(review))(response);};
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30}});seen=[];
+ const busy=await run(['--reviewers','bab'],diff);assert.equal(row(busy)?.status,'success',JSON.stringify(row(busy)));assert.equal(seen.length,2,'asked again once the server had room');assert(seen[1].at-seen[0].at>=1000,'waited as the server asked');assert.equal(row(busy).busy_waits,1,'busy answers are counted apart from the one review');assert.deepEqual(seen[1].body,seen[0].body,'the same request is asked again');}
+ // A small model may invent a claim type; that optional label is dropped, not the whole review.
+ {answer=reply(JSON.stringify({...review,verdict:'MODIFY',summary:'Synthetic labels.',findings:[{id:'f1',severity:'WARNING',target_file:'sample.js',issue:'Synthetic issue one.',rationale:'Synthetic reason.',test_suggestion:null,line_range:null,claim_type:'BUG'},{id:'f2',severity:'WARNING',target_file:'sample.js',issue:'Synthetic issue two.',rationale:'Synthetic reason.',test_suggestion:null,line_range:null,claim_type:'defect'}]}));
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30}});
+ const labelled=await run(['--reviewers','bab'],diff);assert.equal(row(labelled)?.status,'success',JSON.stringify(row(labelled)?.detail));assert.equal(row(labelled).verdict,'MODIFY');}
+ {answer=response=>{response.writeHead(429,{'Retry-After':'1'});response.end('{"error":"busy"}');};
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:4}});seen=[];
+ const full=await run(['--reviewers','bab'],diff);assert.notEqual(row(full)?.status,'success');assert(row(full).process_progress.elapsed_ms<=4500,`a server that stays busy cannot stretch the time limit: ${JSON.stringify(row(full).process_progress)}`);assert.match(row(full).detail,/stayed busy until the time limit/);assert(row(full).busy_waits>=1);assert(seen.length>=2&&seen.length<=5,`asked ${seen.length} times within four seconds`);
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30,wait_when_busy:false}});seen=[];
+ const once=await run(['--reviewers','bab'],diff);assert.notEqual(row(once)?.status,'success');assert.equal(seen.length,1,'wait_when_busy false asks exactly once');}
+ save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30},bee:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30}});
+ answer=response=>{response.writeHead(503);response.end('busy');};const covered=await run(['--reviewers','bab,bee','--cover'],diff);assert.equal(JSON.stringify(covered.report).includes('covering_for'),false,'a Bumbler neither covers nor is covered');save({bab:{base_url:`http://127.0.0.1:${server.address().port}/v1`,model:'synthetic-open-model',max_tokens:512,timeout_seconds:30}});
+ answer=reply('Thinking about {this} first.\n'+JSON.stringify({...review,verdict:'MODIFY',summary:'Spliced quote.',reviewed_scope:[{quote:'not in the artifact',assessment:'x'}],findings:[{id:'f',severity:'WARNING',target_file:'sample.js',issue:'Synthetic issue.'}]}));fs.writeFileSync(path.join(project,'change.diff'),diff);const spliced=await run(['--reviewers','bab','--min-success','1','--input','change.diff'],'');assert.equal(row(spliced)?.status,'invalid_output');assert.equal(row(spliced).unverified_answer?.verdict,'MODIFY','a rejected Bumbler answer stays visible');assert.equal(row(spliced).unverified_answer.findings[0].issue,'Synthetic issue.');assert.equal(spliced.report.findings.length,1,'a Bumbler is a reviewer, so the governor must triage what it raised');assert.equal(spliced.report.findings[0].issue,'Synthetic issue.');assert.equal(spliced.report.findings[0].quotes_unverified,true);assert.equal(spliced.report.quorum.achieved,0,'an answer that fails validation is no vote, as for any reviewer');
+ process.env.MOMM_EVIDENCE_HOME=path.join(parent,'evidence');const obligations=inspectCompletion(project,spliced.report.run_id);delete process.env.MOMM_EVIDENCE_HOME;assert.equal(obligations.items?.filter(i=>i.kind==='finding').length,1,'the governor must decide it');
+ answer=reply('This looks fine to me.');const prose=await run(['--reviewers','bab'],diff);assert.equal(row(prose)?.status,'invalid_output');
+ answer=reply('{"verdict":',  'length');const cut=await run(['--reviewers','bab'],diff);assert.equal(row(cut)?.status,'error',JSON.stringify(row(cut)));
+ answer=response=>{response.writeHead(503);response.end('busy');};const busy=await run(['--reviewers','bab'],diff);
+ answer=response=>{response.writeHead(200,{'Content-Type':'application/json'});response.end(Buffer.alloc(5_000_000,32));};const huge=await run(['--reviewers','bab'],diff);assert.equal(row(huge)?.status,'error','an oversized reply is refused');assert.notEqual(row(busy)?.status,'success');assert(row(busy),'a busy model is a status on the report');
+ await new Promise(resolve=>{server.closeAllConnections?.();server.close(resolve);});
+ const off=await run(['--reviewers','bab'],diff);assert.notEqual(row(off)?.status,'success');assert(row(off),'a model server that is off is a status on the report');assert(off.report,'the review still reports');
+ console.log(JSON.stringify({passed:true,transport:'loopback stand-in only',scope:'real multi-review CLI against a local stand-in model server'}));
+}finally{if(server.listening)await new Promise(resolve=>{server.closeAllConnections?.();server.close(resolve);});fs.rmSync(parent,{recursive:true,force:true,maxRetries:3,retryDelay:100});}

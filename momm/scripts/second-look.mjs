@@ -82,7 +82,7 @@ export function findClaim(report, findingId) {
 
 // Exactly one route: named by --reviewers, or the first requested route of the original run that was
 // not a source of the claim and is not the governor.
-export function chooseSecondLookRoute({ report, finding, reviewers = null, governor = null }) {
+export function chooseSecondLookRoute({ report, finding, reviewers = null, governor = null, excluded = [] }) {
   const sources = Array.isArray(finding.sources) ? finding.sources : [];
   const governors = [...new Set([report.governor, governor].filter(Boolean))];
   const why = (route) => sources.includes(route) ? `${route} was a source of this claim` : governors.includes(route) ? `${route} is the governor` : null;
@@ -92,11 +92,13 @@ export function chooseSecondLookRoute({ report, finding, reviewers = null, gover
     const route = named[0];
     if (!SECOND_LOOK_ROUTES.includes(route)) refuse(`unknown route ${JSON.stringify(route)}`);
     if (why(route)) refuse(`${why(route)}; choose a route that did not raise it`);
+    if (excluded.includes(route)) refuse(`${route} is excluded in saved settings; restore it explicitly or name a permitted route`);
     return route;
   }
   const requested = Array.isArray(report.gate_policy?.requested_routes) ? report.gate_policy.requested_routes : (report.reviewers ?? []).map((r) => r.agent);
   const route = requested.find((r) => SECOND_LOOK_ROUTES.includes(r) && !why(r));
   if (!route) refuse(`no route of the original run is free to take it (every one was a source or the governor); name one with --reviewers <route>`);
+  if (excluded.includes(route)) refuse(`${route} is excluded in saved settings; restore it explicitly or name a permitted route`);
   return route;
 }
 
@@ -195,12 +197,12 @@ function writePrivate(file, bytes) {
 }
 
 // invoke(route, artifact, replyContract, governor) runs ONE invocation and returns the reviewer result.
-export async function runSecondLook({ root, runId, findingId, reviewers = null, governor = null, sanitize = (t) => t, invoke, dispatcherVersion = null, now = () => new Date(), requirePrivate = null }) {
+export async function runSecondLook({ root, runId, findingId, reviewers = null, governor = null, excluded = [], sanitize = (t) => t, invoke, dispatcherVersion = null, now = () => new Date(), requirePrivate = null }) {
   root = fs.realpathSync(root);
   const { report, reportPath, reportSha256 } = readSealedReport(root, runId);
   if (typeof findingId !== "string" || !findingId.trim()) refuse("--finding needs the id of one finding in the report");
   const finding = findClaim(report, findingId);
-  const route = chooseSecondLookRoute({ report, finding, reviewers, governor });
+  const route = chooseSecondLookRoute({ report, finding, reviewers, governor, excluded });
   const reply = secondLookReply(finding, sanitize);
   const artifact = recoverArtifact({ root, report, sanitize });
   requirePrivate?.();

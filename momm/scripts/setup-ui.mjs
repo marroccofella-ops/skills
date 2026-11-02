@@ -13,6 +13,8 @@ import { createUpdateClock, applyUpdates, writeSettings, timerCommand, installTi
 import { runProbes, recordProbe, windowsLauncher, runModalityProbes, generativeCells, routeDisclosure, latestModalityProbes } from "./probes.mjs";
 import { rollupUsage } from "./usage.mjs";
 import { evidenceDir } from "./evidence-location.mjs";
+import {ReviewerRegistry} from './reviewer-registry.mjs';
+import {listBumblers,removeBumbler,saveBumbler} from './bumbler-route.mjs';
 
 // Windows: a bare command name (git.exe, powershell.exe, cmd.exe, a CLI version
 // probe) is looked up in the WORKING DIRECTORY before PATH, by cmd.exe and by
@@ -462,6 +464,7 @@ async function maintenanceReport(governor) {
   const routesReport = await readiness('other');
   let localVersions = {};
   try { localVersions = JSON.parse(fs.readFileSync(localVersionsFile, "utf8")); } catch {}
+  if(localVersions.momm_development?.version)localVersions.momm=localSkillVersion()||localVersions.momm;
   const [publishedResult, codexLatestResult, claudeLatestResult, geminiLatestResult, copilotLatestResult, grokUpdate, gitVersion, gitStatus, shellVersion, models, bootstrap] = await Promise.all([
     fetchJson(publishedVersionsUrl).catch(() => null),
     fetchJson("https://registry.npmjs.org/@openai%2fcodex/latest").catch(() => null),
@@ -1427,16 +1430,17 @@ function readBody(request, limit = 4096) {
     const chunks = [];
     let bytes = 0, failed = false;
     request.on("data", (chunk) => {
-      if (failed) return;
       const buffer = Buffer.from(chunk); bytes += buffer.length;
-      if (bytes > limit) { failed=true; chunks.length=0; reject(new Error("Request body too large")); request.destroy(); return; }
+      // Keep discarding a bounded excess so a client still writing can read the 413.
+      if (failed) { if (bytes > limit + 1_048_576) request.destroy(); return; }
+      if (bytes > limit) { failed=true; chunks.length=0; reject(Object.assign(new Error("Request body too large"),{code:'request_body_too_large'})); return; }
       chunks.push(buffer);
     });
     request.on("end", () => {
       if (failed) return;
       const body = Buffer.concat(chunks).toString('utf8');
       try { resolve(body ? JSON.parse(body) : {}); }
-      catch { reject(new Error("Request body must be JSON")); }
+      catch { reject(Object.assign(new Error("Request body must be JSON"),{code:'invalid_request_json'})); }
     });
     request.on("error", reject);
   });
@@ -1454,6 +1458,7 @@ const STATIC_ASSETS = Object.freeze({
   "/momm-theme.css": ["momm-theme.css", "text/css; charset=utf-8"],
   "/styles.css": ["styles.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/bumblers.js": ["bumblers.js", "text/javascript; charset=utf-8"],
 });
 
 function serveAsset(response, file, contentType) {
@@ -1621,6 +1626,8 @@ function createVersionWatch({ read = installedDispatcherVersion, log = (line) =>
   };
 }
 const setupCenterVersion = createVersionWatch();
+let savedReviewerRegistry;
+function reviewerRegistryStore() { return savedReviewerRegistry ||= new ReviewerRegistry(); }
 
 function createServer() {
   // Navigation cannot send a custom header. Exchange an authenticated request
@@ -1634,7 +1641,42 @@ function createServer() {
     catch { return sendJson(response, 400, { error: "Invalid request URL" }); }
     try {
       if (request.method === "GET" && Object.hasOwn(STATIC_ASSETS, requestUrl.pathname)) return serveAsset(response, ...STATIC_ASSETS[requestUrl.pathname]);
-      if (requestUrl.pathname.startsWith("/api/") && !authorized(request)) return sendJson(response, 403, { error: "Use the private Setup Center launch link from your terminal." });
+      if (requestUrl.pathname.startsWith("/api/") && !authorized(request)) return sendJson(response, 403, { error: "Use the private Setup Center launch link from your terminal.", reason:'private_session' });
+      if (requestUrl.pathname === '/api/bumblers') {
+        try {
+          if (request.method === 'GET') return sendJson(response,200,{bumblers:listBumblers()});
+          if (request.method === 'POST') {
+            if (!request.headers.origin || request.headers.origin !== `http://${request.headers.host}`) return sendJson(response,403,{error:'Use the same local dashboard origin.'});
+            // 4000 characters of guidance can take six bytes each once JSON-escaped.
+            const body=await readBody(request,32768);
+            if (body.op === 'save') return sendJson(response,200,{bumblers:saveBumbler(body.name,body.entry)});
+            if (body.op === 'remove') return sendJson(response,200,{bumblers:removeBumbler(body.name)});
+            return sendJson(response,400,{error:'Unsupported Bumbler operation.'});
+          }
+          return sendJson(response,405,{error:'Unsupported method.'});
+        } catch (error) {
+          if(error?.uncertain_write===true)return sendJson(response,500,{error:'Bumbler settings may have been saved. Refresh and check saved Bumblers before repeating a change.',uncertain_write:true});
+          return sendJson(response,400,{error:/^(Bumbler |bumblers\.json )/.test(error.message)?error.message:'Bumbler settings could not be read or saved.'});
+        }
+      }
+      if (requestUrl.pathname === '/api/reviewers') {
+        try {
+          if (request.method === 'GET') {
+            const number=(name,fallback)=>{const raw=requestUrl.searchParams.get(name);if(!raw)return fallback;const value=Number(raw);return Number.isSafeInteger(value)&&value>=0?value:fallback;};
+            return sendJson(response,200,reviewerRegistryStore().snapshot({query:requestUrl.searchParams.get('q')||'',state:requestUrl.searchParams.get('state')||'visible',offset:number('offset',0),limit:number('limit',25)}));
+          }
+          if (request.method === 'POST') {
+            if (!request.headers.origin || request.headers.origin !== `http://${request.headers.host}`) return sendJson(response,403,{error:'Use the same local dashboard origin.'});
+            const body=await readBody(request,48_000);
+            return sendJson(response,200,reviewerRegistryStore().command(body));
+          }
+          return sendJson(response,405,{error:'Unsupported method.'});
+        } catch (error) {
+          const known=['invalid_configuration','invalid_endpoint','invalid_certificate','invalid_state','not_found','stale_revision','registry_busy','registry_full','storage_budget','policy_required','adapter_required','unsupported_schema','connector_conflict','invalid_request_json','request_body_too_large'];
+          const code=known.includes(error.code)?error.code:'private_store_unavailable';
+          return sendJson(response,code==='request_body_too_large'?413:['stale_revision','registry_busy','policy_required'].includes(code)?409:400,{code,error:known.includes(error.code)?error.message:'Owner-only reviewer settings could not be verified. No permissions were repaired.'});
+        }
+      }
       if (request.method === "GET" && requestUrl.pathname === "/ledger") {
         if (!authorized(request)) {
           const ticket = requestUrl.searchParams.get("ticket"), expires = ledgerTickets.get(ticket);
@@ -1702,17 +1744,18 @@ function createServer() {
           const action = String(body.action || "").toLowerCase();
           const command = actionCommand(provider, action);
           if (!command) return sendJson(response, 400, { error: "Unsupported provider action" });
-          if ((provider !== 'skills' && ['update','install'].includes(action) || body.expected_command) && body.expected_command !== command) return sendJson(response, 409, {error:'Confirm the exact command first. Refresh versions if the installation changed.'});
+          const refuse = (status, reason, error) => sendJson(response, status, {error, receipt:{provider,action,status:'blocked',completion:'unobserved',reason}});
+          if ((provider !== 'skills' && ['update','install'].includes(action) || body.expected_command) && body.expected_command !== command) return refuse(409, 'command_mismatch', 'Confirm the exact command first. Refresh versions if the installation changed.');
           if (provider === "skills" && action === "update") {
             const bootstrap = await bootstrapStatus();
-            if (bootstrap.status !== 'ready_to_verify' || bootstrap.installation?.route !== 'updater_preview') { maintenanceCache=null; return sendJson(response, 409, { error: 'Update prerequisites or installation receipt need attention. Use the bootstrap guide; no update was launched.', guide: 'https://marroccofella.github.io/skills/momm/releases/bootstrap.html', update_readiness: bootstrap }); }
-            if (!fs.existsSync(path.join(skillsRoot, ".git"))) return sendJson(response, 409, { error: "The skills source is not a Git checkout." });
+            if (bootstrap.status !== 'ready_to_verify' || bootstrap.installation?.route !== 'updater_preview') { maintenanceCache=null; return sendJson(response, 409, { error: 'Update prerequisites or installation receipt need attention. Use the bootstrap guide; no update was launched.', guide: 'https://marroccofella.github.io/skills/momm/releases/bootstrap.html', update_readiness: bootstrap, receipt:{provider,action,status:'blocked',completion:'unobserved',reason:'update_prerequisites'} }); }
+            if (!fs.existsSync(path.join(skillsRoot, ".git"))) return refuse(409, 'no_git_checkout', 'The skills source is not a Git checkout.');
             const status = await runCommand("git", ["-C", skillsRoot, "status", "--porcelain"], { timeoutMs: 10_000 });
-            if (status.code !== 0) return sendJson(response, 409, { error: "Git could not verify that the skills checkout is safe to update." });
-            if (status.stdout.trim()) return sendJson(response, 409, { error: "Local skill changes are present. Handle them before updating." });
+            if (status.code !== 0) return refuse(409, 'git_check_failed', 'Git could not verify that the skills checkout is safe to update.');
+            if (status.stdout.trim()) return refuse(409, 'dirty_checkout', 'Local skill changes are present. Handle them before updating.');
           }
-          if (!launchTerminal(command)) return sendJson(response, 500, { error: "Could not open a terminal for this action.", command });
-          return sendJson(response, 202, { launched: true, command, note: actionNote(provider, action) });
+          if (!launchTerminal(command)) return sendJson(response, 500, { error: "Could not open a terminal for this action.", command, receipt: {provider, action, status:'launch_failed', completion:'unobserved'} });
+          return sendJson(response, 202, { launched: true, command, note: actionNote(provider, action), receipt: {provider, action, status:'launch_requested', completion:'unobserved'} });
         }
         if (requestUrl.pathname === "/api/maintenance") {
           const governor = String(body.governor || "codex").toLowerCase();
@@ -2310,7 +2353,7 @@ async function dashboardRegression() {
     // disclosure that is not the exact one shown) is refused before any request; the input
     // probe runs and records; generation with exact consent sends one request per UNBLOCKED
     // cell and skips blocked cells with their clearing action; plan() renders; no registry = 503.
-    const cap = fixture("capabilities");
+    const cap = fixture("capabilities with spaces");
     const capRegistry = await loadCapabilitiesRegistry();
     if (!capRegistry.module) {
       checks.capabilities_registry_loaded = false;
@@ -2341,7 +2384,7 @@ async function dashboardRegression() {
         calls.push(args);
         if (args[0] === "--version") return { code: 0, stdout: "9.9.9", stderr: "" };
         const blob = [...args, options.input].filter((v) => typeof v === "string").join("\n");
-        const png = /This is a capability probe/.test(blob) ? blob.match(/(\S*probe\.png)\b/)?.[1]?.replace(/^@/, "") : null;
+        const png = /This is a capability probe/.test(blob) ? blob.match(/View the image file at ([^\r\n]+?probe\.png) with your file or image tool/)?.[1] : null;
         if (png) return { code: 0, stdout: route === "grok" ? JSON.stringify({ text: colourOf(png) }) : colourOf(png), stderr: "" };
         if (/capability probe/.test(blob)) return { code: 0, stdout: route === "grok" ? JSON.stringify({ text: "The page says something." }) : "The page says something.", stderr: "" };
         const {JPEG,fixturePng} = await import('./media-fixtures.mjs');
@@ -2509,7 +2552,7 @@ async function selfTest() {
       && !isAllowedHost({ headers: {} }),
     terminal_rejects_newline_commands: launchTerminal("git status\nrm -rf /") === false,
     clickjacking_blocked: securityHeaders()["X-Frame-Options"] === "DENY",
-    api_keys_not_mentioned: !JSON.stringify(providers).match(/api[_ -]?key/i),
+    api_keys_not_mentioned: !JSON.stringify(providers).match(/api[_ -]?key/i) && !fs.readFileSync(path.join(assetDir,"bumblers.js"),"utf8").match(/api[_ -]?key/i),
     environment_values_never_classified: sampleEnvironment.api_key_names_present[0] === "XAI_API_KEY" && !("values" in sampleEnvironment),
     relevant_environment_categories: sampleEnvironment.proxy_names_present[0] === "HTTP_PROXY"
       && sampleEnvironment.update_controls_present[0] === "NO_UPDATE_CHECK"
