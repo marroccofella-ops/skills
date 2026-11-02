@@ -13,7 +13,7 @@
         "The Setup Center fixes prepared as 1.17.4 are included: persistent truthful action feedback, local OAuth evidence distinguished from live verification, safe login-command copying, and actionable version-timeout recovery.",
         "No change to the reviewer CLIs, OAuth-only authentication or the review contract. Native Bumbler transport is not part of 1.18."
       ],
-      "sha256": "b19fffd5ecddbbfb3bdee18d1682963c0c34143abc706d0e5cd5b2c933038852",
+      "sha256": "57364e64c16eee1c65d39822b73d570e1040a2e8052f3f34f25111a186404011",
       "hash_covers": "git-tree-blobs-excluding-versions/1"
     },
     {
