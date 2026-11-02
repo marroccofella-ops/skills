@@ -58,7 +58,7 @@ function readBumblers(env){
 function tailnetAddress(host){if(host==='127.0.0.1')return true;if(net.isIP(host)!==4)return false;const [a,b]=host.split('.').map(Number);return a===100&&b>=64&&b<=127;}
 export function bumblerBase(value){
  let url;try{url=new URL(value);}catch{throw Error('base_url is not a URL');}
- if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.search||url.hash||url.pathname!=='/v1')throw Error('base_url must look like http://<tailnet address>:<port>/v1');
+ if(!['http:','https:'].includes(url.protocol)||url.username||url.password||/[?#]/.test(value)||url.pathname!=='/v1')throw Error('base_url must look like http://<tailnet address>:<port>/v1');
  if(!tailnetAddress(url.hostname))throw Error('base_url must be a literal tailnet address, because this route has no credential');
  return url.toString().replace(/\/$/,'');
 }

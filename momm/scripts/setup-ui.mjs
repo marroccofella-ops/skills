@@ -1647,7 +1647,8 @@ function createServer() {
           if (request.method === 'GET') return sendJson(response,200,{bumblers:listBumblers()});
           if (request.method === 'POST') {
             if (!request.headers.origin || request.headers.origin !== `http://${request.headers.host}`) return sendJson(response,403,{error:'Use the same local dashboard origin.'});
-            const body=await readBody(request,4096);
+            // 4000 characters of guidance can take six bytes each once JSON-escaped.
+            const body=await readBody(request,32768);
             if (body.op === 'save') return sendJson(response,200,{bumblers:saveBumbler(body.name,body.entry)});
             if (body.op === 'remove') return sendJson(response,200,{bumblers:removeBumbler(body.name)});
             return sendJson(response,400,{error:'Unsupported Bumbler operation.'});

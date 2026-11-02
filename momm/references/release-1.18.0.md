@@ -32,9 +32,12 @@ contract she reached 9 of 9. Treat every Bumbler finding as the governor treats 
 reviewer's: reproduce it.
 
 **Known speed:** Bab held about 21 tokens per second for her first 5 minutes of load,
-then fell to 5.7, which caused timeouts. A 90-second rest between reviews kept her at 17
-to 21 with no timeouts, averaging 74 seconds a review against 205. The rest changed time,
-not her answers. Set `rest_seconds` for this. Other modest GPUs may behave differently.
+then fell to 5.7, which caused timeouts. When requests were paused 90 seconds apart
+from outside MOMM, she stayed at 17 to 21 with no timeouts, and all seven answers that
+could be compared matched the unpaused run byte for byte. That shows the pause coincided
+with full speed, not why she slows. `rest_seconds` now does this pausing inside MOMM; it
+is tested against a stand-in server, not yet on her. Other modest GPUs may behave
+differently.
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.

@@ -8,7 +8,7 @@ const script=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
 const diff='diff --git a/sample.js b/sample.js\n--- a/sample.js\n+++ b/sample.js\n@@ -1 +1 @@\n-const a = 1;\n+const a = 2;\n';
 const review={review_status:'complete',verdict:'ACCEPT',confidence:0.8,summary:'Synthetic Bumbler review.',reviewed_scope:[{quote:'const a = 2;',assessment:'Synthetic change inspected.'}],findings:[],suggested_improvements:[]};
 for(const good of ['http://127.0.0.1:9/v1','http://100.64.0.1:8080/v1','https://100.127.255.1:8080/v1'])assert.equal(bumblerBase(good),good);
-for(const bad of ['http://8.8.8.8:8080/v1','http://example.com/v1','http://100.128.0.1/v1','http://100.64.0.1:8080/v2','http://user:pw@100.64.0.1/v1','http://100.64.0.1/v1?x=1','not a url'])assert.throws(()=>bumblerBase(bad),undefined,bad);
+for(const bad of ['http://8.8.8.8:8080/v1','http://example.com/v1','http://100.128.0.1/v1','http://100.64.0.1:8080/v2','http://user:pw@100.64.0.1/v1','http://100.64.0.1/v1?x=1','http://100.64.0.1:8080/v1?','http://100.64.0.1:8080/v1#','not a url'])assert.throws(()=>bumblerBase(bad),undefined,bad);
 const parent=fs.realpathSync.native(privateTestFixture('momm-bumbler-test-'));
 const home=path.join(parent,'reviewers'),project=path.join(parent,'project');fs.mkdirSync(home,{mode:0o700});fs.mkdirSync(project,{mode:0o700});
 const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringify(value),{mode:0o600});

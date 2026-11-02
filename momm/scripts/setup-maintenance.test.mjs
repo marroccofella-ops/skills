@@ -599,6 +599,10 @@ await test('review Bumblers need the private session and same origin, and hide i
   assert.equal((await serve({op:'save',name:'bab',entry:{}})({...request,method:'POST'},{})).status,200);assert.equal(saved.length,1);
   assert.equal((await serve({op:'other'})({...request,method:'POST'},{})).status,400);assert.equal((await serve({})({...request,method:'DELETE'},{})).status,405);
   const hidden=await serve({op:'remove',name:'bab'})({...request,method:'POST'},{});assert.equal(hidden.status,400);assert.doesNotMatch(hidden.value.error,/private/);
+  // The longest guidance the form allows must still fit in the request, even when every character is escaped.
+  let limit=0;const longest={op:'save',name:'bab',entry:{base_url:'http://100.64.0.1:8080/v1',model:'m'.repeat(200),max_tokens:65536,timeout_seconds:3600,rest_seconds:3600,guidance:'\u0001'.repeat(4000)}};
+  await handler({},true,{...stubs,readBody:async(_,bytes)=>{limit=bytes;return longest;}}).serve({...request,method:'POST'},{});
+  assert(Buffer.byteLength(JSON.stringify(longest))<=limit,'the request limit fits the longest allowed guidance');
 });
 await test('reviewer settings enforce session, same origin, methods and structured store errors',async()=>{
   let writes=0;const store={snapshot:()=>({revision:0,profiles:[]}),command:()=>{writes++;return {revision:1};}};

@@ -26,8 +26,11 @@ model and engine throughout: plain guidance 5/8 right, her own guidance 5/8,
 seven valid replies each; independent adjudication marked some of those calls
 partly right. A small GPU slowed from about 21 to under 6 tokens a second after
 five minutes of sustained work. `rest_seconds` (0 to 3600) now pauses one
-Bumbler between requests in a run; at 90 seconds she held full speed, average
-74 s a request instead of 205 s, with byte-identical answers. A
+Bumbler between requests in a run. In a test that paused 90 seconds between
+requests from outside MOMM, before this setting existed, she stayed at 17 to 21
+tokens a second with no timeouts, and all seven answers that could be compared
+were byte-identical to the unpaused run. The setting itself is tested only
+against a stand-in server so far, not on her. A
 `frequency_penalty` and a server-enforced JSON schema were tried and removed:
 the schema mostly failed on her server and neither improved answers. A reply
 closed with one stray brace is now still read. Native transport is not part of
