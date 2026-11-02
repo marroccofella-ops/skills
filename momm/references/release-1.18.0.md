@@ -41,9 +41,10 @@ differently. With two jobs at once on her two 64k slots, each ran at about 12.5 
 a second while they overlapped, about 25 combined. `parallel` lets one Bumbler take that
 many pieces at once, and a shared server that answers 429 is waited on and asked again
 within the time limit. In a three-piece review with `parallel` 2 and `max_tokens` 4096,
-one piece answered at 14 tokens a second and two ran into the 290-second limit: at
-shared speed a 4096-token answer cannot finish in time. MOMM marked her review partial.
-Her saved entry uses `max_tokens` 3072.
+one piece answered (1266 tokens at 14 tokens a second) and two were cancelled at the
+time limit, with no token count for those. At that rate a 4096-token answer would need
+about 290 seconds, so long answers risk the limit. MOMM marked her review partial. Her
+saved entry uses `max_tokens` 3072.
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.

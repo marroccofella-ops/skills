@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { update, dailyCheck, updateCheckDisabled, provenance, parse as parseUpdateOptions } from "./update.mjs";
-import { PEER_CONTRACT, reviewProblem, quotationDiagnostics } from "./review-contract.mjs";
+import { CLAIM_TYPES, PEER_CONTRACT, reviewProblem, quotationDiagnostics } from "./review-contract.mjs";
 import {REVIEW_JSON_SCHEMA} from './review-contract-schema.mjs';
 import { captureSourceSnapshot, RANGE_DIFF_FLAGS } from "./governor.mjs";
 import { inventory as installationsInventory } from "./installations.mjs";
@@ -1930,6 +1930,9 @@ async function dispatchReviewer(agent, artifact, options, settings) {
       ...(typeof refused === "string" && refused.trim() && !options.replyContract && !extractJsonObjects(refused).length ? answerShapeEvidence(refused) : {}),
     };
   }
+  // A small model may invent the optional claim label. Fix its case, or drop an unknown label;
+  // the finding itself still faces every other check.
+  if (options.bumblers?.[agent] && Array.isArray(payload?.findings)) for (const finding of payload.findings) if (finding && typeof finding.claim_type === "string") { const known = finding.claim_type.trim().toUpperCase(); if (CLAIM_TYPES.includes(known)) finding.claim_type = known; else delete finding.claim_type; }
   const problem = result.outputLimited ? "output limit hit; review may be truncated" : options.replyContract ? options.replyContract.problem(payload, artifact) : reviewProblem(payload, artifact, { attachments });
   if (problem) return { agent, status: "invalid_output", detail: problem, progress: result.progress, usage: parseUsage(agent, agent === "codex" ? `${result.stdout}\n${result.stderr ?? ""}` : result.stdout), ...(options.replyContract ? {} : quotationEvidence(payload, artifact)) };
   // 1.16: token/cost accounting from the CLI's own envelope — never estimated
