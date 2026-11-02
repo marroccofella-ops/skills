@@ -120,7 +120,10 @@ if(manifest.momm_development){
   assert(!releases.some(r=>r.version===dev.version),'unfinished development must not be inserted into public history');
 }else assert(releases.some(r=>r.version===manifest.momm),'current version missing from archive');
 for(const entry of releases){
-  if(entry.kind==='version-notes'){
+  // A sealed release candidate is the one exception: the updater version, with its release entry and seal.
+  const sealed=entry.kind==='version-notes'&&entry===releases.at(-1)&&entry.version===manifest.momm&&!manifest.momm_development
+    &&manifest.momm_releases.some(r=>r.version===entry.version&&/^[a-f0-9]{64}$/.test(r.sha256??'')&&r.hash_covers==='git-tree-blobs-excluding-versions/1');
+  if(entry.kind==='version-notes'&&!sealed){
     assert.notEqual(entry.version,manifest.momm,'candidate notes must not select the stable updater version');
     assert(!manifest.momm_releases.some(r=>r.version===entry.version),'candidate notes must not appear as an updater release');
   }else assert(manifest.momm_releases.some(r=>r.version===entry.version),'missing changelog entry '+entry.version);
