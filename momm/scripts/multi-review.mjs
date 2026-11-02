@@ -3672,7 +3672,9 @@ async function main() {
   }
   // A Bumbler runs on modest hardware, so it takes one piece at a time.
   options.bumblerRest = new Map();
-  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, uniqueReviewers.length * (split ? 2 : 1)), perRoute: Object.fromEntries(Object.keys(options.bumblers ?? {}).map((name) => [name, 1])) });
+  // A Bumbler takes as many pieces at once as its server has room for, one by default.
+  const bumblerSlots = Object.fromEntries(Object.entries(options.bumblers ?? {}).map(([name, bumbler]) => [name, bumbler.parallel ?? 1]));
+  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, Math.max(uniqueReviewers.length * (split ? 2 : 1), ...(split ? uniqueReviewers.map((agent) => bumblerSlots[agent] ?? 0) : []))), perRoute: bumblerSlots });
   const runId = `rev_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 12)}`;
   const attemptEvidence = [];
   const reviewOne = async (agent, artifactText, pieceId, piece = null, cover = null) => {

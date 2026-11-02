@@ -37,7 +37,10 @@ from outside MOMM, she stayed at 17 to 21 with no timeouts, and all seven answer
 could be compared matched the unpaused run byte for byte. That shows the pause coincided
 with full speed, not why she slows. `rest_seconds` now does this pausing inside MOMM; it
 is tested against a stand-in server, not yet on her. Other modest GPUs may behave
-differently.
+differently. With two jobs at once on her two 64k slots, each ran at about 12.5 tokens
+a second while they overlapped, about 25 combined. `parallel` lets one Bumbler take that
+many pieces at once, and a shared server that answers 429 is waited on and asked again
+within the time limit.
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.

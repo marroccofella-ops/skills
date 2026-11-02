@@ -130,7 +130,11 @@ before content is loaded. Reading these settings never repairs permissions.
 Add an optional `guidance` field, up to 4000 characters, to give one Bumbler its own
 reviewing style on top of MOMM's general guidance. Optional `rest_seconds`, from 0 to
 3600, pauses that Bumbler between requests in one run. A small GPU can slow sharply
-under sustained load, and on the first Bumbler a 90-second rest kept full speed. The name is your choice, in
+under sustained load, and on the first Bumbler a 90-second rest kept full speed.
+Optional `parallel`, from 1 to 8, lets a split review send that many pieces to the
+Bumbler at once; set it no higher than the slots its server runs. A server shared by
+several people may answer 429 when it is full: the Bumbler waits as asked and tries
+again within its time limit. The name is your choice, in
 lowercase, and cannot be a built-in reviewer. One server running two different models
 can be saved as two Bumblers, because they give two opinions; the same model twice
 is refused.

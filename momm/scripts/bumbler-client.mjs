@@ -1,6 +1,7 @@
 // The CLI half of a Bumbler route: prompt on stdin, answer on stdout, like any
-// reviewer CLI. One request, no credential, no retry. The dispatcher's process
-// containment owns the deadline, so this sets no timer of its own.
+// reviewer CLI. No credential. A shared server that answers 429 (busy) is asked again
+// after the wait it names, or a short one; nothing else is retried. The dispatcher's
+// process containment owns the deadline, so this sets no overall timer of its own.
 import http from 'node:http';import https from 'node:https';
 import {bumblerBase} from './bumbler-route.mjs';
 const [baseUrl,model,maxTokens]=process.argv.slice(2);
@@ -10,7 +11,9 @@ try{bumblerBase(baseUrl);}catch{stop('Bumbler address refused');}
 const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);
 const {system,user}=JSON.parse(Buffer.concat(chunks).toString('utf8'));
 const body=Buffer.from(JSON.stringify({model,messages:[{role:'system',content:system},{role:'user',content:user}],max_tokens:Number(maxTokens),temperature:0,stream:false,response_format:{type:'json_object'}}));
-const request=(baseUrl.startsWith('https:')?https:http).request(`${baseUrl}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Content-Length':body.length}},response=>{
+let waits=0;
+const send=()=>{const request=(baseUrl.startsWith('https:')?https:http).request(`${baseUrl}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Content-Length':body.length}},response=>{
+ if(response.statusCode===429){response.resume();const asked=Number(response.headers['retry-after']),seconds=Number.isFinite(asked)&&asked>=0?Math.min(asked,30):Math.min(2+2*waits,15);waits++;process.stderr.write(`Bumbler model server is busy; asking again in ${seconds} s\n`);setTimeout(send,seconds*1000);return;}
  const reply=[];let bytes=0;response.on('data',chunk=>{bytes+=chunk.length;if(bytes>MAX_REPLY_BYTES)stop('Bumbler reply was too large');reply.push(chunk);});response.on('error',()=>stop('Bumbler connection failed during the reply'));
  response.on('end',()=>{
   if(response.statusCode<200||response.statusCode>=300)stop(`Bumbler model server answered HTTP ${response.statusCode}`);
@@ -20,4 +23,5 @@ const request=(baseUrl.startsWith('https:')?https:http).request(`${baseUrl}/chat
   process.stdout.write(choice.message.content);
  });
 });
-request.on('error',()=>stop('Bumbler model server did not answer'));request.end(body);
+request.on('error',()=>stop('Bumbler model server did not answer'));request.end(body);};
+send();
