@@ -19,13 +19,22 @@ on the owner's own machine, is the first Bumbler.
 - **Access:** a Bumbler route has no login and no API key. Review text goes to the
   saved address, which must be a tailnet or loopback address. That address is
   reachability, not authentication, so add only a machine you trust.
-- **Limits:** one piece at a time, with tokens and time set per Bumbler.
+- **Limits:** one piece at a time, with tokens, time and an optional rest between
+  pieces set per Bumbler.
+- **Own guidance:** each Bumbler can carry up to 4000 characters of its own reviewing
+  style on top of MOMM's general guidance.
 
-**Known quality:** on small synthetic files with a stated contract and the general
-Bumbler guidance, Bab reached the right verdict on 9 of 9 files on 1 November, catching
-5 of 5 seeded bugs, though 3 replies failed validation. Without a stated contract or
-the guidance she missed bugs. Results on real changes are less settled. Treat every
-Bumbler finding as the governor treats any reviewer's: reproduce it.
+**Known quality:** on 2 November Bab reviewed 8 real diffs from this repository, 4 clean
+and 4 with a seeded bug, with her own guidance. She reached the right verdict on 5 of 8:
+3 of 4 bugs and 2 of 4 clean diffs, with 6 valid reviews. Some right verdicts carried a
+wrong diagnosis, and some repair advice was wrong. On small synthetic files with a stated
+contract she reached 9 of 9. Treat every Bumbler finding as the governor treats any
+reviewer's: reproduce it.
+
+**Known speed:** Bab held about 21 tokens per second for her first 5 minutes of load,
+then fell to 5.7, which caused timeouts. A 90-second rest between reviews kept her at 17
+to 21 with no timeouts, averaging 74 seconds a review against 205. The rest changed time,
+not her answers. Set `rest_seconds` for this. Other modest GPUs may behave differently.
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.
