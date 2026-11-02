@@ -132,7 +132,9 @@ reviewing style on top of MOMM's general guidance. Optional `rest_seconds`, from
 3600, pauses that Bumbler between requests in one run. A small GPU can slow sharply
 under sustained load, and on the first Bumbler a 90-second rest kept full speed.
 Optional `parallel`, from 1 to 8, lets a split review send that many pieces to the
-Bumbler at once; set it no higher than the slots its server runs. A server shared by
+Bumbler at once; set it no higher than the slots its server runs. Each request runs
+slower when slots share one GPU, so keep `max_tokens` small enough to finish within
+`timeout_seconds` at that shared speed. A server shared by
 several people may answer 429 when it is full: the Bumbler waits as the server asks
 (seconds or a date; otherwise 2 s, growing to 30 s, plus a little jitter) and tries
 again, but never past its time limit, and the report counts those busy answers in
