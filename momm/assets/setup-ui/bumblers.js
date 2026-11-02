@@ -93,7 +93,7 @@
       return Object.assign(value.bumblers,{fresh:!body});
     }finally{if(body){bumblerMutation++;bumblerBusy=false;renderBumblerState();}}
   }
-  const showBumblers=list=>{$('bump-list').innerHTML=list.map(b=>`<p>${esc(b.name)} · ${esc(b.model)} · ${esc(b.base_url)} · ${esc(b.max_tokens)} tokens · ${esc(b.timeout_seconds)} s${b.rest_seconds?` · rests ${esc(b.rest_seconds)} s`:''}${b.parallel>1?` · ${esc(b.parallel)} at once`:''} <button data-bump="${esc(b.name)}" class="button secondary" type="button">Remove</button></p>`).join('')||'<p>No Bumblers saved.</p>';};
+  const showBumblers=list=>{$('bump-list').innerHTML=list.map(b=>`<p>${esc(b.name)} · ${esc(b.model)} · ${esc(b.base_url)} · ${esc(b.max_tokens)} tokens · ${esc(b.timeout_seconds)} s${b.rest_seconds?` · rests ${esc(b.rest_seconds)} s`:''}${b.parallel>1?` · ${esc(b.parallel)} at once`:''}${b.wait_when_busy===false?' · never waits when busy':''} <button data-bump="${esc(b.name)}" class="button secondary" type="button">Remove</button></p>`).join('')||'<p>No Bumblers saved.</p>';};
   let bumblerRequest=0,bumblerMutation=0,bumblerBusy=false,bumblerUncertain=false,bumblerNeedsRead=false;
   function renderBumblerState(){const blocked=!token||bumblerBusy||bumblerUncertain;$('bump-form').querySelector('[type="submit"]').disabled=blocked;$('bump-list').querySelectorAll?.('button').forEach(button=>{button.disabled=blocked;});$('bump-write-warning').hidden=!bumblerUncertain;$('bump-write-ack').disabled=!token||bumblerBusy||bumblerNeedsRead;}
   function markBumblerUncertain(){bumblerUncertain=true;bumblerNeedsRead=true;renderBumblerState();}

@@ -21,7 +21,7 @@ import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./at
 import { ARTIFACT_DELIMITER, resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
-import { BUILT_IN_ROUTES, BUMBLER_CLIENT, BUMBLER_GUIDANCE, bumblerAnswer, bumblerReadiness, loadBumblers } from "./bumbler-route.mjs";
+import { BUILT_IN_ROUTES, BUMBLER_CLIENT, BUMBLER_GUIDANCE, bumblerAnswer, bumblerReadiness, bumblerRest, loadBumblers } from "./bumbler-route.mjs";
 import { ROLE_NAMES, loadRole, loadAllRoles, roleBrief, roleSection, roleGuidanceLayer, staleBriefNotices } from "./roles.mjs";
 import { ATTEMPT_BUDGET, COVERABLE_STATUSES, MODEL_FAMILIES, runPieceCovers, coverSection, coverReportRow, pieceCoverSummary } from "./cover.mjs";
 import { runSecondLook } from "./second-look.mjs";
@@ -1828,7 +1828,8 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     // A Bumbler is one more reviewer: same prompt, containment, validation and evidence.
     const bumbler = options.bumblers[agent];
     command = process.execPath;
-    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens)];
+    // The client learns the run's deadline (fixed below, once) and whether it may wait on a busy server.
+    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens), "", bumbler.wait_when_busy !== false && options.noRetry !== true ? "1" : "0"];
     const prompt = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, [bumbler.guidance ? `## This Bumbler's own guidance, from its owner\n${sanitizeText(bumbler.guidance).value}` : "", options.guidanceRoutes?.[agent] ?? ""].filter(Boolean).join("\n\n"), artifact), boundary = prompt.indexOf(`\n\n${ARTIFACT_DELIMITER}`);
     // The rules go in the system role, the untrusted artifact stays in the user message.
     input = JSON.stringify({ system: prompt.slice(0, boundary), user: prompt.slice(boundary + 2) });
@@ -1838,8 +1839,10 @@ async function dispatchReviewer(agent, artifact, options, settings) {
 
     setupComplete = true;
     // options.runProcess is a test seam only (argv binding is proven with a fake).
-    if (options.bumblers?.[agent]?.rest_ms && options.bumblerRest.has(agent)) await new Promise((resolve) => setTimeout(resolve, Math.max(0, options.bumblerRest.get(agent) + options.bumblers[agent].rest_ms - Date.now())));
-    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: options.timeoutExplicit !== true && options.bumblers?.[agent] ? options.bumblers[agent].timeout_ms : agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
+    if (options.bumblers?.[agent]) await bumblerRest(options.bumblerRest, agent, options.bumblers[agent].rest_ms);
+    const routeTimeoutMs = options.timeoutExplicit !== true && options.bumblers?.[agent] ? options.bumblers[agent].timeout_ms : agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true);
+    if (options.bumblers?.[agent]) args[4] = String(Date.now() + routeTimeoutMs);
+    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: routeTimeoutMs, env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
       onProgress: options.onProgress ? progress => options.onProgress(agent, progress) : null });
   } catch {
     // Unexpected filesystem/launcher exceptions are terminal route failures.
@@ -1877,7 +1880,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // 1.17 A4.3: Grok streams, so its record also says how many events arrived and the last one's type,
   // whatever the outcome; a timeout after partial output is still a timeout.
   if (agent === "grok") result = { ...result, progress: { ...(result.progress ?? {}), ...grokStreamProgress(result.stdout) } };
-  if (options.bumblers?.[agent]) { settings.bumblerStdout = result.stdout; options.bumblerRest.set(agent, Date.now()); }
+  if (options.bumblers?.[agent]) { settings.bumblerStdout = result.stdout; options.bumblerRest.set(agent, Date.now()); options.bumblerBusy.set(agent, (options.bumblerBusy.get(agent) ?? 0) + (String(result.stderr ?? "").match(/^Bumbler model server is busy;/gm)?.length ?? 0)); }
   if (result.code !== 0 || result.error || result.timedOut) {
     // Everything this route was sent: the full prompt when it went by stdin, and always the artifact.
     const failure = classifyFailure(result, agent, [input, artifact].filter((text) => typeof text === "string").join("\n"));
@@ -3672,6 +3675,7 @@ async function main() {
   }
   // A Bumbler runs on modest hardware, so it takes one piece at a time.
   options.bumblerRest = new Map();
+  options.bumblerBusy = new Map();
   // A Bumbler takes as many pieces at once as its server has room for, one by default.
   const bumblerSlots = Object.fromEntries(Object.entries(options.bumblers ?? {}).map(([name, bumbler]) => [name, bumbler.parallel ?? 1]));
   const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, Math.max(uniqueReviewers.length * (split ? 2 : 1), ...(split ? uniqueReviewers.map((agent) => bumblerSlots[agent] ?? 0) : []))), perRoute: bumblerSlots });
@@ -3855,7 +3859,7 @@ async function main() {
       agent: result.agent,
       status: result.status,
       ...(result.unverified_answer ? { unverified_answer: result.unverified_answer } : {}),
-      ...(options.bumblers?.[result.agent] ? { bumbler: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
+      ...(options.bumblers?.[result.agent] ? { bumbler: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, busy_waits: options.bumblerBusy?.get(result.agent) ?? 0, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
       ...(result.status === "authentication_required" ? { login_hint: LOGIN_HINTS[result.agent] ?? null } : {}),
