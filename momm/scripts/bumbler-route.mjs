@@ -28,11 +28,11 @@ function readBumblers(env){
  const root=path.resolve(selected);
  let missing=false;
  for(let entry=root;;entry=path.dirname(entry)){
-  try{const stat=fs.lstatSync(entry);if(stat.isSymbolicLink()||!stat.isDirectory())throw settingsRefused();}
+  try{const stat=fs.lstatSync(entry),systemLink=entry!==root&&process.platform!=='win32'&&stat.isSymbolicLink()&&stat.uid===0;if(!systemLink&&(stat.isSymbolicLink()||!stat.isDirectory()))throw settingsRefused();}
   catch(error){if(error?.code==='ENOENT')missing=true;else throw settingsRefused();}
   if(path.dirname(entry)===entry)break;
  }
- // Literal links are refused above, so this resolves only spellings such as 8.3 short names.
+ // Links the user controls are refused above, leaving system links such as macOS /var and spellings such as 8.3 short names.
  const relative=path.relative(fs.realpathSync.native(process.cwd()),canonical(root));
  if(!relative||(!(relative==='..'||relative.startsWith('..'+path.sep))&&!path.isAbsolute(relative)))throw settingsRefused();
  if(missing)return null;
@@ -40,8 +40,8 @@ function readBumblers(env){
  let before;
  try{before=fs.lstatSync(file,{bigint:true});}catch(error){if(error?.code!=='ENOENT')throw settingsRefused();}
  if(before&&(!before.isFile()||before.isSymbolicLink()||before.nlink!==1n||before.size>BigInt(MAX_CONFIG_BYTES)))throw settingsRefused();
- try{requirePrivateEvidence(root);}catch{throw settingsRefused();}
  if(!before)return null;
+ try{requirePrivateEvidence(root);}catch{throw settingsRefused();}
  let fd;
  try{
   fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));

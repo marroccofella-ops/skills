@@ -19,6 +19,19 @@ const save=value=>fs.writeFileSync(path.join(home,'bumblers.json'),JSON.stringif
  const answer={verdict:'MODIFY',summary:'s',findings:[]};assert.equal(bumblerAnswer('thinking {a} and {b}\n'+JSON.stringify(answer)).verdict,'MODIFY','a preamble brace does not hide the answer');assert.equal(bumblerAnswer(JSON.stringify({verdict:'ACCEPT',findings:[]})+'\nthen '+JSON.stringify(answer)).verdict,'MODIFY','the last answer wins');
  assert.equal(bumblerAnswer(JSON.stringify({verdict:'REJECT',findings:Array.from({length:50},(_,n)=>({id:'f'+n,severity:'WARNING',issue:'x',nested:{a:{b:1}}}))})).verdict,'REJECT','a large valid answer is found');
  const started=Date.now();assert.equal(bumblerAnswer('{'.repeat(900000)+'}'),null);assert(Date.now()-started<2000,'many braces stay cheap');}
+{
+ // A home other people can read holds nothing to trust until a settings file is there.
+ const open=path.join(parent,'open-home');fs.mkdirSync(open,{mode:0o700});
+ if(process.platform==='win32'){const granted=spawnSync('icacls',[open,'/grant','*S-1-1-0:(OI)(CI)R'],{encoding:'utf8',windowsHide:true});assert.equal(granted.status,0,granted.stdout);}else fs.chmodSync(open,0o755);
+ assert.deepEqual(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:open})),[],'an open home with no settings file does not stop a run');
+ fs.writeFileSync(path.join(open,'bumblers.json'),'{}',{mode:0o600});assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:open}),/private reviewer home/,'settings in an open home are refused');
+ if(process.platform!=='win32'&&process.getuid()!==0){
+  const link=path.join(parent,'linked');fs.symlinkSync(parent,link);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:path.join(link,'reviewers')}),/private reviewer home/,'a link the user owns is refused');
+  fs.symlinkSync(home,path.join(parent,'home-link'));assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:path.join(parent,'home-link')}),/private reviewer home/,'the home itself cannot be a link');
+ }
+ // macOS reaches its temp folder through /var -> /private/var, a link the system owns.
+ if(process.platform==='darwin'){const system=fs.mkdtempSync(path.join(os.tmpdir(),'momm-system-link-'));try{assert.notEqual(fs.realpathSync.native(system),system);assert.deepEqual(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:system})),[],'a system link above the home is not refused');}finally{fs.rmSync(system,{recursive:true,force:true});}}
+}
 assert.equal(Object.keys(loadBumblers({MOMM_REVIEWER_HOME:home})).length,0,'no saved Bumblers is not an error');assert.equal(loadBumblers({MOMM_REVIEWER_HOME:home}).constructor,undefined,'inherited names are not saved routes');
 for(const bad of [{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',timeout_seconds:3601}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',max_tokens:70000}},{codex:{base_url:'http://127.0.0.1:9/v1',model:'m'}},{bab:{base_url:'http://8.8.8.8/v1',model:'m'}},{bab:{base_url:'http://127.0.0.1:9/v1'}},{bab:{base_url:'http://127.0.0.1:9/v1',model:'m',api_key:'x'}}]){save(bad);assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/Bumbler /);}
 fs.writeFileSync(path.join(home,'bumblers.json'),'{not json');assert.throws(()=>loadBumblers({MOMM_REVIEWER_HOME:home}),/bumblers\.json/);
@@ -32,7 +45,7 @@ const run=(args,input)=>new Promise(resolve=>{
  const child=spawn(process.execPath,[script,'--governor','claude','--no-ui',...args],{cwd:project,env,windowsHide:true,stdio:['pipe','pipe','pipe']});let stdout='',stderr='';child.stdout.setEncoding('utf8');child.stdout.on('data',b=>{stdout+=b;});child.stderr.setEncoding('utf8');child.stderr.on('data',b=>{stderr+=b;});child.stdin.end(input);
  child.on('close',code=>{let report=null;try{report=JSON.parse(stdout);}catch{}resolve({code,report,stderr});});
 });
-{const file=path.join(home,'bumblers.json'),bad=fs.readFileSync(file);fs.rmSync(file);const inherited=await run(['--preflight','--reviewers','constructor'],'');fs.writeFileSync(file,bad);assert.equal(inherited.code,0,inherited.stderr);assert.doesNotMatch(inherited.stderr,/TypeError/);}
+{const file=path.join(home,'bumblers.json'),bad=fs.readFileSync(file);fs.rmSync(file);const inherited=await run(['--preflight','--reviewers','constructor'],'');fs.writeFileSync(file,bad,{mode:0o600});assert.equal(inherited.code,0,inherited.stderr);assert.doesNotMatch(inherited.stderr,/TypeError/);}
 const broken=await run(['--reviewers','bab'],diff);assert.equal(broken.code,4,'a broken settings file is a clean refusal');assert.match(broken.stderr,/bumblers\.json/);
 let answer,seen=[],active=0,peak=0;
 const server=http.createServer((request,response)=>{
