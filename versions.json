@@ -12,7 +12,9 @@
         "Per Bumbler: tokens, time, its own guidance, an optional rest between requests, and how many pieces it takes at once (parallel, 1 to 8). A shared model server that answers 429 is waited on as it asks, within one fixed deadline; wait_when_busy false asks once. The report counts busy answers in busy_waits.",
         "The Setup Center fixes prepared as 1.17.4 are included: persistent truthful action feedback, local OAuth evidence distinguished from live verification, safe login-command copying, and actionable version-timeout recovery.",
         "No change to the reviewer CLIs, OAuth-only authentication or the review contract. Native Bumbler transport is not part of 1.18."
-      ]
+      ],
+      "sha256": "b19fffd5ecddbbfb3bdee18d1682963c0c34143abc706d0e5cd5b2c933038852",
+      "hash_covers": "git-tree-blobs-excluding-versions/1"
     },
     {
       "version": "1.17.3",
