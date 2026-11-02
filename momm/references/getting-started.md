@@ -128,10 +128,10 @@ before content is loaded. Reading these settings never repairs permissions.
 ```
 
 Add an optional `guidance` field, up to 4000 characters, to give one Bumbler its own
-reviewing style on top of MOMM's general guidance. Optional `frequency_penalty` (0 to 2)
-discourages repetition, and `json_schema: true` asks the server to enforce MOMM's reply
-shape, if your model server supports them. The name is your choice, in
-lowercase, and cannot be a built-in reviewer.
+reviewing style on top of MOMM's general guidance. The name is your choice, in
+lowercase, and cannot be a built-in reviewer. One server running two different models
+can be saved as two Bumblers, because they give two opinions; the same model twice
+is refused.
 `base_url` is an OpenAI-compatible server ending in `/v1`, on a literal tailnet
 address in 100.64.0.0/10 or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
 to 1024 and 180; an explicit `--timeout` wins. Then name it alongside your other
