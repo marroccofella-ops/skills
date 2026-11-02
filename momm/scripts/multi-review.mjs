@@ -1838,7 +1838,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
 
     setupComplete = true;
     // options.runProcess is a test seam only (argv binding is proven with a fake).
-    if (options.bumblers?.[agent]?.rest_ms && options.bumblerRest?.has(agent)) await new Promise((resolve) => setTimeout(resolve, Math.max(0, options.bumblerRest.get(agent) + options.bumblers[agent].rest_ms - Date.now())));
+    if (options.bumblers?.[agent]?.rest_ms && options.bumblerRest.has(agent)) await new Promise((resolve) => setTimeout(resolve, Math.max(0, options.bumblerRest.get(agent) + options.bumblers[agent].rest_ms - Date.now())));
     result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: options.timeoutExplicit !== true && options.bumblers?.[agent] ? options.bumblers[agent].timeout_ms : agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
       onProgress: options.onProgress ? progress => options.onProgress(agent, progress) : null });
   } catch {
@@ -1877,7 +1877,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // 1.17 A4.3: Grok streams, so its record also says how many events arrived and the last one's type,
   // whatever the outcome; a timeout after partial output is still a timeout.
   if (agent === "grok") result = { ...result, progress: { ...(result.progress ?? {}), ...grokStreamProgress(result.stdout) } };
-  if (options.bumblers?.[agent]) { settings.bumblerStdout = result.stdout; (options.bumblerRest ??= new Map()).set(agent, Date.now()); }
+  if (options.bumblers?.[agent]) { settings.bumblerStdout = result.stdout; options.bumblerRest.set(agent, Date.now()); }
   if (result.code !== 0 || result.error || result.timedOut) {
     // Everything this route was sent: the full prompt when it went by stdin, and always the artifact.
     const failure = classifyFailure(result, agent, [input, artifact].filter((text) => typeof text === "string").join("\n"));
@@ -3671,6 +3671,7 @@ async function main() {
     }
   }
   // A Bumbler runs on modest hardware, so it takes one piece at a time.
+  options.bumblerRest = new Map();
   const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, uniqueReviewers.length * (split ? 2 : 1)), perRoute: Object.fromEntries(Object.keys(options.bumblers ?? {}).map((name) => [name, 1])) });
   const runId = `rev_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 12)}`;
   const attemptEvidence = [];
