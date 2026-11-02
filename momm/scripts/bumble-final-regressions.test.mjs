@@ -9,7 +9,9 @@ const flush=async()=>{for(let n=0;n<8;n++)await new Promise(r=>setImmediate(r));
 const cases={
   async archives(){const parent=fs.mkdtempSync(path.join(os.tmpdir(),'momm-final-probe-'));try{const r=new ReviewerRegistry({root:path.join(parent,'private')});const cmd=b=>r.command({...b,revision:r.read().revision}),id=cmd({op:'save',profile:{label:'One'}}).result.id;r.mutate(r.read().revision,s=>{for(let n=0;n<499;n++)s.events.push({id:`e${n}`,at:'2026-10-10T00:00:00.000Z',action:'wording',profile_id:id});});for(let n=0;n<3;n++)cmd({op:'wording',id,wording:'text-'+n});assert(r.read().event_archives.length<=1,'normal individual edits must produce full batches, not one archive each');assert(r.read().events.length<=500);}finally{assert(path.resolve(parent).startsWith(path.resolve(os.tmpdir())+path.sep+'momm-final-probe-'));fs.rmSync(parent,{recursive:true,force:true});}},
   async legacyManifest(){
-    const manifest=JSON.parse(fs.readFileSync(new URL('../../versions.json',import.meta.url),'utf8'));
+    // The development-state manifest this guard was written for: stable 1.17.3 with an unpublished
+    // 1.18 entry. The live versions.json names 1.18.0 once it is sealed for release.
+    const manifest={...JSON.parse(fs.readFileSync(new URL('../../versions.json',import.meta.url),'utf8')),momm:'1.17.3',momm_development:{version:'1.18.0',stable:'1.17.3',notes_path:'momm/references/release-1.18.0.md'}};
     // Exact dailyCheck from released 1.17.3 commit507e5f778110755be91eebc03ef4309538414857.
     // Keep the legacy source immutable and usable in an export without Git history.
     const pinned=fs.readFileSync(new URL('./fixtures/update-1.17.3-daily-check.txt',import.meta.url),'utf8').replace(/\r\n/g,'\n');
@@ -26,9 +28,9 @@ const cases={
     assert.equal(manifest.momm,manifest.momm_development.stable,'published manifest key remains compatible with older clients');
   },
   siteStable(){
-    const read=f=>fs.readFileSync(new URL('../../'+f,import.meta.url),'utf8'),m=JSON.parse(read('versions.json')),stable=m.momm_development.stable;
+    const read=f=>fs.readFileSync(new URL('../../'+f,import.meta.url),'utf8'),m=JSON.parse(read('versions.json')),stable=m.momm_development?.stable??m.momm;// sealed for release: no development entry, momm is the release
     assert.equal(read('docs/index.html').match(/data-momm-version>([^<]+)/)?.[1],stable,'front door displays installable stable, not local development');
-    assert(!read('docs/momm/updates.html').includes('--apply --version '+m.momm_development.version),'pin example must not target unpublished development');
+    if(m.momm_development)assert(!read('docs/momm/updates.html').includes('--apply --version '+m.momm_development.version),'pin example must not target unpublished development');
     for(const name of ['overview','setup','trailer'])assert(read('docs/momm/watch/'+name+'.html').includes('Current version: '+stable),'watch pages name the stable version');
     const ld=read('docs/momm/index.html').match(/<script type="application\/ld\+json">(.*?)<\/script>/s)?.[1];assert.equal(JSON.parse(ld)['@graph'].find(n=>n['@type']==='SoftwareSourceCode').version,stable);
   },

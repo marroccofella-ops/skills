@@ -1,4 +1,12 @@
-# MOMM 1.18.0 — development build, not released
+# MOMM 1.18.0 — release candidate
+
+Sealed for release on 2 November 2026 with the owner's approval to merge and sign once every
+gate passes on the sealed commit; see the [gate record](gates-1.18.0.md). Until the signed tag
+`momm-1.18.0` exists, 1.17.3 remains the stable release.
+
+1.18 includes the Setup Center fixes prepared as 1.17.4 ([notes](release-1.17.4.md)), which
+was never published separately: the owner folded it into 1.18 on 2 November 2026. Native
+transport is not part of 1.18.
 
 ## What 1.18 is
 
@@ -19,8 +27,9 @@ on the owner's own machine, is the first Bumbler.
 - **Access:** a Bumbler route has no login and no API key. Review text goes to the
   saved address, which must be a tailnet or loopback address. That address is
   reachability, not authentication, so add only a machine you trust.
-- **Limits:** one piece at a time, with tokens, time and an optional rest between
-  pieces set per Bumbler.
+- **Limits:** tokens, time, an optional rest and how many pieces it takes at once
+  (`parallel`, 1 by default, up to 8) are set per Bumbler. A shared server that answers
+  429 is waited on as it asks, within one fixed deadline; `wait_when_busy: false` asks once.
 - **Own guidance:** each Bumbler can carry up to 4000 characters of its own reviewing
   style on top of MOMM's general guidance.
 
@@ -43,8 +52,17 @@ many pieces at once, and a shared server that answers 429 is waited on and asked
 within the time limit. In a three-piece review with `parallel` 2 and `max_tokens` 4096,
 one piece answered (1266 tokens at 14 tokens a second) and two were cancelled at the
 time limit, with no token count for those. At that rate a 4096-token answer would need
-about 290 seconds, so long answers risk the limit. MOMM marked her review partial. Her
-saved entry uses `max_tokens` 3072.
+about 290 seconds, so long answers risk the limit. MOMM marked her review partial. In
+the final review she ran with `max_tokens` 6144, 590 seconds, `parallel` 2 and no rest, at
+the owner's request: she slowed to about 5 tokens a second under sustained load, two pieces
+timed out, and one of her 17 pieces gave a valid review.
+
+**Final review:** run `rev_20261102161835_b21cc084fe09` reviewed the Bumbler code with
+Codex, Antigravity, Copilot, Grok and Bab; quorum was met on all 17 pieces and the governor
+recorded it complete. It reproduced and fixed six defects, among them a regression from
+earlier 1.18 work that let a secret written inside a call in a declaration reach reviewers
+unredacted, and quote-failed Bumbler findings that could corroborate another reviewer and
+raise its severity. Details are in the [gate record](gates-1.18.0.md).
 
 The older signed OAuth pilot, witness and release-proof work below is development
 history. It is not used by this route and does not gate it.

@@ -1,8 +1,8 @@
 # MOMM 1.17.4 — setup feedback stabilization
 
-**Candidate; publication pending.** The intended signed tag is `momm-1.17.4`.
-Do not install an unsigned branch as a signed release. Stable remains 1.17.3 until
-the signing workflow and public verification complete.
+**Not released separately.** On 2 November 2026 the owner folded these fixes into
+[MOMM 1.18.0](release-1.18.0.md); there is no `momm-1.17.4` tag. The text below is the
+candidate's record as it stood.
 
 This patch responds to [issue #57](https://github.com/marroccofella/skills/issues/57).
 Its report did not establish that every sign-in button failed; investigation reproduced

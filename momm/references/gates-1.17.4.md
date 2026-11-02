@@ -1,6 +1,7 @@
 # MOMM 1.17.4 — acceptance and release gates
 
-Publication pending. The owner authorized implementing, testing and publishing this narrow
+Folded into 1.18.0 by the owner on 2 November 2026 and not published separately; see the
+[1.18.0 gate record](gates-1.18.0.md). Historical: publication was pending. The owner authorized implementing, testing and publishing this narrow
 patch before 1.18 on 9 October 2026. This is not authorization to complete OAuth logins,
 install the changed protocol locally, merge unrelated cleanup work or alter existing signed tags.
 

@@ -1,13 +1,19 @@
 {
   "_comment": "Source of truth for published skill versions. Skills read this (cached daily, fail-silent) to tell users when an update is available. Bump the entry whenever you bump a skill's version.",
-  "momm": "1.17.3",
-  "momm_development": {
-    "version": "1.18.0",
-    "stable": "1.17.3",
-    "notes_path": "momm/references/release-1.18.0.md"
-  },
+  "momm": "1.18.0",
   "momm_release_schema": "momm-releases/1",
   "momm_releases": [
+    {
+      "version": "1.18.0",
+      "tag": "momm-1.18.0",
+      "changes": [
+        "Bumblers join the review pool: a lower-powered open model you run yourself, reached over your tailnet or loopback with no login or key, reviews like any other reviewer. Add one in the Setup Center under Bumblers in the review pool, or in bumblers.json in your reviewer home.",
+        "A valid Bumbler review counts as one vote towards --min-success; an unusable one is a status and gives no vote. What it raised still reaches the governor, marked quotes_unverified, and can neither corroborate another reviewer nor raise a severity.",
+        "Per Bumbler: tokens, time, its own guidance, an optional rest between requests, and how many pieces it takes at once (parallel, 1 to 8). A shared model server that answers 429 is waited on as it asks, within one fixed deadline; wait_when_busy false asks once. The report counts busy answers in busy_waits.",
+        "The Setup Center fixes prepared as 1.17.4 are included: persistent truthful action feedback, local OAuth evidence distinguished from live verification, safe login-command copying, and actionable version-timeout recovery.",
+        "No change to the reviewer CLIs, OAuth-only authentication or the review contract. Native Bumbler transport is not part of 1.18."
+      ]
+    },
     {
       "version": "1.17.3",
       "tag": "momm-1.17.3",

@@ -1,5 +1,11 @@
 # MOMM Roadmap — alignment record
 
+2 November 2026: 1.18.0 is sealed for release, with the 1.17.4 Setup Center fixes folded in
+and native transport out, on the owner's decision of that day. See the
+[gate record](references/gates-1.18.0.md). The 1.18.1 backlog holds the final review's
+deferred suggestions: more Bumbler and media tests, refactors of compact code, and a
+permanent `--max-bytes` regression.
+
 1 November direction, from the owner: a Bumbler is an ordinary reviewer in the
 pool, a lower-powered open model the owner runs. Its route is
 `bumbler-route.mjs` and `bumbler-client.mjs`: it joins by name in `--reviewers`
@@ -134,11 +140,11 @@ again at release. This is candidate frame custody only: no OAuth transport,
 issuer registration, native activation, backend release observer or reviewer-pool
 eligibility is inferred. The issued-key shadow worker remains separate and disabled.
 
-**Published manifest version:** `versions.json` (`momm`) remains **1.17.3** for compatibility
-with installed clients. Today they say **1.17.3** for publication. The separate
-`momm_development.version` is **1.18.0**, a local development build, not yet published.
-Stable remains **1.17.3**, signed tag `momm-1.17.3`, released on 6 October 2026 after exact-main CI and six hosted lifecycle
-cells passed. The signed tag `momm-1.17.4` will be created only after its release gates pass. Nothing else
+**Published manifest version:** `versions.json` (`momm`) names the sealed release candidate.
+Today they say **1.18.0** for publication, which takes effect only when the signed tag
+`momm-1.18.0` is made after its gates pass. Until then stable remains **1.17.3**, signed tag
+`momm-1.17.3`, released on 6 October 2026 after exact-main CI and six hosted lifecycle cells
+passed. 1.17.4 was folded into 1.18.0 and has no tag of its own. Nothing else
 in this file gets to say "current". Website notes live in
 [references/site-changelog.md](references/site-changelog.md).
 
