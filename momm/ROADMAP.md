@@ -21,6 +21,18 @@ about 47 seconds on Bab. The transport worked. On a synthetic file with a seeded
 `||` bug the model noted the condition was always true, yet returned ACCEPT with
 no findings. One sample, not a quality measure.
 
+2 November, Bab on eight real diffs (four with a known bug, four clean), same
+model and engine throughout: plain guidance 5/8 right, her own guidance 5/8,
+seven valid replies each; independent adjudication marked some of those calls
+partly right. A small GPU slowed from about 21 to under 6 tokens a second after
+five minutes of sustained work. `rest_seconds` (0 to 3600) now pauses one
+Bumbler between requests in a run; at 90 seconds she held full speed, average
+74 s a request instead of 205 s, with byte-identical answers. A
+`frequency_penalty` and a server-enforced JSON schema were tried and removed:
+the schema mostly failed on her server and neither improved answers. A reply
+closed with one stray brace is now still read. Native transport is not part of
+1.18. Details: [release-1.18.0.md](references/release-1.18.0.md).
+
 31 October audit continuation: the remaining OAuth-vault and retired legacy
 store revocation checks now distinguish verified absence from an unreadable
 marker. Any marker entry, including a dangling link, refuses before record
