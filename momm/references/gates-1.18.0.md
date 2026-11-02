@@ -74,6 +74,15 @@ that was fixed with a failing-before, passing-after check, and the governor reco
 complete. A false CRITICAL arose because MOMM redacts its own review input, so reviewers saw
 the test fixtures already masked.
 
+The owner then asked for a test run with Bumblers and the other reviewers together. Run
+`rev_20261102201920_fdeaaa82fd97` reviewed that change with Codex, Antigravity, Copilot, Grok and Bab
+(one request of at most 1024 tokens; her answer was cut off at that limit, so it gave no vote).
+Copilot's suggestion that the new pattern was slow on long lines was reproduced: a 300,000-character
+line of key/value pairs took about 18 seconds, against 2 ms in 1.17.3. The pattern's reach is now
+bounded and the same lines take under 20 ms. Its CRITICAL claim that a call's name is lost inside a
+declaration was not reproduced; outside a declaration the older pattern redacts the call, as in
+1.17.3, which over-redacts rather than leaks. The governor recorded the run complete.
+
 Known limit: a quoted secret made only of letters, or assigned under a name other than those
 four, is not redacted. Redaction is a safeguard, not a guarantee; do not review files that hold
 live credentials.

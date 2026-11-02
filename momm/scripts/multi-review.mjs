@@ -1056,8 +1056,9 @@ function sanitizeText(text) {
     /\b(bearer[ \t]+)[A-Za-z0-9._~+\/-]{8,}=*/gi,
     // A quoted secret further along the same statement, such as an argument or arrow body:
     // eight or more characters mixing letters and digits inside quotes after a key name.
-    // Earlier quoted arguments are stepped over, so a secret in a later argument is still found.
-    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=](?:[^\n"';]|"[^"\n]*"|'[^'\n]*')*?["'])(?=[^"'\n]*\d)(?=[^"'\n]*[A-Za-z])[^"'\n]{8,}(?=["'])/gi,
+    // Earlier quoted arguments are stepped over, so a secret in a later argument is still found. The reach
+    // is bounded (40 steps, quoted spans of at most 200 characters) so a long line of keys stays linear.
+    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=](?:[^\n"';]|"[^"\n]{0,200}"|'[^'\n]{0,200}'){0,40}?["'])(?=[^"'\n]*\d)(?=[^"'\n]*[A-Za-z])[^"'\n]{8,}(?=["'])/gi,
   ];
   let value = text;
   for (const [patternIndex, pattern] of patterns.entries()) {
