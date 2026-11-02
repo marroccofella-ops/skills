@@ -1,7 +1,7 @@
 // A Bumbler is an ordinary pool reviewer: a lower-powered open model the owner
 // runs on their own tailnet. Saved settings say where it answers. This route
 // carries no credential, so it refuses any address outside the tailnet range.
-import fs from 'node:fs';import http from 'node:http';import https from 'node:https';import net from 'node:net';import path from 'node:path';import {fileURLToPath} from 'node:url';
+import {randomBytes} from 'node:crypto';import fs from 'node:fs';import http from 'node:http';import https from 'node:https';import net from 'node:net';import path from 'node:path';import {fileURLToPath} from 'node:url';
 import {defaultRegistryHome} from './reviewer-registry.mjs';
 import {preparePrivateEvidence,requirePrivateEvidence} from './evidence-permissions.mjs';
 export const BUMBLER_CLIENT=fileURLToPath(new URL('./bumbler-client.mjs',import.meta.url));
@@ -84,9 +84,9 @@ function readSaved(env){
 function unconfirmedBumblerWrite(){return Object.assign(Error('Bumbler settings may have been saved. Refresh and check saved Bumblers before repeating a change.'),{code:'BUMBLER_WRITE_UNCONFIRMED',uncertain_write:true});}
 function listAfterBumblerWrite(env){try{return listBumblers(env);}catch{throw unconfirmedBumblerWrite();}}
 function writeSaved(saved,env){
- const file=savedFile(env),temporary=`${file}.${process.pid}.tmp`;preparePrivateEvidence(path.dirname(file));
+ const file=savedFile(env),temporary=`${file}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;preparePrivateEvidence(path.dirname(file));
  try{fs.writeFileSync(temporary,JSON.stringify(saved,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(temporary,file);}
- catch(error){fs.rmSync(temporary,{force:true});throw error;}
+ catch(error){if(error?.code!=="EEXIST")fs.rmSync(temporary,{force:true});throw error;}
 }
 export function loadBumblers(env=process.env){
  const saved=readSaved(env),routes=Object.create(null),seen=new Set();
@@ -125,7 +125,7 @@ export function bumblerAnswer(text){
   if(value===undefined)continue;
   if(!value||typeof value!=='object'||!('verdict' in value||'findings' in value))continue;
   const clip=(item,max=600)=>typeof item==='string'?item.slice(0,max):null;
-  return {verdict:clip(value.verdict,20),summary:clip(value.summary),findings:(Array.isArray(value.findings)?value.findings:[]).slice(0,20).filter(f=>typeof f?.issue==='string'&&f.issue.trim()),suggestions:(Array.isArray(value.suggested_improvements)?value.suggested_improvements:[]).slice(0,10).map(s=>clip(s)).filter(Boolean)};
+  return {verdict:clip(value.verdict,20),summary:clip(value.summary),findings:(Array.isArray(value.findings)?value.findings:[]).filter(f=>typeof f?.issue==='string'&&f.issue.trim()).slice(0,50),suggestions:(Array.isArray(value.suggested_improvements)?value.suggested_improvements:[]).slice(0,10).map(s=>clip(s)).filter(Boolean)};
  }
  return null;
 }

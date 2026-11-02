@@ -955,7 +955,7 @@ function parseArgs(argv) {
       options.effort = next();
       if (!["default", "medium"].includes(options.effort)) throw new Error("--effort must be default or medium");
     }
-    else if (arg === "--max-bytes") { const raw = next(), bytes = Number(raw); if (!String(raw).trim() || !Number.isFinite(bytes) || !Number.isSafeInteger(Math.max(1, bytes))) throw new Error("--max-bytes requires a finite safe integer"); options.maxBytes = Math.max(1, bytes); }
+    else if (arg === "--max-bytes") { const raw = next(), bytes = Number(raw); if (!String(raw).trim() || !Number.isSafeInteger(bytes)) throw new Error("--max-bytes requires a whole number"); options.maxBytes = Math.max(1, bytes); }
     else if (arg === "--strict") options.strict = true;
     else if (arg === "--retry-invalid") options.retryInvalid = true;
     else if (arg === "--cover") options.cover = true;
@@ -1062,7 +1062,11 @@ function sanitizeText(text) {
       // Retain the original literal rule for ambiguous bare values and quotes.
       if (patternIndex === 3 && typeof prefix === "string" && !/["']$/.test(prefix)) {
         const before = input.slice(0, offset).split(/\r?\n/).at(-1), expression = match.slice(prefix.length);
-        if (/\b(?:const|let|var)\s+$/.test(before) && /^(?:[$A-Z_a-z][\w$]*(?:\.[\w$]+)*\(|\([^)]*\)=>)/.test(expression)) return match;
+        // Only when what the call or arrow passes holds no secret-looking token: eight or more
+        // characters mixing letters and digits, like a key or password written in place.
+        const passed = expression.includes("=>") ? expression.slice(expression.indexOf("=>") + 2) : expression.slice(expression.indexOf("("));
+        if (/\b(?:const|let|var)\s+$/.test(before) && /^(?:[$A-Z_a-z][\w$]*(?:\.[\w$]+)*\(|\([^)]*\)=>)/.test(expression)
+          && !/(?:^|[^\w$.])(?=[\w~+/-]*\d)(?=[\w~+/-]*[A-Za-z])[\w~+/-]{8,}/.test(passed)) return match;
       }
       redactions += 1;
       // The first pattern has no capture group, so `prefix` is the numeric
@@ -2119,10 +2123,13 @@ function looksLikeDiff(artifact) {
 function rationalize(results, { prose = false, artifact = null } = {}) {
   const grouped = new Map();
   const corpus = artifact === null ? null : artifactShingles(artifact);
-  const byId = new Map();
+  const byId = new Map(), unverified = [];
   for (const result of results) {
     if (result.status !== "success") continue;
     for (const finding of result.review.findings) {
+      // A finding whose quotes failed gives no vote: it stands alone, so it can neither
+      // corroborate another reviewer nor raise a severity, and it keeps its marker.
+      if (finding.quotes_unverified) { unverified.push({ ...finding, sources: [result.agent] }); continue; }
       // Reviewers that independently coin the identical slug for the same file
       // are agreeing even when their wording differs — merge on (file, id)
       // first, then on overlapping line ranges (same code, any wording), then
@@ -2154,7 +2161,7 @@ function rationalize(results, { prose = false, artifact = null } = {}) {
     }
   }
   const rank = { CRITICAL: 0, WARNING: 1, NITPICK: 2 };
-  return [...grouped.values()].sort((left, right) => rank[left.severity] - rank[right.severity]);
+  return [...grouped.values(), ...unverified].sort((left, right) => rank[left.severity] - rank[right.severity]);
 }
 
 // Progress events go to stderr so stdout stays a single parseable report —
@@ -3037,7 +3044,9 @@ async function selfTest(pretty) {
         "const password=hashPassword(input.password);", "const bearer=headers.authorization.slice(7);", "apiKey = await loadApiKey(profile);"];
       const quoted = ['secret = "', 'synthetic'.repeat(3), '"'].join('');
       const bearer = ['Authorization: Bearer ', 'synthetic'.repeat(3)].join('');
-      return code.every(line => sanitizeText(line).value === line)
+      // A secret written in place inside a call or arrow is still a secret.
+      const leaks = ["const secret = abcdefgh(Zk9sUperSecret1)", "const password = decrypt(Zk9sUperSecret1)", "const api_key = wrap(N3vErSeEnK3yValue99)", "let apiKey = (x)=>Zk9sUperSecret1"];
+      return code.every(line => sanitizeText(line).value === line) && leaks.every(line => /\[REDACTED\]/.test(sanitizeText(line).value))
         && sanitizeText(quoted).value === 'secret = "[REDACTED]"'
         && sanitizeText('api_key=' + 'synthetic'.repeat(3)).value === 'api_key=[REDACTED]'
         && sanitizeText(bearer).value === 'Authorization: Bearer [REDACTED]';
@@ -3275,6 +3284,12 @@ async function selfTest(pretty) {
     // A unanimous coalition must SCORE as unanimous: four reviewers describing
     // one defect at the same lines in four different sentences is agreement,
     // and merging only on wording used to report it as ~8%.
+    unverified_findings_never_corroborate: (() => {
+      const mk = (agent, severity, extra = {}) => ({ agent, status: "success", review: { findings: [{ id: "two-changed", severity, target_file: "a.js", line_range: [7, 7], issue: "two is now 3", rationale: "", test_suggestion: null, ...extra }] } });
+      const merged = rationalize([mk("codex", "NITPICK"), mk("bab", "CRITICAL", { quotes_unverified: true })]);
+      const verified = merged.find(f => f.sources.includes("codex")), alone = merged.find(f => f.sources.includes("bab"));
+      return merged.length === 2 && verified.sources.length === 1 && verified.severity === "NITPICK" && !verified.quotes_unverified && alone.quotes_unverified === true;
+    })(),
     same_lines_different_wording_merges: (() => {
       const mk = (agent, id, issue, range) => ({ agent, status: "success", review: { findings: [{ id, severity: "WARNING", target_file: "metrics.py", line_range: range, issue, rationale: "", test_suggestion: null }] } });
       const merged = rationalize([
@@ -3676,7 +3691,7 @@ async function main() {
       if (!options.stream) process.stderr.write(`momm split: ${split.pieces.length} pieces at a ${Math.round(ceilingBytes / 1024)} KB ceiling${cappedFor.length ? ` (capped from ${Math.round(requestedBytes / 1024)} KB for ${cappedFor.join(", ")})` : ""}${split.stats.overCeilingPieces ? `, ${split.stats.overCeilingPieces} over the ceiling (a change block kept whole)` : ""}${split.stats.lineSplitHunks ? `, ${split.stats.lineSplitHunks} large hunk(s) divided at line boundaries` : ""}${split.oversize.length ? `, ${split.oversize.length} oversize hunk(s) for the governor` : ""}\n`);
     }
   }
-  // A Bumbler runs on modest hardware, so it takes one piece at a time.
+  // Per-Bumbler rest times and busy-answer counts for this run.
   options.bumblerRest = new Map();
   options.bumblerBusy = new Map();
   // A Bumbler takes as many pieces at once as its server has room for, one by default.
