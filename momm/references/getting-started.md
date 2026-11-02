@@ -69,6 +69,35 @@ Add `--link` only when the user wants MOMM added to the current harness's skill 
 
 OAuth presence is only local evidence, not proof that a session is live. The Setup Center makes that distinction visible and fails closed with **Needs login** when its synthetic verification finds an expired or shared session.
 
+### Setup action feedback (1.17.4)
+
+A sign-in click leaves a receipt on its card until that tab reloads, rather than only a
+temporary notification. **Launch request accepted** means the terminal process was admitted;
+the page cannot observe completion inside a detached terminal, prove that a browser opened,
+or certify the login. Finish the provider's login yourself, then choose **Verify after login**.
+That check sends one synthetic provider request and uses allowance, never project source.
+A confirmed login launch clears the previous successful check; a confirmed refusal preserves it.
+An unconfirmed launch invalidates a previous success conservatively, but retains evidence that
+authentication is required. Verification remains separate from
+the terminal action's unobserved completion; receipts are not installation or review receipts.
+
+**Retry discovery** reruns local discovery without a model call. An inconclusive version check
+is not proof of missing installation or authentication. Run the displayed version command in a
+fresh terminal when PATH changed. CLI updates do not repair authentication, quota, retired tiers
+or service outages. A compatibility warning continues to offer its update path, not another login.
+
+**Copy login command** copies a fixed official command and launches nothing. **Copy action receipt**
+copies only provider, action, launch status and `completion: unobserved`; there are no commands,
+OAuth codes/URLs, account identifiers, machine paths or raw diagnostics. Receipts disappear on
+reload. If copying is unavailable, the login command remains visible. A lost launch response is
+unconfirmed: check whether a terminal already opened before retrying.
+
+The page observes a provider launch for at most 15 seconds (120 seconds for the signed-update
+preview's prerequisites). This bounds the page's waiting state, not the terminal or OAuth flow:
+an unconfirmed request can still have launched. No observation timeout automatically retries it.
+After a live check passes, the last terminal action stays explicitly historical and no longer
+tells you to finish logging in. Blocked update actions retain fixed, actionable refusal reasons.
+
 ## Run the first review
 
 Start with one ready reviewer and an explicit minimum-success gate:
@@ -80,6 +109,65 @@ node momm/scripts/multi-review.mjs --governor codex --reviewers antigravity --mi
 With no `--input`, MOMM reviews `git diff HEAD`. It sends the sanitized diff to the selected provider, so confirm that the provider is allowed to receive the source before dispatching. To review a specific patch or text artifact, use `--input <file>`.
 
 The governor then reproduces plausible findings, authors any fixes itself, runs local checks, and records an explicit disposition for every improvement suggestion. Reviewer consensus prioritizes investigation; it is never permission to edit.
+
+## Add a Bumbler reviewer
+
+A Bumbler is a lower-powered open model you run yourself, added to the pool as
+one more reviewer. Add it in the Setup Center under Bumblers in the review pool,
+which saves `bumblers.json`, or edit that file in your reviewer home, which is
+`~/.momm-reviewers` unless `MOMM_REVIEWER_HOME` says otherwise. Keep this file
+out of your project:
+
+Use the private reviewer home created by MOMM's settings setup. The file must
+have owner-only access (for example, 0600 on POSIX), be a regular file with one link, and
+be no larger than 1,000,000 bytes. Linked paths and unverifiable privacy refuse
+before content is loaded. Reading these settings never repairs permissions.
+
+```json
+{"bab":{"base_url":"http://100.64.0.1:8080/v1","model":"your-model-id","max_tokens":1024,"timeout_seconds":180}}
+```
+
+Add an optional `guidance` field, up to 4000 characters, to give one Bumbler its own
+reviewing style on top of MOMM's general guidance. Optional `rest_seconds`, from 0 to
+3600, pauses that Bumbler between requests in one run. A small GPU can slow sharply
+under sustained load, and on the first Bumbler a 90-second rest kept full speed.
+Optional `parallel`, from 1 to 8, lets a split review send that many pieces to the
+Bumbler at once; set it no higher than the slots its server runs. On the first
+Bumbler, two requests sharing one GPU each ran slower than one alone, so check that
+`max_tokens` can finish within `timeout_seconds` at the speed you see when shared. A server shared by
+several people may answer 429 when it is full: the Bumbler waits as the server asks
+(seconds or a date; otherwise 2 s, growing to 30 s, plus a little jitter) and tries
+again, but never past its time limit, and the report counts those busy answers in
+`busy_waits`. Only 429 is asked again; a timeout or broken connection is not, because
+the model may already have started. Set `wait_when_busy: false` to ask exactly once.
+`rest_seconds` is a pause for the whole Bumbler: a piece that is ready to go waits
+until that long after the latest answer. Two Bumblers on the same model are two
+samples of one model, not two kinds of reviewer; each valid review still counts once. The name is your choice, in
+lowercase, and cannot be a built-in reviewer. One server running two different models
+can be saved as two Bumblers, because they give two opinions; the same model twice
+is refused.
+`base_url` is an OpenAI-compatible server ending in `/v1`, on a literal tailnet
+address in 100.64.0.0/10 or `127.0.0.1`. `max_tokens` and `timeout_seconds` are optional and default
+to 1024 and 180; an explicit `--timeout` wins. Then name it alongside your other
+reviewers:
+
+```bash
+node momm/scripts/multi-review.mjs --preflight --governor claude --reviewers bab
+node momm/scripts/multi-review.mjs --governor claude --reviewers codex,antigravity,bab --min-success 2
+```
+
+This route carries no login or API key, so review text goes to that address with
+nothing else protecting it. A tailnet address is reachability, not authentication:
+choose the machine yourself and decide what may be sent to it. Preflight only
+shows whether the server answers. A Bumbler takes one piece at a time. A slow or
+stopped model shows as a status on the report. Its answers are evidence for the
+governor. A saved Bumbler joins every review unless you name reviewers with
+`--reviewers`, and a valid review counts towards `--min-success` like any other. A
+large split review waits on the Bumbler for each piece, so name your reviewers when
+you want a faster run.
+If its quotes fail validation, its findings still reach the governor, marked
+`quotes_unverified`, and its row shows `invalid_output`. With `--strict`, a named
+Bumbler must still answer. The Bumbler Bees cards are separate OAuth drafts.
 
 ## A low-stress team rollout
 

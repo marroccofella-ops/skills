@@ -26,6 +26,81 @@ let loc = null;
 try { loc = await import('./evidence-location.mjs'); } catch (error) { loc = { missing: error.message }; }
 const need = (name) => { assert.equal(typeof loc[name], 'function', `evidence-location.mjs must export ${name} (${loc.missing ?? 'not exported'})`); return loc[name]; };
 
+function inspectionErrors(){
+  const text=fs.readFileSync(new URL('./evidence-location.mjs',import.meta.url),'utf8'),method=text.match(/function realLocation\([\s\S]*?(?=\r?\nconst within)/);assert(method);
+  const target='/synthetic-private/not-present-yet';
+  for(const code of ['ENOENT','EACCES','EPERM','EIO']){
+    const locate=vm.runInNewContext('('+method[0]+')',{path:path.posix,realOf(p){if(p===target)throw Object.assign(Error('Synthetic resolution failure'),{code});return p;},fs:{lstatSync(){throw Object.assign(Error('Synthetic inspection failure'),{code});}}});
+    assert.equal(locate(target,false),code==='ENOENT'?target:null,code+' must not be treated as verified absence');
+  }
+}
+function portableReferences(){
+  const project=process.cwd(),outside=path.resolve(project,'..','synthetic-evidence-not-read');
+  for(const dir of [path.join(project,'.ensemble_reviews'),outside]){
+    const options={root:project,dir};
+    for(const name of ['../outside.txt','sub/../../outside.txt',['..','outside.txt'].join(path.win32.sep),['sub','..','..','outside.txt'].join(path.win32.sep),path.win32.join('C:','fixture','outside.txt'),'/outside.txt','file:stream','a//b','a/./b','.. /outside.txt','folder./report.json','folder /report.json','.ensemble_reviews./report.json','.ensemble_reviews/NUL','.ensemble_reviews/aux.txt','.ensemble_reviews/src/CON','.ensemble_reviews/com1.log','.ensemble_reviews/LPT9','.ensemble_reviews/COM\u00b9.log','.ensemble_reviews/lpt\u00b2.txt','bad?name','bad*name','.ENSEMBLE_REVIEWS/reports/x.json','.ensemble_reviews/CONIN$','.ensemble_reviews/CONOUT$','.ensemble_reviews/con .txt','.ensemble_reviews/COM0','.ensemble_reviews/LPT0'])assert.throws(()=>need('evidenceReference')(name,options),e=>e.code==='MOMM_UNSAFE_EVIDENCE_REFERENCE',name);
+    assert.equal(need('evidenceFile')('src/safe.js',options),path.join(project,'src','safe.js'));
+    assert.equal(need('evidenceFile')('src/.hidden/report v2.json',options),path.join(project,'src','.hidden','report v2.json'));
+    assert.equal(need('evidenceFile')('.ensemble_reviews/reports/safe.json',options),path.join(dir,'reports','safe.json'));
+    if(win&&dir===path.join(project,'.ensemble_reviews')){const routed=need('evidenceReference')('.ensemble_reviews/reports/safe.json',{root:project,dir:path.join(project.toUpperCase(),'.ensemble_reviews')});assert.equal(routed.base,path.resolve(project));assert.deepEqual(routed.parts,['.ensemble_reviews','reports','safe.json']);}
+  }
+}
+if(process.argv[2]==='--inspection-errors'){inspectionErrors();console.log(JSON.stringify({passed:true,scope:'Actual source function with synthetic filesystem failures; no permission change'}));process.exit(0);}
+if(process.argv[2]==='--reference-grammar'){portableReferences();console.log(JSON.stringify({passed:true,scope:'Pure portable reference grammar, including relocated evidence; no filesystem access'}));process.exit(0);}
+
+function posixIdentityControls(updater=false){
+ const complete=fs.readFileSync(new URL(updater?'./update.mjs':'./evidence-location.mjs',import.meta.url),'utf8');
+ const start=updater?complete.indexOf('export function reviewLogFor('):0,end=updater?complete.indexOf('export function lastSuccessfulReviews(',start):complete.length;assert(start>=0&&end>start);
+ const source=complete.slice(start,end);
+ const cases=[{"name":"case-insensitive inside alias","inside":true},{"name":"case-sensitive sibling","sensitive":true},{"name":"different-device same inode","home":"/other/private"},{"name":"unreadable project identity","statError":"EACCES","reason":"unresolvable"},{"name":"unreadable ancestor identity","ancestorError":"EIO","home":"/other/private","reason":"unresolvable"},{"name":"unusable inode","zero":true,"reason":"unresolvable"},{"name":"lexically inside path","home":"/work/Project/private","statError":"EACCES","reason":"inside_project"},{"name":"unusable ancestor inode","ancestorZero":true,"home":"/other/private","reason":"unresolvable"},{"name":"non-directory ancestor","ancestorNotDirectory":true,"home":"/other/private","reason":"unresolvable"}];
+function execute(source,scenario){
+ assert.equal([...source.matchAll(/^import /gm)].length,updater?0:3);
+ const identities=scenario.sensitive?new Map([['/',[1n,1n]],['/work',[1n,2n]],['/work/Project',[1n,7n]],['/work/project',[1n,8n]],['/other',[2n,7n]]]):new Map([['/',[1n,1n]],['/work',[1n,2n]],['/work/project',[1n,7n]],['/other',[2n,7n]]]),key=p=>scenario.sensitive?p:p.toLowerCase(),error=code=>Object.assign(Error('Synthetic identity failure'),{code}),exists=p=>identities.has(key(p)),realpath=p=>{if(exists(p))return p;throw error('ENOENT');};
+ const mock={realpathSync:realpath,lstatSync(p){if(!exists(p))throw error('ENOENT');return{isDirectory:()=>true,isSymbolicLink:()=>false};},statSync(p){if(scenario.statError&&p==='/work/Project')throw error(scenario.statError);if(scenario.ancestorError&&p==='/other')throw error(scenario.ancestorError);const id=identities.get(key(p));if(!id)throw error('ENOENT');return{dev:id[0],ino:(scenario.zero||(scenario.ancestorZero&&p==='/other'))?0n:id[1],isDirectory:()=>!(scenario.ancestorNotDirectory&&p==='/other')};}};mock.realpathSync.native=realpath;
+ const context={fs:mock,path:path.posix,createHash,process:{platform:'darwin',cwd:()=>'/work/Project',env:{}}};vm.createContext(context);const adapter=updater?"options=>{const result=reviewLogFor(options.cwd,{MOMM_EVIDENCE_HOME:options.home});if(result===null)throw Object.assign(Error('refused'),{reason:'refused'});return result;}":'evidenceLocation';new vm.Script(source.replace(/^import .*;\r?\n/gm,'').replace(/^export /gm,'')+'\n;globalThis.locate='+adapter+';').runInContext(context);
+ let result=null,reason=null;try{result=context.locate({cwd:'/work/Project',home:scenario.home??'/work/project/private'});}catch(e){reason=e.reason??e.code??'unexpected';}
+ const originalExpected=scenario.reason??(scenario.inside?'inside_project':null),expected=updater&&originalExpected?'refused':originalExpected;return{name:scenario.name,expected,reason,passed:reason===expected,accepted:result!==null};
+}
+ for(const scenario of cases){const row=execute(source,scenario);assert(row.passed,JSON.stringify(row));}
+}
+if(process.argv[2]==='--posix-identity'){posixIdentityControls();console.log(JSON.stringify({passed:true,checks:9,scope:'Actual source with synthetic POSIX identities; native filesystem probe is separate'}));process.exit(0);}
+if(process.argv[2]==='--updater-identity'){posixIdentityControls(true);console.log(JSON.stringify({passed:true,checks:9,scope:'Actual standalone updater resolver with synthetic POSIX identities; no update or native filesystem mutation'}));process.exit(0);}
+function sourceNamespaceControls(){
+ const source=fs.readFileSync(new URL('./evidence-location.mjs',import.meta.url),'utf8'),start=source.indexOf('export function evidenceReference('),end=source.indexOf('export function evidenceFile(',start);assert(start>=0&&end>start);
+ const reference=vm.runInNewContext('('+source.slice(start,end).replace(/^export /,'')+')',{path:path.win32,process:{platform:'win32'},EVIDENCE_FOLDER:'.ensemble_reviews'}),root='Z:\\fixture\\project',dir='Z:\\fixture\\owner-evidence',options={root,dir};
+ for(const name of ['src/aux.h','src/CON','src/NUL','src/CONIN$','src/COM\u00b9.log','src/con .txt','src/LPT0.c']){
+  const result=reference(name,options);assert.equal(result.base,path.win32.toNamespacedPath(root),'source aliases require the literal Windows namespace');assert.equal(result.parts.join('/'),name);
+  assert.throws(()=>reference('.ensemble_reviews/'+name,options),e=>e.code==='MOMM_UNSAFE_EVIDENCE_REFERENCE');
+ }
+}
+async function sourceAliasRecords(){
+ sourceNamespaceControls();
+ const fixture=privateTestFixture('momm-source-alias-'),prior=process.env.MOMM_EVIDENCE_HOME,rows=[];
+ try{
+  const home=path.join(fixture,'home');fs.mkdirSync(home,{mode:0o700});process.env.MOMM_EVIDENCE_HOME=home;
+  const {recordCheck}=await import('./checks.mjs'),native=file=>win?path.toNamespacedPath(file):file;
+  const names=['src/main.c','src/aux.h','lib/con.py','drivers/nul.js','tools/com1.txt','docs/prn.md','src/com0.h','src/lpt0.c','pkg/aux/helpers.go'];
+  for(const [index,name]of names.entries()){
+   const project=path.join(fixture,'project-'+index),file=path.join(project,...name.split('/')),content='int synthetic(void){return 0;}\n';fs.mkdirSync(native(path.dirname(file)),{recursive:true,mode:0o700});
+   let fd;try{fd=fs.openSync(native(file),'wx',0o600);assert(fs.fstatSync(fd).isFile(),'source fixture must be a real regular file');fs.writeSync(fd,content);}finally{if(fd!==undefined)fs.closeSync(fd);}
+   fs.writeFileSync(path.join(project,'check.mjs'),"console.log('synthetic source-path check');\n",{mode:0o600});const root=fs.realpathSync(project),dir=need('evidenceDir')({cwd:root,env:process.env});preparePrivateEvidence(dir);fs.mkdirSync(path.join(dir,'reports'),{mode:0o700});
+   const runId='rev_sourcealias_'+index;fs.writeFileSync(path.join(dir,'reports',runId+'.json'),JSON.stringify({run_id:runId,input_sha256:digest('synthetic source-path fixture'),synthetic_test:true,source_snapshot:{complete:true,kind:'file',files:[{path:name,sha256:digest(content)}]}}),{mode:0o600});
+   const result=await recordCheck(root,{runId,phase:'final',test:'check.mjs'});assert.equal(result.exit_code,0);const recorded=JSON.parse(fs.readFileSync(need('evidenceFile')(result.path,{root,dir}),'utf8'));assert.equal(recorded.artifacts[0].path,name);assert.equal(recorded.artifacts[0].sha256,digest(content));rows.push(name);
+  }
+  return rows;
+ }finally{if(prior===undefined)delete process.env.MOMM_EVIDENCE_HOME;else process.env.MOMM_EVIDENCE_HOME=prior;assert(path.basename(fixture).startsWith('momm-source-alias-'));fs.rmSync(fixture,{recursive:true,force:true});}
+}
+if(process.argv[2]==='--source-alias-records'){const rows=await sourceAliasRecords();console.log(JSON.stringify({passed:true,recorded:rows,scope:'Actual recordCheck/Node executions with synthetic reports and real source files; no peer/model or qualification claim'}));process.exit(0);}
+let nativeCaseProbe='not_run';
+async function nativeProbeMetadataControl(){
+ const source=fs.readFileSync(new URL('./evidence-location.test.mjs',import.meta.url),'utf8'),rootAt=source.indexOf('\nconst root = privateTestFixture('),start=source.indexOf("  await check('native filesystem case aliases",rootAt),end=source.indexOf("  await check('an evidence home that reaches",start);
+ assert(rootAt>=0&&start>rootAt&&end>start);let failed=false;
+ const context={fs:{statSync:()=>({dev:1n,ino:7n}),existsSync:()=>true},path:path.posix,projectA:'/synthetic/app',nativeCaseProbe:'not_run',need:()=>()=>({}),assert,check:async(name,fn)=>{try{fn();}catch{failed=true;}}};
+ vm.createContext(context);await new vm.Script('(async()=>{'+source.slice(start,end)+'})()').runInContext(context);
+ assert(failed,'The accepting resolver must fail the actual native-probe assertion');
+ assert.equal(context.nativeCaseProbe,'not_run','A failed probe cannot advertise a successful native observation');
+}
+if(process.argv[2]==='--native-probe-metadata'){await nativeProbeMetadataControl();console.log(JSON.stringify({passed:true,scope:'Actual native-probe callback with synthetic acceptance; no real filesystem mutation'}));process.exit(0);}
 const checks = [];
 async function check(name, fn) {
   try { await fn(); checks.push({ name, passed: true }); }
@@ -77,6 +152,18 @@ try {
       return true;
     });
     assert.throws(() => need('evidenceDir')({ cwd: projectA, env: { MOMM_EVIDENCE_HOME: projectA } }), { code: 'MOMM_EVIDENCE_LOCATION' });
+  });
+  await check('native filesystem case aliases cannot move evidence inside the project',()=>{
+    const alias=path.join(path.dirname(projectA),path.basename(projectA).toUpperCase()),original=fs.statSync(projectA,{bigint:true});
+    const alternate=fs.existsSync(alias)?fs.statSync(alias,{bigint:true}):null;
+    if(alternate&&alternate.dev===original.dev&&alternate.ino===original.ino){
+      assert.throws(()=>need('evidenceLocation')({cwd:projectA,home:path.join(alias,'private-evidence')}),e=>e.reason==='inside_project');
+      nativeCaseProbe='case_insensitive_alias_refused';
+    }else{
+      const sibling=mk('one','APP'),location=need('evidenceLocation')({cwd:projectA,home:path.join(sibling,'private-evidence')});
+      assert.equal(location.home,path.join(sibling,'private-evidence'));
+      nativeCaseProbe='case_sensitive_sibling_allowed';
+    }
   });
   await check('an evidence home that reaches the project through a link or junction is refused (real spelling)', () => {
     const link = path.join(root, 'alias-of-one');
@@ -452,6 +539,7 @@ try {
       [projectA, {}], [projectA, { MOMM_EVIDENCE_HOME: '' }], [projectA, { MOMM_EVIDENCE_HOME: home }], [projectB, { MOMM_EVIDENCE_HOME: home }],
       [aliasApp, { MOMM_EVIDENCE_HOME: home }], [projectA, { MOMM_EVIDENCE_HOME: 'relative-evidence' }], [projectA, { MOMM_EVIDENCE_HOME: path.join(projectA, 'inside') }],
       [projectA, { MOMM_EVIDENCE_HOME: projectA }], [projectA, { MOMM_EVIDENCE_HOME: path.join(aliasApp, 'evidence') }], [path.join(root, 'no-such-project'), { MOMM_EVIDENCE_HOME: home }],
+      [projectA, { MOMM_EVIDENCE_HOME: path.join(root,'home-dangling-library') }], [projectA, { MOMM_EVIDENCE_HOME: path.join(path.dirname(projectA),'APP','private-evidence') }],
     ];
     for (const [cwd, env] of cases) {
       let expected;
@@ -474,6 +562,12 @@ try {
   assert(resolved.startsWith(temporary + path.sep) && path.basename(resolved).startsWith('momm-evidence-location-test-'));
   fs.rmSync(resolved, { recursive: true, force: true });
 }
+await check('POSIX physical ancestor identities refuse aliases and unavailable metadata',posixIdentityControls);
+await check('a failed native probe never advertises a successful observation',nativeProbeMetadataControl);
+await check('standalone updater and evidence resolver enforce the same modeled physical identities',()=>posixIdentityControls(true));
+await check('real source files with device-like basenames can receive source-bound check records',sourceAliasRecords);
+await check('inspection errors never become verified absence',inspectionErrors);
+await check('portable references refuse traversal, Windows aliases and devices before access',portableReferences);
 const failed = checks.filter((c) => !c.passed);
-console.log(JSON.stringify({ node: process.version, passed: checks.length - failed.length, total: checks.length, checks }, null, 2));
+console.log(JSON.stringify({ node: process.version, passed: checks.length - failed.length, total: checks.length, native_case_probe:nativeCaseProbe, checks }, null, 2));
 process.exitCode = failed.length ? 1 : 0;

@@ -36,7 +36,13 @@ export function addAttribution(output) {
   for(const [file,original] of Object.entries(output)) {
     if(!file.endsWith('.html'))continue;
     const html=original.replace(/\n?<!-- MOMM CREDIT START -->[\s\S]*?<!-- MOMM CREDIT END -->\n?/g,'');
-    output[file]=html.includes('</footer>')?html.replace(/[ \t]*<\/footer>/,credit+'</footer>'):html+credit;
+    // Closing-tag text can appear inside scripts, textareas and comments.
+    // An explicit body ends at the document boundary, before optional comments.
+    const bodyEnd=/\s*(<\/body\s*>)(?=(?:\s|<!--[\s\S]*?-->)*(?:<\/html\s*>(?:\s|<!--[\s\S]*?-->)*)?$)/i;
+    if(html.includes('</footer>')) output[file]=html.replace(/[ \t]*<\/footer>/,credit+'</footer>');
+    else if(bodyEnd.test(html)) output[file]=html.replace(bodyEnd,(_,closing)=>credit+closing);
+    else if(/<\/body\s*>/i.test(html)) throw new Error(`Unsupported closing body boundary: ${file}`);
+    else output[file]=html+credit;
   }
 }
 
@@ -73,8 +79,12 @@ export function pageMetadata(file, catalogue) {
   return {title:`MOMM ${version}: ${kind}`, description, release};
 }
 
-export function enhanceSearch(output, {version, catalogue}) {
+export function enhanceSearch(output, {version, catalogue, development=null}) {
   for (const [file, original] of Object.entries(output)) {
+    if(development && file===`docs/momm/releases/${development.version}.html`) {
+      if(!original.includes('LOCAL DEVELOPMENT · NOT RELEASED')||!original.includes('content="noindex,nofollow"'))throw Error('Development page must remain explicitly unpublished and unindexed');
+      continue;
+    }
     if (!file.endsWith('.html') || file.startsWith('docs/momm/watch/') || !(file.startsWith('docs/momm/') || file==='docs/evidence/index.html')) continue; // Watch pages own their VideoObject graph.
     const meta=pageMetadata(file,catalogue),url=canonicalUrl(file);
     const crumbs=[['Skills',SITE],['MOMM',SITE+'momm/']];

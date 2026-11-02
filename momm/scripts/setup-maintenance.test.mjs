@@ -10,7 +10,13 @@ const source = fs.readFileSync(new URL('./setup-ui.mjs', import.meta.url), 'utf8
 const start = source.indexOf('function parseVersion('), end = source.indexOf('// Returns true only if a terminal');
 assert(start >= 0 && end > start);
 const passed = [], failures = [];
-async function test(name, fn) { try { await fn(); passed.push(name); } catch (e) { failures.push({name,error:e.message,stack:String(e.stack||'').split('\n').slice(1,4).map(l=>l.trim())}); } }
+function sessionCore(js){const begin=js.indexOf('let reviewerSessionValidated='),end=js.indexOf('let capabilities =',begin);assert(begin>=0&&end>begin,'shared session source is included');return js.slice(begin,end);}
+async function test(name, fn) {
+  let deadline;
+  try { await Promise.race([Promise.resolve().then(fn),new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('Test did not settle within 30 seconds')),30_000);})]); passed.push(name); }
+  catch (e) { failures.push({name,error:e.message,stack:String(e.stack||'').split('\n').slice(1,4).map(l=>l.trim())}); }
+  finally { clearTimeout(deadline); }
+}
 // vm-context values carry foreign prototypes, so structural checks compare JSON.
 const same=(actual,expected,message)=>assert.equal(JSON.stringify(actual),JSON.stringify(expected),message);
 async function report(grok = {code:0,stdout:'{}'}) {
@@ -194,8 +200,8 @@ await test('bootstrap keeps the launch capability when the session reply omits o
       sessionStorage:{getItem:()=>null,setItem(){}},history:{replaceState(){}},
       fetch:async(url,options)=>{requests.push({url,headers:options.headers});return {ok:true,json:async()=>url==='/api/session'?reply:{url:'/ledger?ticket='+'0'.repeat(48)}};},
       refresh:async()=>{},loadMaintenance(){},loadGuidance(){},loadUsage(){},loadUpdateClock(){},loadCapabilities(){finish(null);},
-      summary:{},showToast:message=>finish(message)});
-    vm.runInContext('var session=null;'+js.slice(apiStart,apiEnd)+js.slice(bootStart,bootEnd)+';this.call=api;this.current=()=>session;',c);
+      window:{},summary:{},showToast:message=>finish(message)});
+    vm.runInContext('var session=null;'+sessionCore(js)+js.slice(apiStart,apiEnd)+js.slice(bootStart,bootEnd)+';this.call=api;this.current=()=>session;',c);
     assert.equal(await started,null,'bootstrap must complete');
     assert.equal(requests[0].headers['X-MOMM-Token'],token,'the session read itself carries the launch capability');
     await c.call('/api/ledger-ticket',{method:'POST',body:'{}'});
@@ -218,8 +224,8 @@ await test('a rejected stored launch token is forgotten; a transient failure kee
       sessionStorage:{getItem:k=>stored.get(k)??null,setItem:(k,v)=>stored.set(k,v),removeItem:k=>stored.delete(k)},history:{replaceState(){}},
       fetch:async(url,options)=>{requests.push(options.headers['X-MOMM-Token']);return respond(options.headers['X-MOMM-Token']);},
       refresh:async()=>{},loadMaintenance(){},loadGuidance(){},loadUsage(){},loadUpdateClock(){},loadCapabilities(){finish(null);},
-      summary:{},showToast:message=>finish(message)});
-    vm.runInContext('var session=null;'+js.slice(apiStart,apiEnd)+js.slice(bootStart,bootEnd),c);
+      window:{},summary:{},showToast:message=>finish(message)});
+    vm.runInContext('var session=null;'+sessionCore(js)+js.slice(apiStart,apiEnd)+js.slice(bootStart,bootEnd),c);
     return {message:await done,requests};
   };
   const server=token=>token===fresh?{ok:true,status:200,json:async()=>({platform:'test',providers:{}})}
@@ -549,7 +555,68 @@ await test('request body decodes split UTF-8 once and closes oversize streams',a
   const request=new EventEmitter();const promise=read(request);const bytes=Buffer.from('{"text":"😀"}');
   for(const byte of bytes) request.emit('data',Buffer.from([byte]));request.emit('end');assert.equal((await promise).text,'😀');
   const oversized=new EventEmitter();let destroyed=false;oversized.destroy=()=>{destroyed=true;};const pending=read(oversized);
-  oversized.emit('data',Buffer.alloc(5000));await assert.rejects(pending);assert.equal(destroyed,true);
+  oversized.emit('data',Buffer.alloc(5000));await assert.rejects(pending);assert.equal(destroyed,false,'a client still writing must be able to read the 413');
+  oversized.emit('data',Buffer.alloc(1_100_000));assert.equal(destroyed,true,'the excess after refusal stays bounded');
+});
+await test('reviewer settings malformed JSON is not misreported as a private-store failure',async()=>{
+  const a=source.indexOf('function readBody('),b=source.indexOf('function authorized(',a);
+  const read=vm.runInNewContext(source.slice(a,b)+';readBody',{Buffer});
+  const request=new EventEmitter();const parsed=read(request,48000);
+  request.emit('data',Buffer.from('{broken'));request.emit('end');
+  let error;try{await parsed;}catch(e){error=e;}
+  assert.equal(error?.code,'invalid_request_json');
+  const h=handler({},true,{readBody:async()=>{throw error;}});
+  const response=await h.serve({method:'POST',url:'/api/reviewers',headers:{origin:'http://127.0.0.1:1',host:'127.0.0.1:1'},socket:{}},{});
+  assert.equal(response.status,400);assert.equal(response.value.code,'invalid_request_json');
+});
+await test('an oversized reviewer save reads a complete 413 over real HTTP, not a reset',async()=>{
+  const a=source.indexOf('function readBody('),b=source.indexOf('function authorized(',a);
+  const read=vm.runInNewContext(source.slice(a,b)+';readBody',{Buffer});let writes=0;
+  const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+  const server=handler({},true,{http,crypto,readBody:read,sendJson:json,reviewerRegistryStore:()=>({command(){writes++;return {};}})}).serve;
+  try {
+    await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+    const port=server.address().port,result=await new Promise((resolve,reject)=>{
+      const req=http.request({hostname:'127.0.0.1',port,path:'/api/reviewers',method:'POST',headers:{origin:`http://127.0.0.1:${port}`,'Content-Length':60_000}},res=>{
+        let body='';res.setEncoding('utf8');res.on('data',b=>{body+=b;});res.on('error',reject);res.on('end',()=>resolve({status:res.statusCode,value:JSON.parse(body)}));
+      });req.on('error',reject);req.setTimeout(5000,()=>req.destroy(new Error('Synthetic HTTP deadline')));req.end(Buffer.alloc(60_000,97));
+    });
+    assert.equal(result.status,413);assert.equal(result.value.code,'request_body_too_large');assert.equal(writes,0);
+  } finally {server.closeAllConnections?.();if(server.listening)await new Promise(resolve=>server.close(resolve));}
+});
+await test('an empty reviewer page parameter means absent, never zero',async()=>{
+  const seen=[];const serve=handler({},true,{reviewerRegistryStore:()=>({snapshot(query){seen.push([query.limit,query.offset]);return {revision:0,profiles:[]};}})}).serve;
+  const request={method:'GET',socket:{},headers:{host:'127.0.0.1:1',origin:'http://127.0.0.1:1'}};
+  for(const query of ['?limit=&offset=','?limit=7&offset=2','?limit=-1&offset=x','?limit=0'])assert.equal((await serve({...request,url:'/api/reviewers'+query},{})).status,200);
+  assert.deepEqual(seen,[[25,0],[7,2],[25,0],[0,0]]);
+});
+await test('review Bumblers need the private session and same origin, and hide internal errors',async()=>{
+  const saved=[];const stubs={listBumblers:()=>[{name:'bab'}],saveBumbler:(name,entry)=>{saved.push([name,entry]);return [];},removeBumbler:()=>{throw Error('EACCES C:/private/path');}};
+  const request={url:'/api/bumblers',socket:{},headers:{host:'127.0.0.1:1',origin:'http://127.0.0.1:1'}};const serve=body=>handler(body,true,stubs).serve;
+  assert.equal((await handler({},false,stubs).serve({...request,method:'GET'},{})).status,403);
+  const listed=await serve({})({...request,method:'GET'},{});assert.equal(listed.status,200);assert.equal(listed.value.bumblers[0].name,'bab');
+  assert.equal((await serve({op:'save',name:'bab',entry:{}})({...request,method:'POST',headers:{...request.headers,origin:'http://evil.test'}},{})).status,403);assert.equal(saved.length,0);
+  assert.equal((await serve({op:'save',name:'bab',entry:{}})({...request,method:'POST'},{})).status,200);assert.equal(saved.length,1);
+  assert.equal((await serve({op:'other'})({...request,method:'POST'},{})).status,400);assert.equal((await serve({})({...request,method:'DELETE'},{})).status,405);
+  const hidden=await serve({op:'remove',name:'bab'})({...request,method:'POST'},{});assert.equal(hidden.status,400);assert.doesNotMatch(hidden.value.error,/private/);
+  // The longest guidance the form allows must still fit in the request, even when every character is escaped.
+  let limit=0;const longest={op:'save',name:'bab',entry:{base_url:'http://100.64.0.1:8080/v1',model:'m'.repeat(200),max_tokens:65536,timeout_seconds:3600,rest_seconds:3600,guidance:'\u0001'.repeat(4000)}};
+  await handler({},true,{...stubs,readBody:async(_,bytes)=>{limit=bytes;return longest;}}).serve({...request,method:'POST'},{});
+  assert(Buffer.byteLength(JSON.stringify(longest))<=limit,'the request limit fits the longest allowed guidance');
+});
+await test('reviewer settings enforce session, same origin, methods and structured store errors',async()=>{
+  let writes=0;const store={snapshot:()=>({revision:0,profiles:[]}),command:()=>{writes++;return {revision:1};}};
+  const serve=handler({},true,{reviewerRegistryStore:()=>store}).serve;
+  const request={url:'/api/reviewers',socket:{},headers:{host:'127.0.0.1:1',origin:'http://127.0.0.1:1'}};
+  assert.equal((await serve({...request,method:'GET'},{})).status,200);
+  assert.equal((await serve({...request,method:'POST'},{})).status,200);assert.equal(writes,1);
+  assert.equal((await serve({...request,method:'POST',headers:{...request.headers,origin:'http://evil.test'}},{})).status,403);assert.equal(writes,1);
+  assert.equal((await serve({...request,method:'DELETE'},{})).status,405);
+  assert.equal((await handler({},false,{reviewerRegistryStore:()=>store}).serve({...request,method:'GET'},{})).status,403);
+  for(const code of ['connector_conflict','policy_required','not_found','stale_revision']){
+    const failed=handler({},true,{reviewerRegistryStore:()=>({command(){throw Object.assign(Error('Safe configuration error'),{code});}})});
+    const response=await failed.serve({...request,method:'POST'},{});assert.equal(response.value.code,code);assert.equal(response.status,['stale_revision','policy_required'].includes(code)?409:400);
+  }
 });
 // Drains host microtasks so promise chains inside the vm context settle.
 const flush=async()=>{for(let i=0;i<12;i++)await new Promise(r=>setImmediate(r));};
@@ -583,7 +650,7 @@ function ui(extra={}) {
   // governor and Close handlers are reachable through node(...).listeners.
   const end=client.lastIndexOf('(async () => {');assert(end>0);
   const optional=name=>`${name}:typeof ${name}==='function'?${name}:null`;
-  vm.runInContext(client.slice(0,end)+`\nthis.core={api,cliRow,miniStatus,launchAction,routeCopy,modelFact,renderMaintenance,loadMaintenance,render,providerCard,routeState,renderUsage,renderUpdateClock,loadUpdateClock,renderGuidance,renderGuidancePreview,draftGuidance,routeTotal,selectedBatch,refresh,runTest,runQuickSetup,saveGuidanceDraft,${['toggleBatch','changeGovernor','closeSetupCenter','renderCapabilities','renderPlan','probeRoute','runPlan','pipelinesText','loadCapabilities','clockAction','renderStaleNotice'].map(optional).join(',')}};this.init=(s,m)=>{session=s;maintenance=m};this.setSession=s=>session=s;this.fail=(a,r)=>liveResults.set(a,{status:'failed',result:r});this.pass=a=>liveResults.set(a,{status:'success'});this.getLive=()=>new Map(liveResults);this.setReport=r=>report=r;this.getReport=()=>report;this.setApi=f=>api=f;this.getMaintenance=()=>maintenance;this.setUsage=u=>usage=u;this.setClock=c=>clockState=c;this.setGuidance=g=>guidance=g;this.getGuidance=()=>guidance;this.setCapabilities=c=>capabilities=c;this.node=s=>document.querySelector(s);const toastLog=this.toasts=[];showToast=m=>{toastLog.push(String(m));};`,context);
+  vm.runInContext(client.slice(0,end)+`\nthis.core={api,cliRow,miniStatus,launchAction,routeCopy,modelFact,renderMaintenance,loadMaintenance,render,providerCard,routeState,renderUsage,renderUpdateClock,loadUpdateClock,renderGuidance,renderGuidancePreview,draftGuidance,routeTotal,selectedBatch,refresh,runTest,runQuickSetup,saveGuidanceDraft,${['toggleBatch','runBatchUpdate','runAllUpdates','changeGovernor','closeSetupCenter','renderCapabilities','renderPlan','probeRoute','runPlan','pipelinesText','loadCapabilities','clockAction','renderStaleNotice'].map(optional).join(',')}};this.init=(s,m)=>{session=s;maintenance=m};this.setSession=s=>session=s;this.fail=(a,r)=>liveResults.set(a,{status:'failed',result:r});this.pass=a=>liveResults.set(a,{status:'success'});this.getLive=()=>new Map(liveResults);this.setReport=r=>report=r;this.getReport=()=>report;this.setApi=f=>api=f;this.getMaintenance=()=>maintenance;this.setUsage=u=>usage=u;this.setClock=c=>clockState=c;this.setGuidance=g=>guidance=g;this.getGuidance=()=>guidance;this.setCapabilities=c=>capabilities=c;this.node=s=>document.querySelector(s);const toastLog=this.toasts=[];showToast=m=>{toastLog.push(String(m));};`,context);
   return context;
 }
 await test('six CLI rows include controller, unknown latest and explicit native update',()=>{
@@ -718,7 +785,7 @@ await test('guidance editor omits empty blocks and totals a route against user-l
 });
 await test('declining update never calls mutation API',async()=>{
   const c=ui();let calls=0;c.setApi(async()=>{calls++;return {};});
-  c.init({platform:'win32',providers:{codex:{}}},{cli_updates:[{agent:'codex',update_command:'codex update'}]});await c.core.launchAction('codex','update');assert.equal(calls,0);
+  c.init({platform:'win32',providers:{codex:{label:'Codex',docs:'x'}}},{cli_updates:[{agent:'codex',current:'1.0.0',status:'update_available',installed:true,update_command:'codex update'}],models:[],skills:{versions:[],repository_dirty:false},environment:{},runtime:{platform:'win32',node:'22',git:'2',powershell:'7',node_ready:true},checked_at:'2026-10-09T00:00:00Z'});await c.core.launchAction('codex','update');assert.equal(calls,0);
   c.window.confirm=()=>true;await c.core.launchAction('codex','update');assert.equal(calls,1,'positive control must reach the same instrumented API');
 });
 await test('quota failure is not turned into authentication advice',()=>{
@@ -1016,7 +1083,7 @@ await test('probe generation needs consent and the exact disclosure, skips block
   const {c,written}=capabilitiesSlice({matrix:capMatrix});
   const home=fs.mkdtempSync(path.join(os.tmpdir(),'momm-cap-home-'));
   const calls=[];
-  const exec=async(command,args,options)=>{calls.push(args);if(args[0]==='--version')return {code:0,stdout:'9.9.9',stderr:''};const blob=[...args,options.input].filter(v=>typeof v==='string').join('\n');const png=/This is a capability probe/.test(blob)?blob.match(/(\S*probe\.png)\b/)?.[1]:null;if(png)return {code:0,stdout:JSON.stringify({text:colourOf(png)}),stderr:''};if(/capability probe/.test(blob))return {code:0,stdout:JSON.stringify({text:'a page'}),stderr:''};const dir=path.join(home,'.grok','sessions','s','images');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'1.jpg'),(await import('./media-fixtures.mjs')).JPEG);return {code:0,stdout:JSON.stringify({text:'written'}),stderr:''};};
+  const exec=async(command,args,options)=>{calls.push(args);if(args[0]==='--version')return {code:0,stdout:'9.9.9',stderr:''};const blob=[...args,options.input].filter(v=>typeof v==='string').join('\n');const png=/This is a capability probe/.test(blob)?blob.match(/View the image file at ([^\r\n]+?probe\.png) with your file or image tool/)?.[1]:null;if(png)return {code:0,stdout:JSON.stringify({text:colourOf(png)}),stderr:''};if(/capability probe/.test(blob))return {code:0,stdout:JSON.stringify({text:'a page'}),stderr:''};const dir=path.join(home,'.grok','sessions','s','images');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'1.jpg'),(await import('./media-fixtures.mjs')).JPEG);return {code:0,stdout:JSON.stringify({text:'written'}),stderr:''};};
   const deps={home,installedVersions:{grok:'9.9.9'},exec};
   try{
     const snap=await c.snapshot(deps);const disclosure=snap.value.generation.grok.disclosure;
@@ -1641,6 +1708,279 @@ await test('the self-test passes whatever MOMM_EVIDENCE_HOME the caller has set,
     }
     assert.deepEqual(fs.readdirSync(home),[],'nothing was written into the caller\'s evidence home');
   }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+// Issue #57: exercise the production handlers and client, not a second model of the UI.
+const journeySession={platform:'win32',providers:{antigravity:{label:'Antigravity',docs:'https://example.invalid',login:{win32:'agy login'}},copilot:{label:'Copilot',docs:'https://example.invalid',login:{win32:'copilot login'}}}};
+const journeyRoute={agent:'antigravity',installed:true,ready:true,version:'1.3.1',note:'weak evidence: shared local account evidence'};
+await test('shared local evidence is not presented as a verified account',()=>{
+  const c=ui();c.init(journeySession,null);
+  const card=c.core.providerCard(journeyRoute);
+  assert.match(card,/shared|weak/i);assert.match(card,/not.*verified/i);
+  assert.equal(c.core.routeState(journeyRoute),'detected');
+  c.fail('antigravity',{route_status:'authentication_required'});
+  assert.match(c.core.providerCard(journeyRoute),/<strong>Not verified<\/strong>/);
+});
+await test('version timeout names a safe version check and a zero-model discovery retry',()=>{
+  const c=ui();c.init(journeySession,null);
+  const card=c.core.providerCard({agent:'copilot',installed:null,ready:false,version_status:'timeout',note:'Version check inconclusive'});
+  assert.match(card,/copilot --version/);assert.match(card,/fresh terminal/i);assert.match(card,/data-discovery="copilot"/);
+  assert.match(card,/not.*login|not.*sign.in/i);
+});
+await test('sign-in launch has persistent, truthful feedback and blocks duplicate pending clicks',async()=>{
+  const calls=deferredApi(),c=ui();c.init(journeySession,null);c.setApi(calls.stub);
+  const first=c.core.launchAction('antigravity','login');
+  assert.match(c.core.providerCard(journeyRoute),/Launching/i);
+  await c.core.launchAction('antigravity','login');assert.equal(calls.calls.length,1);
+  calls.calls[0].resolve({launched:true,note:'Finish in the terminal.'});await first;
+  c.core.render();const card=c.core.providerCard(journeyRoute);
+  assert.match(card,/launch.*accepted/i);assert.match(card,/not.*observed/i);assert.match(card,/Verify after login/);
+  assert.match(card,/data-copy-login="antigravity"/);
+});
+await test('failed and uncertain launches do not echo sensitive diagnostics',async()=>{
+  // The second action follows an uncertain result; the owner explicitly confirms that retry.
+  const c=ui({window:{confirm:()=>true}});c.init(journeySession,null);
+  c.setApi(async()=>{throw new Error('https://example.invalid/oauth?code=PRIVATE_OAUTH_MARKER '+'C:/'+'Users/'+'PRIVATE_ACCOUNT_MARKER');});
+  await c.core.launchAction('antigravity','login');
+  const card=c.core.providerCard(journeyRoute);
+  assert.match(card,/unconfirmed|not.*confirmed/i);assert.doesNotMatch(card,/PRIVATE_|oauth\?/);
+  c.setApi(async()=>({launched:false}));await c.core.launchAction('antigravity','login');
+  assert.match(c.core.providerCard(journeyRoute),/not.*launch|launch.*failed/i);
+});
+await test('login clears old verification and action receipt export contains fixed fields only',async()=>{
+  let copied='';const c=ui({navigator:{clipboard:{writeText:async t=>{copied=t;}}}});c.init(journeySession,null);c.pass('antigravity');
+  c.setApi(async()=>({launched:true,note:'PRIVATE_OAUTH_MARKER'}));await c.core.launchAction('antigravity','login');
+  assert.equal(c.core.routeState(journeyRoute),'detected');
+  const click=c.node('#provider-grid').listeners.click;
+  await click({target:{closest:selector=>selector==='[data-copy-receipt]'?{dataset:{copyReceipt:'antigravity'}}:null}});
+  const receipt=JSON.parse(copied);assert.equal(receipt.provider,'antigravity');assert.equal(receipt.action,'login');
+  assert.equal(receipt.completion,'unobserved');assert.doesNotMatch(copied,/PRIVATE_|command|detail|account|path|token/i);
+  await click({target:{closest:selector=>selector==='[data-copy-login]'?{dataset:{copyLogin:'antigravity'}}:null}});
+  assert.equal(copied,'agy login');
+});
+await test('action endpoint separates launch acceptance from unobserved completion',async()=>{
+  const h=handler({provider:'copilot',action:'login'});
+  const r=await h.serve({method:'POST',url:'/api/action',socket:{}},{});
+  assert.equal(r.status,202);assert.equal(r.value.receipt.status,'launch_requested');assert.equal(r.value.receipt.completion,'unobserved');
+  assert.equal(r.value.receipt.provider,'copilot');assert.equal(r.value.receipt.action,'login');
+});
+await test('a refused launch retains authentication failure and an existing successful check; uncertainty never restores success',async()=>{
+  for(const status of ['absent','success'])for(const outcome of ['failed','blocked','lost']){
+    const c=ui();c.init(journeySession,null);if(status==='success')c.pass('antigravity');else c.fail('antigravity',{route_status:'authentication_required'});
+    c.setApi(async()=>{if(outcome==='failed')return {launched:false};const e=new Error('synthetic');if(outcome==='blocked')e.status=409;throw e;});
+    await c.core.launchAction('antigravity','login');
+    if(status==='absent')assert.match(c.core.providerCard(journeyRoute),/data-action="login"/,outcome);
+    else assert.equal(c.core.routeState(journeyRoute),outcome==='lost'?'detected':'ready',outcome);
+  }
+});
+await test('running and successful verification have truthful account facts and no stale login instruction',async()=>{
+  const c=ui();c.init(journeySession,null);c.setApi(async()=>({launched:true}));await c.core.launchAction('antigravity','login');c.pass('antigravity');
+  const ready=c.core.providerCard(journeyRoute);assert.match(ready,/Live verified/);assert.match(ready,/Last terminal action/);
+  assert.doesNotMatch(ready,/Finish the provider login yourself|Copy login command/);
+  c.setApi(()=>new Promise(()=>{}));c.core.runTest('antigravity');const pending=c.core.providerCard(journeyRoute);
+  assert.match(pending,/<strong>Live check running<\/strong>/);assert.doesNotMatch(pending,/<strong>Not connected<\/strong>|Finish the provider login yourself/);
+});
+await test('fixed refusal reasons are actionable without exporting them or private diagnostics',async()=>{
+  const c=ui({window:{confirm:()=>true},navigator:{clipboard:{writeText:async()=>{}}}});c.init(journeySession,null);
+  c.setApi(async()=>{const e=new Error('PRIVATE_MARKER');e.status=409;e.action_receipt={provider:'skills',action:'update',status:'blocked',reason:'dirty_checkout'};throw e;});
+  await c.core.launchAction('skills','update');assert.match(c.toasts.at(-1),/local skill changes/);assert.doesNotMatch(c.toasts.at(-1),/PRIVATE_MARKER/);
+  const h=handler({provider:'skills',action:'update'},true,{runCommand:async()=>({code:0,stdout:' M synthetic-file'})},{status:'ready_to_verify',installation:{route:'updater_preview'}});
+  const result=await h.serve({method:'POST',url:'/api/action',socket:{}},{});assert.equal(result.value.receipt.reason,'dirty_checkout');assert.equal(h.launches(),0);
+  const invalid=ui();invalid.init(journeySession,null);invalid.setApi(()=>{throw Error('must not call API');});await invalid.core.launchAction('unlisted','login');
+  assert.match(invalid.toasts.at(-1),/Unsupported/);
+});
+await test('a hung launch observes a bounded deadline, releases the pending state and claims no terminal outcome',async()=>{
+  const timers=fakeTimers(),c=ui({...timers,AbortController});c.init(journeySession,null);c.setApi(()=>new Promise(()=>{}));
+  const pending=c.core.launchAction('antigravity','login');const deadline=timers.pending().find(t=>t.ms===15_000);
+  assert(deadline);deadline.fn();await pending;assert.match(c.core.providerCard(journeyRoute),/Launch could not be confirmed/);
+  assert.doesNotMatch(c.core.providerCard(journeyRoute),/Finish the provider login yourself/);
+});
+await test('a render failure after accepted launch is not relabelled as an unknown launch',async()=>{
+  const c=ui();c.init(journeySession,null);c.setApi(async()=>({launched:true}));
+  vm.runInContext("this.renderActuallyThrew=false;render=()=>{if(!this.renderActuallyThrew && providerCard(journeyRoute).includes('Launch request accepted')){this.renderActuallyThrew=true;throw Error('synthetic render failure');}};",Object.assign(c,{journeyRoute}));
+  await c.core.launchAction('antigravity','login');assert.equal(c.renderActuallyThrew,true);assert.match(c.core.providerCard(journeyRoute),/Launch request accepted/);
+});
+await test('copy messages identify the operation, and non-timeout discovery keeps diagnostics private',async()=>{
+  let copied='';const c=ui({navigator:{clipboard:{writeText:async t=>{copied=t;}}}});c.init(journeySession,null);
+  const click=c.node('#provider-grid').listeners.click;
+  await click({target:{closest:s=>s==='[data-copy-login]'?{dataset:{copyLogin:'antigravity'}}:null}});
+  assert.equal(copied,'agy login');assert.match(c.toasts.at(-1),/Login command copied/);
+  c.setApi(async()=>({launched:false}));await c.core.launchAction('antigravity','login');assert.doesNotMatch(c.core.providerCard(journeyRoute),/Finish the provider login yourself/);
+  const text=c.core.routeCopy({agent:'copilot',installed:null,version_status:'error',note:'PRIVATE_MARKER'},'unknown');assert.match(text,/failed|unreadable/);assert.doesNotMatch(text,/PRIVATE_MARKER/);
+});
+await test('an unconfirmed launch needs explicit retry confirmation and a decline dispatches nothing',async()=>{
+  const timers=fakeTimers();let calls=0,confirmed=0;
+  const c=ui({...timers,AbortController,window:{confirm:()=>{confirmed++;return false;}}});c.init(journeySession,null);
+  c.setApi(()=>{calls++;return new Promise(()=>{});});const pending=c.core.launchAction('antigravity','login');
+  timers.pending().find(t=>t.ms===15_000).fn();await pending;
+  await c.core.launchAction('antigravity','login');assert.equal(calls,1);assert.equal(confirmed,1);
+  assert.match(c.core.providerCard(journeyRoute),/Launch could not be confirmed/);
+});
+await test('production HTTP 500 launch refusal traverses the real client API and preserves previous verification',async()=>{
+  const h=handler({provider:'antigravity',action:'login'},true,{launchTerminal:()=>false});
+  const result=await h.serve({method:'POST',url:'/api/action',socket:{}},{});
+  assert.equal(result.status,500);assert.equal(result.value.receipt.status,'launch_failed');
+  const c=ui({fetch:async()=>({ok:false,status:result.status,json:async()=>result.value})});
+  c.init({...journeySession,token:crypto.randomBytes(24).toString('hex')},null);c.pass('antigravity');
+  await c.core.launchAction('antigravity','login');assert.equal(c.core.routeState(journeyRoute),'ready');
+  assert.match(c.core.providerCard(journeyRoute),/Terminal was not launched/);
+});
+await test('all five fixed refusal reasons agree between production handler and client without leaking diagnostics',async()=>{
+  const ready={status:'ready_to_verify',installation:{route:'updater_preview'}};
+  const cases=[
+    ['command_mismatch',{provider:'skills',action:'update',expected_command:'not-confirmed'},{},ready,/confirm the exact command/],
+    ['update_prerequisites',{provider:'skills',action:'update'},{},{status:'prerequisites_missing',installation:{route:'legacy_bootstrap'}},/Check update prerequisites/],
+    ['no_git_checkout',{provider:'skills',action:'update'},{fs:{existsSync:()=>false}},ready,/not a Git checkout/],
+    ['git_check_failed',{provider:'skills',action:'update'},{runCommand:async()=>({code:1,stdout:'PRIVATE_MARKER'})},ready,/Git could not verify/],
+    ['dirty_checkout',{provider:'skills',action:'update'},{runCommand:async()=>({code:0,stdout:' M PRIVATE_MARKER'})},ready,/local skill changes/]
+  ];
+  for(const [reason,body,extra,bootstrap,label] of cases){
+    const h=handler(body,true,extra,bootstrap);const r=await h.serve({method:'POST',url:'/api/action',socket:{}},{});
+    assert.equal(r.status,409,reason);assert.equal(r.value.receipt.reason,reason);assert.equal(h.launches(),0);
+    assert.doesNotMatch(JSON.stringify(r.value),/PRIVATE_MARKER/);
+    const c=ui({window:{confirm:()=>true},fetch:async()=>({ok:false,status:r.status,json:async()=>r.value})});
+    c.init({...journeySession,token:crypto.randomBytes(24).toString('hex')},null);await c.core.launchAction('skills','update');
+    assert.match(c.toasts.at(-1),label,reason);assert.doesNotMatch(c.toasts.at(-1),/PRIVATE_MARKER/);
+  }
+});
+await test('receipt state matrix and four-field whitelist preserve historical facts without stale instructions',()=>{
+  const c=ui();c.init(journeySession,null);Object.assign(c,{fixtureRoute:journeyRoute});
+  for(const state of ['ready','testing','login','detected','unknown','failed'])for(const status of ['launching','launch_requested','launch_failed','launch_unconfirmed','blocked'])for(const action of ['login','update']){
+    vm.runInContext(`actionReceipts.set('antigravity',${JSON.stringify({provider:'antigravity',action,status,completion:'unobserved',reason:'dirty_checkout',extra:'PRIVATE_MARKER'})});`,c);
+    const html=vm.runInContext(`receiptHtml('antigravity',${JSON.stringify(state)})`,c);
+    assert.doesNotMatch(html,/PRIVATE_MARKER|undefined/);
+    if(status!=='launch_requested'||['ready','testing'].includes(state))assert.doesNotMatch(html,/Finish the provider login yourself|Finish in the terminal/);
+    const copied=JSON.parse(vm.runInContext("receiptCopy('antigravity')",c));assert.deepEqual(Object.keys(copied).sort(),['action','completion','provider','status']);
+  }
+});
+await test('bare HTTP statuses remain generic; only a fixed private-session code names that cause',async()=>{
+  for(const status of [400,403]){
+    const c=ui();c.init(journeySession,null);c.setApi(async()=>{const e=new Error('PRIVATE_MARKER');e.status=status;throw e;});
+    await c.core.launchAction('antigravity','login');assert.match(c.toasts.at(-1),/^Action blocked/);assert.doesNotMatch(c.toasts.at(-1),/Unsupported|reopen|PRIVATE_MARKER/);
+  }
+  const c=ui();c.init(journeySession,null);c.setApi(async()=>{const e=new Error('PRIVATE_MARKER');e.status=403;e.action_reason='private_session';throw e;});
+  await c.core.launchAction('antigravity','login');assert.match(c.toasts.at(-1),/reopen the private Setup Center launch link/);
+});
+const dashboardSession={token:'fixture-session',platform:'win32',providers:{codex:{label:'Codex',docs:'x'},copilot:{label:'Copilot',docs:'x'},grok:{label:'Grok',docs:'x'}}};
+await test('maintenance receipt-copy click reaches its production listener and never launches',async()=>{
+  const begin=client.indexOf('maintenanceGrid.addEventListener("click",'),end=client.indexOf('maintenanceGrid.addEventListener("change",',begin);
+  assert(begin>=0&&end>begin,'production maintenance listener exists');let listener;
+  const copies=[],actions=[],context=vm.createContext({maintenanceGrid:{addEventListener:(type,fn)=>{assert.equal(type,'click');listener=fn;}},
+    copySetupText:(text,kind)=>copies.push([text,kind]),receiptCopy:provider=>JSON.stringify({provider,action:'update',status:'launch_requested',completion:'unobserved'}),
+    launchAction:(...args)=>actions.push(args),clockAction(){},timerAction(){},runBatchUpdate(){},runAllUpdates(){}});
+  vm.runInContext(client.slice(begin,end),context);
+  await listener({target:{closest:selector=>selector==='[data-copy-receipt]'?{dataset:{copyReceipt:'codex'}}:null}});
+  assert.equal(copies.length,1,'maintenance receipt click reaches the copy handler exactly once');assert.equal(copies[0][1],'receipt');assert.equal(JSON.parse(copies[0][0]).provider,'codex');assert.equal(actions.length,0,'copy never launches');
+  await listener({target:{closest:selector=>selector==='[data-maint-action]'?{dataset:{maintProvider:'copilot',maintAction:'update'}}:null}});
+  same(actions,[['copilot','update']],'ordinary action delegation is preserved');assert.equal(copies.length,1);
+});
+const dashboardMaintenance=()=>({cli_updates:[
+  {agent:'codex',current:'1.0.0',latest:'1.1.0',status:'update_available',installed:true,update_command:'synthetic codex'},
+  {agent:'copilot',current:'1.0.0',latest:'1.1.0',status:'update_available',installed:true,update_command:'synthetic copilot'},
+  {agent:'grok',current:'1.0.0',latest:null,status:'unknown',installed:true,update_command:'synthetic grok'}
+],models:[],skills:{versions:[],repository_dirty:false},environment:{},runtime:{node_ready:true,node:'22',git:'2',powershell:'7',platform:'win32'},checked_at:'2026-10-09T00:00:00Z'});
+function visibleText(c) {
+  return c.toasts.join('\n')+['#provider-grid','#maintenance-grid','#batch-progress','#operation-status','#action-confirm-copy'].map(selector=>{const node=c.node(selector);return String(node.innerHTML||'')+String(node.textContent||'');}).join('\n');
+}
+await test('readiness percentage counts live-verified reviewers only and exposes its denominator',()=>{
+  const c=ui();c.init(dashboardSession,null);c.setReport({routes:[{agent:'codex',role:'governor',installed:true,ready:true},{agent:'copilot',role:'reviewer',installed:true,ready:true},{agent:'grok',role:'reviewer',installed:true,ready:true}]});
+  c.core.render();assert.equal(c.node('#setup-percent').textContent,'0%','presence and installation are not completed live verification');
+  c.pass('copilot');c.core.render();assert.equal(c.node('#setup-percent').textContent,'50%');assert.match(c.node('#setup-progress-detail').textContent,/1 of 2/);
+  assert.equal(c.node('#setup-percent-compact').textContent,'50%');
+});
+await test('an empty reviewer pool is unavailable rather than 100 percent complete',()=>{
+  const c=ui();c.init(dashboardSession,null);c.setReport({routes:[]});c.core.render();assert.equal(c.node('#setup-percent').textContent,'—');assert.equal(c.node('#setup-percent-compact').textContent,'—');assert.match(c.node('#status-title').textContent,/No reviewers/);
+});
+await test('Update all is prominent and selects only known available updates with verified commands',()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.core.renderMaintenance();assert.match(c.node('#maintenance-grid').innerHTML,/id="update-all"/);
+  assert.match(c.node('#update-all-top').textContent,/Update all.*2/);assert.equal(typeof c.core.runAllUpdates,'function');
+  const missingCommand=dashboardMaintenance();missingCommand.cli_updates[1].update_command=null;c.init(dashboardSession,missingCommand);c.core.renderMaintenance();assert.match(c.node('#update-all-top').textContent,/Update all.*1/);
+});
+await test('a batch launch refusal preserves live evidence and never says the updater opened',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.pass('codex');c.core.toggleBatch('codex',true);
+  c.setApi(async()=>({launched:false}));const pending=c.core.runBatchUpdate();await flush();
+  assert.equal(c.getLive().get('codex')?.status,'success');assert.doesNotMatch(visibleText(c),/Updater opened/);await pending;assert.match(c.node('#maintenance-grid').innerHTML,/Terminal was not launched/);
+});
+await test('a batch transport error is fixed-field uncertainty and never echoes private diagnostics',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);
+  c.setApi(async()=>{throw Error('PRIVATE_OAUTH_MARKER');});await c.core.runBatchUpdate();
+  assert.doesNotMatch(visibleText(c),/PRIVATE_OAUTH_MARKER/);assert.match(c.node('#maintenance-grid').innerHTML,/unconfirmed|could not be confirmed/i);
+});
+await test('a live-check guard stops a batch as not launched, never as an uncertain launch',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;
+  const requests=[];c.setApi(async(p)=>{requests.push(p);if(p==='/api/test')return new Promise(()=>{});return {launched:false};});
+  c.core.runTest('codex');await flush();
+  await c.core.runBatchUpdate(['codex','copilot']);
+  assert.equal(requests.filter(p=>p==='/api/action').length,0,'neither guarded provider nor the remaining batch may launch');
+  assert.match(c.node('#batch-progress').textContent,/Stopped:.*not launched/i);
+  assert.doesNotMatch(c.node('#batch-progress').textContent,/launch unconfirmed/i);
+  assert(c.toasts.some(t=>/live connection check/.test(t)),'the guard still explains why no launch was sent');
+});
+await test('a stalled batch launch has a bounded observation deadline and stops the remaining queue',async()=>{
+  const timers=fakeTimers(),c=ui(timers);c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);c.core.toggleBatch('copilot',true);
+  const calls=[];c.setApi(async(p,o)=>{calls.push(p);if(p==='/api/action')return new Promise(()=>{});return {};});const pending=c.core.runBatchUpdate();await flush();
+  const deadline=timers.pending().find(t=>t.ms===15000);assert(deadline,'batch must not await its launch response forever');deadline.fn();await flush();await pending;
+  assert.equal(calls.filter(p=>p==='/api/action').length,1,'unknown launch must halt this queue');assert.match(c.node('#batch-progress').textContent,/stopped|unconfirmed/i);
+});
+await test('the walkthrough shortcut expands its instructions in one click',()=>{
+  const c=ui();const shortcut=c.node('#walkthrough-open');assert.equal(typeof shortcut.listeners.click,'function');shortcut.listeners.click();assert.equal(c.node('#setup-walkthrough').open,true);
+});
+await test('in-page Update all confirmation cancels without dispatch, then admits only its listed commands',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());
+  const dialog=c.node('#action-confirm');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};
+  const calls=[];c.setApi(async(p,o)=>{calls.push(JSON.parse(o.body));return {launched:false};});
+  const cancel=c.core.runAllUpdates();await flush();assert.equal(dialog.open,true);assert.match(c.node('#action-confirm-copy').textContent,/synthetic codex/);assert.match(c.node('#action-confirm-copy').textContent,/synthetic copilot/);assert.doesNotMatch(c.node('#action-confirm-copy').textContent,/synthetic grok/);
+  assert.equal(calls.length,0);c.node('#action-confirm-cancel').onclick();await cancel;assert.equal(calls.length,0);assert.equal(dialog.open,false);
+  const accept=c.core.runAllUpdates();await flush();c.node('#action-confirm-accept').onclick();await accept;
+  same(calls,[{provider:'codex',action:'update',expected_command:'synthetic codex'}],'a launch that was not accepted stops the rest of the batch');
+});
+await test('dialog Escape cancels without dispatch',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());const dialog=c.node('#action-confirm');dialog.showModal=()=>{dialog.open=true;};dialog.close=()=>{dialog.open=false;};let calls=0;c.setApi(async()=>{calls++;return {launched:false};});
+  const pending=c.core.runAllUpdates();await flush();assert.equal(dialog.open,true);let prevented=false;dialog.oncancel({preventDefault(){prevented=true;}});await pending;assert.equal(prevented,true);assert.equal(dialog.open,false);assert.equal(calls,0);
+});
+await test('a batch stops after unobserved version evidence',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.waitForVersionChange=async()=>null;let calls=0;c.setApi(async()=>{calls++;return {launched:true};});
+  await c.core.runBatchUpdate(['codex','copilot']);assert.equal(calls,1);assert.match(c.node('#batch-progress').textContent,/Stopped.*unconfirmed/);
+});
+await test('a changed batch command is blocked before any terminal request',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>{c.getMaintenance().cli_updates[0].update_command='different synthetic command';return true;};let calls=0;c.setApi(async()=>{calls++;return {launched:false};});
+  await c.core.runBatchUpdate(['codex']);assert.equal(calls,0);assert.match(c.toasts.join('\n'),/confirm the exact command again/);
+});
+await test('a previous batch summary cannot hide a current connection-check operation',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);c.setApi(async()=>({launched:false}));await c.core.runBatchUpdate();
+  c.setApi(async p=>p.startsWith('/api/status')?new Promise(()=>{}):{});c.core.refresh();assert.match(c.node('#operation-status').textContent,/Checking reviewer discovery/);
+});
+await test('an individual verification is visible in the sticky operation status while awaiting its result',async()=>{
+  const c=ui();c.init(dashboardSession,null);c.setReport({routes:[{agent:'copilot',role:'reviewer',installed:true,ready:true}]});c.setApi(async()=>new Promise(()=>{}));c.core.runTest('copilot');await flush();assert.match(c.node('#operation-status').textContent,/Verifying.*connection/i);
+});
+await test('a terminal update cannot start while the same provider has a live check in flight',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.setReport({routes:[{agent:'copilot',role:'reviewer',installed:true,ready:true}]});
+  const calls=[];c.setApi(async p=>{calls.push(p);return new Promise(()=>{});});c.core.runTest('copilot');await flush();c.core.launchAction('copilot','update');await flush();assert.equal(calls.filter(p=>p==='/api/action').length,0);
+});
+await test('the progress toolbar stays visible and confirmation is an accessible in-page dialog',()=>{
+  const html=fs.readFileSync(new URL('../assets/setup-ui/index.html',import.meta.url),'utf8'),css=fs.readFileSync(new URL('../assets/setup-ui/styles.css',import.meta.url),'utf8');
+  assert.match(html,/id="setup-percent-compact"/);assert.match(html,/id="setup-progress-detail"/);assert.match(html,/<dialog[^>]+id="action-confirm"/);assert.match(css,/\.setup-toolbar\s*\{[^}]*position:\s*sticky/);
+});
+await test('an accepted unobserved update needs explicit reconfirmation',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;let calls=0;c.setApi(async()=>{calls++;return {launched:true};});await c.core.launchAction('codex','update');
+  const prompts=[];c.window.confirm=text=>{prompts.push(text);return false;};await c.core.launchAction('codex','update');assert.equal(calls,1);assert.match(prompts[0],/unconfirmed|unobserved/);
+});
+await test('unknown update launch invalidates old verification while a refused launch preserves it',async()=>{
+  for(const unknown of [true,false]){const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.pass('codex');c.setApi(async()=>{if(unknown)throw Error('synthetic lost reply');return {launched:false};});await c.core.launchAction('codex','update');assert.equal(c.getLive().has('codex'),!unknown);}
+});
+await test('governor review probes run in the canonical dashboard suite',async()=>{
+  const {runReviewProbes}=await import('./setup-review-regressions.test.mjs');const result=await runReviewProbes();assert.equal(result.passed,true,JSON.stringify(result.results.filter(row=>!row.passed)));
+});
+await test('a refused reply followed by render failure never claims an accepted launch',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.setApi(async()=>({launched:false}));let renders=0;vm.runInContext('this.replaceRender=f=>{render=f;};',c);c.replaceRender(()=>{if(++renders===2)throw Error('synthetic');});const receipt=await c.core.launchAction('codex','update');assert.equal(receipt.status,'launch_failed');assert.doesNotMatch(c.toasts.join('\n'),/Launch request accepted/);assert.match(c.toasts.at(-1),/not launched/);
+});
+await test('an explicit batch consumes processed selections and keeps unrelated ticks',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.core.toggleBatch('codex',true);c.core.toggleBatch('grok',true);c.waitForVersionChange=async()=> '2';c.setApi(async()=>({launched:true}));await c.core.runBatchUpdate(['codex']);same(c.core.selectedBatch(),['grok']);
+});
+await test('accepted reply with render failure has phase-specific recovery copy',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.setApi(async()=>({launched:true}));let renders=0;vm.runInContext('this.replaceRender=f=>{render=f;};',c);c.replaceRender(()=>{if(++renders===2)throw Error('synthetic');});const receipt=await c.core.launchAction('codex','update');assert.equal(receipt.status,'launch_requested');assert.match(c.toasts.at(-1),/Launch request accepted/);assert.match(c.toasts.at(-1),/reload/i);
+});
+await test('lost reply and render failure explicitly require page recovery',async()=>{
+  const c=ui();c.init(dashboardSession,dashboardMaintenance());c.window.confirm=()=>true;c.setApi(async()=>{throw Error('synthetic lost reply');});let renders=0;vm.runInContext('this.replaceRender=f=>{render=f;};',c);c.replaceRender(()=>{if(++renders===2)throw Error('synthetic');});const receipt=await c.core.launchAction('codex','update');assert.equal(receipt.status,'launch_unconfirmed');assert.match(c.toasts.at(-1),/reload/i);assert.doesNotMatch(c.toasts.join('\n'),/synthetic lost reply/);
 });
 console.log(JSON.stringify({passed:passed.length,checks:passed,failures},null,2));
 if(failures.length) process.exitCode=1;

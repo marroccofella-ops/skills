@@ -10,16 +10,18 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { update, dailyCheck, updateCheckDisabled, provenance, parse as parseUpdateOptions } from "./update.mjs";
-import { PEER_CONTRACT, reviewProblem, quotationDiagnostics } from "./review-contract.mjs";
+import { CLAIM_TYPES, PEER_CONTRACT, reviewProblem, quotationDiagnostics } from "./review-contract.mjs";
+import {REVIEW_JSON_SCHEMA} from './review-contract-schema.mjs';
 import { captureSourceSnapshot, RANGE_DIFF_FLAGS } from "./governor.mjs";
 import { inventory as installationsInventory } from "./installations.mjs";
 import { createProcessScope, executableOutside } from "./process-scope.mjs";
 import { parseUsage, inputEstimate, rollupUsage } from "./usage.mjs";
 import { readMedia } from "./media-bytes.mjs";
 import { attemptRecord, startAttempt, persistAttempt, attemptTotals } from "./attempts.mjs";
-import { resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
+import { ARTIFACT_DELIMITER, resolveGuidance, assemblePrompt, guidanceReportFields, writeGuidanceSidecar, trustProject, validateGuidance } from "./guidance.mjs";
 import { splitDiff, headerOnlyQuote } from "./split.mjs";
 import { createScheduler } from "./scheduler.mjs";
+import { BUILT_IN_ROUTES, BUMBLER_CLIENT, BUMBLER_GUIDANCE, bumblerAnswer, bumblerReadiness, bumblerRest, loadBumblers } from "./bumbler-route.mjs";
 import { ROLE_NAMES, loadRole, loadAllRoles, roleBrief, roleSection, roleGuidanceLayer, staleBriefNotices } from "./roles.mjs";
 import { ATTEMPT_BUDGET, COVERABLE_STATUSES, MODEL_FAMILIES, runPieceCovers, coverSection, coverReportRow, pieceCoverSummary } from "./cover.mjs";
 import { runSecondLook } from "./second-look.mjs";
@@ -28,6 +30,8 @@ import { preparePrivateEvidence, requirePrivateEvidence, createEvidenceWorkspace
 import { evidenceLocation, evidenceDir, recordEvidenceProject, takeEvidenceHomeOption, evidenceRefusal, EVIDENCE_FOLDER } from "./evidence-location.mjs";
 import { knownIncompatibility, settleCompatibility, rememberedNotice } from "./compatibility.mjs";
 import { repeatedStatusNotices, diffInputNotice } from "./run-notices.mjs";
+import {applyReviewerSettings,assertReviewerSelection} from './reviewer-selection.mjs';
+import {runNativeBumbleStage} from './bumble-native.mjs';
 
 // Windows: for a bare command name (git.exe, a reviewer CLI, taskkill) both
 // cmd.exe and libuv's own shell:false lookup try the WORKING DIRECTORY before
@@ -40,7 +44,7 @@ if (process.platform === "win32") process.env.NoDefaultCurrentDirectoryInExePath
 const processScope = createProcessScope();
 processScope.installSignalHandlers();
 
-const MOMM_VERSION = "1.17.3";
+const MOMM_VERSION = "1.18.0";
 const REPORT_SCHEMA = "momm-report/1";
 const VERSIONS_URL = "https://raw.githubusercontent.com/marroccofella/skills/main/versions.json";
 
@@ -438,12 +442,20 @@ function stripJpegMetadata(buffer) {
   const parts = [buffer.subarray(0, 2)];
   let offset = 2;
   let stripped = false;
-  while (offset + 4 <= buffer.length && buffer[offset] === 0xff) {
-    const marker = buffer[offset + 1];
-    if (marker === 0xda) { parts.push(buffer.subarray(offset)); offset = buffer.length; break; } // start of scan: rest is image data
-    const size = buffer.readUInt16BE(offset + 2) + 2;
+  while (offset < buffer.length) {
+    const start = offset;
+    if (buffer[offset] !== 0xff) throw new Error("Malformed JPEG marker before scan");
+    while (offset < buffer.length && buffer[offset] === 0xff) offset++;
+    if (offset >= buffer.length) throw new Error("Truncated JPEG marker");
+    const marker = buffer[offset++];
+    if (marker === 0xd9) { parts.push(buffer.subarray(start, offset)); stripped ||= offset < buffer.length; offset = buffer.length; break; }
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { parts.push(buffer.subarray(start, offset)); continue; }
+    if (offset + 2 > buffer.length) throw new Error("Truncated JPEG segment");
+    const size = buffer.readUInt16BE(offset);
+    if (size < 2 || size > buffer.length - offset) throw new Error("Invalid JPEG segment length");
+    if (marker === 0xda) { parts.push(buffer.subarray(start)); offset = buffer.length; break; } // entropy data remains unchanged
     if (marker === 0xe1 || marker === 0xe2) stripped = true; // APP1 (EXIF/XMP) / APP2
-    else parts.push(buffer.subarray(offset, offset + size));
+    else parts.push(buffer.subarray(start, offset + size));
     offset += size;
   }
   if (offset < buffer.length) parts.push(buffer.subarray(offset));
@@ -461,6 +473,7 @@ function stripPngMetadata(buffer) {
     const length = buffer.readUInt32BE(offset);
     const type = buffer.subarray(offset + 4, offset + 8).toString("latin1");
     const total = 12 + length;
+    if (total > buffer.length - offset) throw new Error("Invalid PNG chunk length");
     if (drop.has(type)) stripped = true;
     else parts.push(buffer.subarray(offset, offset + total));
     if (type === "IEND") break;
@@ -773,51 +786,6 @@ Prefer 1–3 short single-line excerpts with a one- or two-sentence assessment e
 At most 50 findings and 20 suggestions; do not silently omit work to meet these limits: report incomplete if necessary. Finding limits: id 80, target_file 500, issue/rationale 2000, test_suggestion 1500 UTF-16 code units; suggestions 500 UTF-16 code units each. Non-BMP symbols such as emoji count as two units. Use unique finding ids.
 Describe only defects genuinely present in the artifact; never emit placeholder or example text.`;
 
-// Antigravity's generation hint. Other routes receive the prose contract;
-// every completed reply is independently checked by reviewProblem below.
-const REVIEW_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["review_status", "reviewed_scope", "verdict", "confidence", "findings", "summary", "suggested_improvements"],
-  properties: {
-    review_status: { type: "string", enum: ["complete", "incomplete"] },
-    reviewed_scope: { type: "array", maxItems: 12, items: { anyOf: [
-      { type: "object", additionalProperties: false, required: ["quote", "assessment"], properties: { quote: { type: "string", maxLength: 500 }, assessment: { type: "string", maxLength: 1000 } } },
-      // 1.17 A3: valid only when that attachment was sent in this run (checked by reviewProblem).
-      { type: "object", additionalProperties: false, required: ["attachment_sha256", "observation", "assessment"], properties: { attachment_sha256: { type: "string", maxLength: 64 }, observation: { type: "string", maxLength: 500 }, assessment: { type: "string", maxLength: 1000 }, region: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 4, maxItems: 4 } } },
-    ] } },
-    verdict: { type: "string", enum: ["ACCEPT", "MODIFY", "REJECT"] },
-    suggested_improvements: { type: "array", maxItems: 20, items: { type: "string", maxLength: 500 } },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
-    findings: {
-      type: "array",
-      maxItems: 50,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "severity", "target_file", "line_range", "issue", "rationale", "test_suggestion"],
-        properties: {
-          id: { type: "string", maxLength: 80 },
-          severity: { type: "string", enum: ["CRITICAL", "WARNING", "NITPICK"] },
-          target_file: { type: ["string", "null"], maxLength: 500 },
-          line_range: {
-            anyOf: [
-              { type: "array", prefixItems: [{ type: "integer" }, { type: "integer" }], minItems: 2, maxItems: 2 },
-              { type: "null" },
-            ],
-          },
-          issue: { type: "string", maxLength: 2000 },
-          rationale: { type: "string", maxLength: 2000 },
-          test_suggestion: { type: ["string", "null"], maxLength: 1500 },
-          region: { type: "array", items: { type: "integer", minimum: 0 }, minItems: 4, maxItems: 4 },
-          // 1.17 B2: optional; must equal review-contract.mjs CLAIM_TYPES (most blocking first).
-          claim_type: { type: "string", enum: ["DEFECT", "RISK", "QUESTION", "IDEA", "NOISE"] },
-        },
-      },
-    },
-    summary: { type: "string", maxLength: 1000 },
-  },
-};
 
 function normalizeAgentName(value) {
   const name = String(value || "").trim().toLowerCase();
@@ -982,12 +950,12 @@ function parseArgs(argv) {
     }
     else if (arg === "--capabilities") options.capabilitiesMatrix = true;
     else if (arg === "--json") options.json = true;
-    else if (arg === "--timeout") { options.timeoutMs = Math.max(1, Number(next())) * 1000; options.timeoutExplicit = true; }
+    else if (arg === "--timeout") { const raw = next(), seconds = Number(raw), milliseconds = Math.max(1, seconds) * 1000; if (!String(raw).trim() || !Number.isFinite(seconds) || !Number.isSafeInteger(milliseconds) || milliseconds > 2147483647) throw new Error("--timeout requires a finite timer-safe number of seconds"); options.timeoutMs = milliseconds; options.timeoutExplicit = true; }
     else if (arg === "--effort") {
       options.effort = next();
       if (!["default", "medium"].includes(options.effort)) throw new Error("--effort must be default or medium");
     }
-    else if (arg === "--max-bytes") options.maxBytes = Math.max(1, Number(next()));
+    else if (arg === "--max-bytes") { const raw = next(), bytes = Number(raw); if (!String(raw).trim() || !Number.isSafeInteger(bytes)) throw new Error("--max-bytes requires a whole number"); options.maxBytes = Math.max(1, bytes); }
     else if (arg === "--strict") options.strict = true;
     else if (arg === "--retry-invalid") options.retryInvalid = true;
     else if (arg === "--cover") options.cover = true;
@@ -1084,11 +1052,27 @@ function sanitizeText(text) {
     /\b(?:sk-ant-|sk-proj-|xai-|ghp_|gho_|ghu_|ghs_|github_pat_)[A-Za-z0-9._-]{12,}\b/g,
     /\bsk-[A-Za-z0-9]{20,}\b/g,
     /\bAKIA[0-9A-Z]{16}\b/g,
-    /((?:api[_-]?key|password|secret|bearer)\s*[:=]\s*["']?)[^\s"']{8,}/gi,
+    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=]\s*["']?)[^\s"']{8,}/gi,
+    /\b(bearer[ \t]+)[A-Za-z0-9._~+\/-]{8,}=*/gi,
+    // A quoted secret further along the same statement, such as an argument or arrow body:
+    // eight or more characters mixing letters and digits inside quotes after a key name.
+    // Earlier quoted arguments are stepped over, so a secret in a later argument is still found. The reach
+    // is bounded (40 steps, quoted spans of at most 200 characters) so a long line of keys stays linear.
+    /((?:api[_-]?key|password|secret|bearer)["']?\s*[:=](?:[^\n"';]|"[^"\n]{0,200}"|'[^'\n]{0,200}'){0,40}?["'])(?=[^"'\n]*\d)(?=[^"'\n]*[A-Za-z])[^"'\n]{8,}(?=["'])/gi,
   ];
   let value = text;
-  for (const pattern of patterns) {
-    value = value.replace(pattern, (_match, prefix) => {
+  for (const [patternIndex, pattern] of patterns.entries()) {
+    value = value.replace(pattern, (match, prefix, offset, input) => {
+      // Unquoted calls/arrows in explicit declarations are source expressions.
+      // Retain the original literal rule for ambiguous bare values and quotes.
+      if (patternIndex === 3 && typeof prefix === "string" && !/["']$/.test(prefix)) {
+        const before = input.slice(0, offset).split(/\r?\n/).at(-1), expression = match.slice(prefix.length);
+        // Only when what the call or arrow passes holds no secret-looking token: eight or more
+        // characters mixing letters and digits, like a key or password written in place.
+        const passed = expression.includes("=>") ? expression.slice(expression.indexOf("=>") + 2) : expression.slice(expression.indexOf("("));
+        if (/\b(?:const|let|var)\s+$/.test(before) && /^(?:[$A-Z_a-z][\w$]*(?:\.[\w$]+)*\(|\([^)]*\)=>)/.test(expression)
+          && !/(?:^|[^\w$.])(?=[\w~+/-]*\d)(?=[\w~+/-]*[A-Za-z])[\w~+/-]{8,}/.test(passed)) return match;
+      }
       redactions += 1;
       // The first pattern has no capture group, so `prefix` is the numeric
       // match offset — only prepend it when it is an actual captured string.
@@ -1625,7 +1609,8 @@ async function invokeReviewer(agent, artifact, options) {
   // result the route produced (codex only; see codexIsolationArgs in route-isolation.mjs).
   const settings = { route: null };
   const result = await dispatchReviewer(agent, artifact, options, settings);
-  return settings.route ? { ...result, route_settings: settings.route } : result;
+  const shown = result.status === "invalid_output" && settings.bumblerStdout ? bumblerAnswer(sanitizeText(settings.bumblerStdout).value) : null;
+  return { ...result, ...(settings.route ? { route_settings: settings.route } : {}), ...(shown ? { unverified_answer: shown } : {}) };
 }
 
 async function dispatchReviewer(agent, artifact, options, settings) {
@@ -1665,7 +1650,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // Stdin-based routes must not inherit the governor's project/evidence root
   // as their working directory. This limits ambient project discovery; it is
   // not an OS boundary against a process running as the same account.
-  if (["gemini", "codex", "claude"].includes(agent)) {
+  if (["gemini", "codex", "claude"].includes(agent) || options.bumblers?.[agent]) {
     temporaryDirectory = (options.runProcess && options.testWorkspace ? options.testWorkspace : createEvidenceWorkspace)("momm-review-");
     cwd = temporaryDirectory;
   }
@@ -1848,13 +1833,25 @@ async function dispatchReviewer(agent, artifact, options, settings) {
     // switches turn that off for MOMM's runs only; the user's own Grok setup is unchanged.
     // One definition shared with the probe and the generation runner (route-isolation.mjs, 1.17 A10).
     routeEnv = grokIsolationEnv();
+  } else if (options.bumblers?.[agent]) {
+    // A Bumbler is one more reviewer: same prompt, containment, validation and evidence.
+    const bumbler = options.bumblers[agent];
+    command = process.execPath;
+    // The client learns the run's deadline (fixed below, once) and whether it may wait on a busy server.
+    args = [BUMBLER_CLIENT, bumbler.base_url, bumbler.model, String(bumbler.max_tokens), "", bumbler.wait_when_busy !== false && options.noRetry !== true ? "1" : "0"];
+    const prompt = assemblePrompt(`${contract}${BUMBLER_GUIDANCE}`, [bumbler.guidance ? `## This Bumbler's own guidance, from its owner\n${sanitizeText(bumbler.guidance).value}` : "", options.guidanceRoutes?.[agent] ?? ""].filter(Boolean).join("\n\n"), artifact), boundary = prompt.indexOf(`\n\n${ARTIFACT_DELIMITER}`);
+    // The rules go in the system role, the untrusted artifact stays in the user message.
+    input = JSON.stringify({ system: prompt.slice(0, boundary), user: prompt.slice(boundary + 2) });
   } else {
     return { agent, status: "unsupported", detail: "no reviewed adapter exists" };
   }
 
     setupComplete = true;
     // options.runProcess is a test seam only (argv binding is proven with a fake).
-    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true), env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
+    if (options.bumblers?.[agent]) await bumblerRest(options.bumblerRest, agent, options.bumblers[agent].rest_ms);
+    const routeTimeoutMs = options.timeoutExplicit !== true && options.bumblers?.[agent] ? options.bumblers[agent].timeout_ms : agentTimeoutMs(agent, options.timeoutMs, options.timeoutExplicit === true);
+    if (options.bumblers?.[agent]) args[4] = String(Date.now() + routeTimeoutMs);
+    result = await (options.runProcess ?? runProcess)(command, args, { input, timeoutMs: routeTimeoutMs, env: routeEnv ? { ...cleanOauthEnv(), ...routeEnv } : cleanOauthEnv(), cwd,
       onProgress: options.onProgress ? progress => options.onProgress(agent, progress) : null });
   } catch {
     // Unexpected filesystem/launcher exceptions are terminal route failures.
@@ -1892,6 +1889,7 @@ async function dispatchReviewer(agent, artifact, options, settings) {
   // 1.17 A4.3: Grok streams, so its record also says how many events arrived and the last one's type,
   // whatever the outcome; a timeout after partial output is still a timeout.
   if (agent === "grok") result = { ...result, progress: { ...(result.progress ?? {}), ...grokStreamProgress(result.stdout) } };
+  if (options.bumblers?.[agent]) { settings.bumblerStdout = result.stdout; options.bumblerRest.set(agent, Date.now()); options.bumblerBusy.set(agent, (options.bumblerBusy.get(agent) ?? 0) + (String(result.stderr ?? "").match(/^Bumbler model server is busy;/gm)?.length ?? 0)); }
   if (result.code !== 0 || result.error || result.timedOut) {
     // Everything this route was sent: the full prompt when it went by stdin, and always the artifact.
     const failure = classifyFailure(result, agent, [input, artifact].filter((text) => typeof text === "string").join("\n"));
@@ -1941,6 +1939,9 @@ async function dispatchReviewer(agent, artifact, options, settings) {
       ...(typeof refused === "string" && refused.trim() && !options.replyContract && !extractJsonObjects(refused).length ? answerShapeEvidence(refused) : {}),
     };
   }
+  // A small model may invent the optional claim label. Fix its case, or drop an unknown label;
+  // the finding itself still faces every other check.
+  if (options.bumblers?.[agent] && Array.isArray(payload?.findings)) for (const finding of payload.findings) if (finding && typeof finding.claim_type === "string") { const known = finding.claim_type.trim().toUpperCase(); if (CLAIM_TYPES.includes(known)) finding.claim_type = known; else delete finding.claim_type; }
   const problem = result.outputLimited ? "output limit hit; review may be truncated" : options.replyContract ? options.replyContract.problem(payload, artifact) : reviewProblem(payload, artifact, { attachments });
   if (problem) return { agent, status: "invalid_output", detail: problem, progress: result.progress, usage: parseUsage(agent, agent === "codex" ? `${result.stdout}\n${result.stderr ?? ""}` : result.stdout), ...(options.replyContract ? {} : quotationEvidence(payload, artifact)) };
   // 1.16: token/cost accounting from the CLI's own envelope — never estimated
@@ -2127,10 +2128,13 @@ function looksLikeDiff(artifact) {
 function rationalize(results, { prose = false, artifact = null } = {}) {
   const grouped = new Map();
   const corpus = artifact === null ? null : artifactShingles(artifact);
-  const byId = new Map();
+  const byId = new Map(), unverified = [];
   for (const result of results) {
     if (result.status !== "success") continue;
     for (const finding of result.review.findings) {
+      // A finding whose quotes failed gives no vote: it stands alone, so it can neither
+      // corroborate another reviewer nor raise a severity, and it keeps its marker.
+      if (finding.quotes_unverified) { unverified.push({ ...finding, sources: [result.agent] }); continue; }
       // Reviewers that independently coin the identical slug for the same file
       // are agreeing even when their wording differs — merge on (file, id)
       // first, then on overlapping line ranges (same code, any wording), then
@@ -2138,7 +2142,8 @@ function rationalize(results, { prose = false, artifact = null } = {}) {
       // name, so they can never collide across reviewers.
       const idKey = `${(finding.target_file || "").toLowerCase()}|${finding.id.toLowerCase()}`;
       const quoted = prose || !normalizedRange(finding) ? quotationKey(grouped, finding, result.agent, prose, corpus) : null;
-      let key = byId.get(idKey) ?? quoted ?? (prose ? null : overlappingKey(grouped, finding)) ?? fingerprint(finding);
+      const priorKeys = byId.get(idKey) ?? [], priorKey = priorKeys.find(candidate => prose || !disjointRanges(grouped.get(candidate), finding));
+      let key = priorKey ?? quoted ?? (prose ? null : overlappingKey(grouped, finding)) ?? fingerprint(finding);
       // Precise locations beat fuzzy wording in BOTH directions: if the
       // candidate group sits at line ranges that demonstrably do not overlap
       // this finding's, they are different defects however similarly they are
@@ -2147,7 +2152,7 @@ function rationalize(results, { prose = false, artifact = null } = {}) {
       if (!prose && collision && disjointRanges(collision, finding)) {
         key = `${key}|@${Math.min(finding.line_range[0], finding.line_range[1])}`;
       }
-      byId.set(idKey, key);
+      if (!priorKeys.includes(key)) byId.set(idKey, [...priorKeys, key]);
       const existing = grouped.get(key);
       if (!existing) grouped.set(key, { ...finding, sources: [result.agent] });
       else {
@@ -2161,7 +2166,7 @@ function rationalize(results, { prose = false, artifact = null } = {}) {
     }
   }
   const rank = { CRITICAL: 0, WARNING: 1, NITPICK: 2 };
-  return [...grouped.values()].sort((left, right) => rank[left.severity] - rank[right.severity]);
+  return [...grouped.values(), ...unverified].sort((left, right) => rank[left.severity] - rank[right.severity]);
 }
 
 // Progress events go to stderr so stdout stays a single parseable report —
@@ -2373,10 +2378,11 @@ function authEvidence(agent) {
 // Zero model calls: version probes plus auth evidence for every requested
 // route, so a user sees exactly which reviewers will join and what to run to
 // bring the missing ones online — before any tokens are spent.
-async function preflightCheck(reviewers, governor) {
+async function preflightCheck(reviewers, governor, bumblers = Object.create(null)) {
   const knownAdapters = new Set(["codex", "gemini", "claude", "antigravity", "copilot", "grok"]);
   return Promise.all([...new Set(reviewers)].map(async (agent) => {
     if (agent === governor) return { agent, role: "governor", ready: false, note: "self-excluded (governor never reviews its own work)" };
+    if (bumblers[agent]) return bumblerReadiness(agent, bumblers[agent]);
     // Only probe adapters we ship: an arbitrary --reviewers name must never
     // become a command execution, even of "<name> --version".
     if (!knownAdapters.has(agent)) return { agent, installed: false, ready: false, auth: "n/a", note: "no reviewed adapter exists" };
@@ -3038,6 +3044,19 @@ async function selfTest(pretty) {
       const src = "const url = `${base}/api?key=${key}`; const k = process.env.OPENAI_API_KEY; import sklearn as sk-learn";
       return sanitizeText(src).value === src;
     })(),
+    code_assignments_survive_sanitizer_but_literals_do_not: (() => {
+      const code = ["const secret=own(privateInput,['access_token','certificate']);", "const secret=()=>({access_token:Buffer.from(x)});",
+        "const password=hashPassword(input.password);", "const bearer=headers.authorization.slice(7);", "apiKey = await loadApiKey(profile);"];
+      const quoted = ['secret = "', 'synthetic'.repeat(3), '"'].join('');
+      const bearer = ['Authorization: Bearer ', 'synthetic'.repeat(3)].join('');
+      // A secret written in place inside a call or arrow is still a secret.
+      const leaks = ["const secret = abcdefgh(Zk9sUperSecret1)", "const password = decrypt(Zk9sUperSecret1)", "const api_key = wrap(N3vErSeEnK3yValue99)", "let apiKey = (x)=>Zk9sUperSecret1",
+        'const password = identityFunction("SYNTHETICabc123456789");', "const secret = ()=>'SYNTHETICabc123456789';", 'const apiKey = load(profile, "N3vErSeEnK3yValue99");', 'const apiKey = load("profile", "N3vErSeEnK3yValue99");'];
+      return code.every(line => sanitizeText(line).value === line) && leaks.every(line => /\[REDACTED\]/.test(sanitizeText(line).value))
+        && sanitizeText(quoted).value === 'secret = "[REDACTED]"'
+        && sanitizeText('api_key=' + 'synthetic'.repeat(3)).value === 'api_key=[REDACTED]'
+        && sanitizeText(bearer).value === 'Authorization: Bearer [REDACTED]';
+    })(),
     verify_first_flags_only_low_precision_single_sources: (() => {
       const trackRecord = {
         copilot: { applied: 1, rejected: 9, samples: 10, precision: 0.1 },
@@ -3271,6 +3290,12 @@ async function selfTest(pretty) {
     // A unanimous coalition must SCORE as unanimous: four reviewers describing
     // one defect at the same lines in four different sentences is agreement,
     // and merging only on wording used to report it as ~8%.
+    unverified_findings_never_corroborate: (() => {
+      const mk = (agent, severity, extra = {}) => ({ agent, status: "success", review: { findings: [{ id: "two-changed", severity, target_file: "a.js", line_range: [7, 7], issue: "two is now 3", rationale: "", test_suggestion: null, ...extra }] } });
+      const merged = rationalize([mk("codex", "NITPICK"), mk("bab", "CRITICAL", { quotes_unverified: true })]);
+      const verified = merged.find(f => f.sources.includes("codex")), alone = merged.find(f => f.sources.includes("bab"));
+      return merged.length === 2 && verified.sources.length === 1 && verified.severity === "NITPICK" && !verified.quotes_unverified && alone.quotes_unverified === true;
+    })(),
     same_lines_different_wording_merges: (() => {
       const mk = (agent, id, issue, range) => ({ agent, status: "success", review: { findings: [{ id, severity: "WARNING", target_file: "metrics.py", line_range: range, issue, rationale: "", test_suggestion: null }] } });
       const merged = rationalize([
@@ -3305,6 +3330,7 @@ async function selfTest(pretty) {
         && buildOutstanding([], [], "fixture", os.tmpdir()).complete === false;
     })(),
     temp_location_detected_as_ephemeral: isEphemeralLocation(os.tmpdir()) === true,
+    sanitizer_redacts_quoted_keys: ['{"pass' + 'word":"VALUE"}', '{"api' + '_key":"VALUE"}', '{"sec' + 'ret":"VALUE"}', "{'pass" + "word':'VALUE'}"].map((text) => text.replace("VALUE", "synthetic".repeat(2))).every((text) => !sanitizeText(text).value.includes("synthetic")),
     sanitizer_no_offset_leak: sanitizeText("token s" + "k-ant-abcdefghijklmnop end").value === "token [REDACTED] end"
       && sanitizeText("api_key=supersecretvalue").value === "api_key=[REDACTED]",
     severity_merge_takes_max: (() => {
@@ -3439,7 +3465,7 @@ function guidanceCommand(args) {
 
 // 1.17 B5: one claim, one route, a separate linked report (see second-look.mjs). Everything that can
 // refuse (seal, finding, route, artifact) is checked before the route is launched.
-async function secondLookCommand(options) {
+async function secondLookCommand(options, reviewerSelection) {
   if (!options.secondLook || !options.finding) throw new Error("--second-look needs <run_id> and --finding <finding_id>");
   const extra = [["--input", options.input], ["--range", options.range], ["--attach", options.attach?.length], ["--split", options.split], ["--cover", options.cover], ["--personas", options.personas], ["--guidance", options.guidance || options.guidanceFile], ["--tier", options.tier], ["--min-success", options.minSuccess], ["--strict", options.strict], ["--retry-invalid", options.retryInvalid]].filter(([, value]) => value).map(([flag]) => flag);
   if (extra.length) throw new Error(`--second-look takes only --finding, --reviewers <route>, --governor, --timeout, --effort and --pretty; remove ${extra.join(", ")}`);
@@ -3447,6 +3473,7 @@ async function secondLookCommand(options) {
   if (!Number.isFinite(options.timeoutMs)) throw new Error("Timeout and size limits must be numbers");
   const result = await runSecondLook({
     root: process.cwd(), runId: options.secondLook, findingId: options.finding, reviewers: options.reviewersExplicit ? options.reviewers : null, governor: options.governor ?? null,
+    excluded: reviewerSelection.excluded,
     sanitize: (text) => sanitizeText(text).value, dispatcherVersion: MOMM_VERSION, requirePrivate: () => requirePrivateEvidence(evidenceDir({ cwd: process.cwd(), env: process.env })),
     invoke: async (route, artifact, replyContract, governor) => {
       const started = Date.now();
@@ -3482,6 +3509,17 @@ async function main() {
     return;
   }
   if (options.selfTest) { await selfTest(options.pretty); return; }
+  let reviewerSelection;
+  // Saved Bumblers join a default run. A broken file stops a run only when it names a Bumbler.
+  try {
+    if (options.reviewers.some((route) => !BUILT_IN_ROUTES.has(route))) options.bumblers = loadBumblers();
+    else if (!options.reviewersExplicit && !options.selfTest) {
+      try { options.bumblers = loadBumblers(); }
+      catch (error) { process.stderr.write(`momm: saved Bumblers were not added: ${error.message}\n`); }
+    }
+    reviewerSelection = applyReviewerSettings(options);
+  }
+  catch(error) { process.stderr.write(`Reviewer settings refused: ${error.message}\n`); process.exitCode=4; return; }
   if (options.capabilitiesMatrix) {
     // The effective matrix for this machine: baseline plus still-valid overlay,
     // rendered by the registry module; the pipeline summary is derived from it.
@@ -3504,7 +3542,7 @@ async function main() {
   if (options.versions || options.expectVersion) throw new Error("--versions and --expect belong to --doctor: use --doctor --versions [--expect <version>]");
   if (options.doctor) { await doctor(options.pretty); return; }
   if (options.preflight) {
-    const entries = await preflightCheck(options.reviewers, options.governor);
+    const entries = await preflightCheck(!options.reviewersExplicit && options.bumblers ? [...options.reviewers, ...Object.keys(options.bumblers)] : options.reviewers, options.governor, options.bumblers);
     process.stdout.write(`${JSON.stringify({ policy: "oauth-only", model_calls_made: false, routes: entries, caveat: "presence evidence does not prove a live session; a route can still fail closed at dispatch" }, null, options.pretty ? 2 : 0)}\n`);
     if (process.stderr.isTTY) {
       const color = process.env.NO_COLOR ? (_c, t) => t : (c, t) => `${c}${t}${ANSI.reset}`;
@@ -3525,7 +3563,7 @@ async function main() {
 
   const currentDepth = parseReviewDepth(process.env.MULTI_LLM_REVIEW_DEPTH); // invalid values throw: fail closed
   if (currentDepth > 0) throw new Error("Nested multi-LLM dispatch is blocked to prevent recursive harness calls");
-  if (options.secondLook !== undefined || options.finding !== undefined) { await secondLookCommand(options); return; }
+  if (options.secondLook !== undefined || options.finding !== undefined) { await secondLookCommand(options, reviewerSelection); return; }
   if (!VALID_GOVERNORS.has(options.governor)) throw new Error("--governor is required and must be codex, gemini, claude, antigravity, copilot, grok, or other");
   if (!Number.isFinite(options.timeoutMs) || !Number.isFinite(options.maxBytes)) throw new Error("Timeout and size limits must be numbers");
 
@@ -3577,6 +3615,9 @@ async function main() {
       options.reviewersAuto = { selected: auto.routes, per_modality: auto.perModality };
     }
   }
+  // A saved Bumbler is a reviewer in the pool unless the run names its reviewers.
+  if (!options.reviewersExplicit && options.bumblers) options.reviewers = [...options.reviewers, ...Object.keys(options.bumblers)];
+  assertReviewerSelection(options, reviewerSelection);
   const uniqueReviewers = [...new Set(options.reviewers)];
   // 1.17 B1: every role brief loads from momm/roles before anything is dispatched; a missing or
   // malformed brief refuses the run. A brief past its review date is a visible notice, never a refusal.
@@ -3625,7 +3666,7 @@ async function main() {
   // with synchronous launch work (permission audits, path resolution) and every route read
   // "timeout" in every report, while a standalone --preflight answers in about a second. It stays
   // informational (routes still fail closed on their own) and its own timers keep it bounded.
-  const preflightFirst = await preflightCheck(uniqueReviewers, options.governor);
+  const preflightFirst = await preflightCheck(uniqueReviewers, options.governor, options.bumblers);
   for (const entry of preflightFirst) emitEvent(options.stream, { event: "preflight", ...entry });
   ui.preflight(preflightFirst);
   // 1.17.1 R1: a remembered CLI/model mismatch is said before any route is asked. The route still
@@ -3656,7 +3697,12 @@ async function main() {
       if (!options.stream) process.stderr.write(`momm split: ${split.pieces.length} pieces at a ${Math.round(ceilingBytes / 1024)} KB ceiling${cappedFor.length ? ` (capped from ${Math.round(requestedBytes / 1024)} KB for ${cappedFor.join(", ")})` : ""}${split.stats.overCeilingPieces ? `, ${split.stats.overCeilingPieces} over the ceiling (a change block kept whole)` : ""}${split.stats.lineSplitHunks ? `, ${split.stats.lineSplitHunks} large hunk(s) divided at line boundaries` : ""}${split.oversize.length ? `, ${split.oversize.length} oversize hunk(s) for the governor` : ""}\n`);
     }
   }
-  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, uniqueReviewers.length * (split ? 2 : 1)) });
+  // Per-Bumbler rest times and busy-answer counts for this run.
+  options.bumblerRest = new Map();
+  options.bumblerBusy = new Map();
+  // A Bumbler takes as many pieces at once as its server has room for, one by default.
+  const bumblerSlots = Object.fromEntries(Object.entries(options.bumblers ?? {}).map(([name, bumbler]) => [name, bumbler.parallel ?? 1]));
+  const scheduler = createScheduler({ jobs: options.jobs ?? Math.min(6, Math.max(uniqueReviewers.length * (split ? 2 : 1), ...(split ? uniqueReviewers.map((agent) => bumblerSlots[agent] ?? 0) : []))), perRoute: bumblerSlots });
   const runId = `rev_${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}_${createHash("sha256").update(String(Math.random())).digest("hex").slice(0, 12)}`;
   const attemptEvidence = [];
   const reviewOne = async (agent, artifactText, pieceId, piece = null, cover = null) => {
@@ -3702,7 +3748,8 @@ async function main() {
   // 1.17 B3 (--cover): after a piece's native reviews, each coverable failure with budget left gets
   // one cover by another requested route; votes follow the model-family rule in cover.mjs.
   const coversFor = (pieceId, natives, text, piece = null) => runPieceCovers({
-    enabled: options.cover === true, piece: pieceId, natives, requested: uniqueReviewers, governor: options.governor,
+    // A Bumbler neither covers a failed route nor is covered: it holds no quorum role.
+    enabled: options.cover === true, piece: pieceId, natives: natives.filter((row) => !options.bumblers?.[row.agent]), requested: uniqueReviewers.filter((route) => !options.bumblers?.[route]), governor: options.governor,
     roleOf: (agent) => personaFor(agent, options),
     invoke: (route, request) => scheduler.schedule(route, `${pieceId ?? "single"}:cover:${route}:${request.covering_for}`, () => reviewOne(route, text, pieceId, piece, request)),
   });
@@ -3747,7 +3794,10 @@ async function main() {
   // With pieces, corroboration runs over every piece result (same route may
   // appear once per piece); header-only quotes never corroborate.
   // A successful cover's findings join the pool under its own route name (sources never double-count a route).
-  const findings = rationalize(pieceResults ? pieceResults.flatMap((piece) => [...piece.results, ...piece.covers.map((c) => c.result)].map((r) => ({ ...r, piece: piece.id }))) : [...results, ...coverResults.map((c) => c.result)], { prose, artifact: sanitized.value })
+  const reviewedRows = pieceResults ? pieceResults.flatMap((piece) => [...piece.results, ...piece.covers.map((c) => c.result)].map((r) => ({ ...r, piece: piece.id }))) : [...results, ...coverResults.map((c) => c.result)];
+  // What a Bumbler raised reaches the governor even when its quotes failed. Its row keeps the true status.
+  const bumblerOpinions = reviewedRows.filter((r) => r.unverified_answer).map((r) => ({ agent: r.agent, status: "success", ...(r.piece ? { piece: r.piece } : {}), review: { findings: normalizeReview(r.agent, { findings: r.unverified_answer.findings }).findings.map((f) => ({ ...f, quotes_unverified: true })) } }));
+  const findings = rationalize([...reviewedRows, ...bumblerOpinions], { prose, artifact: sanitized.value })
     .map((f) => ({ ...f, sources: [...new Set(f.sources)], ...(f.quote && headerOnlyQuote(f.quote) ? { header_only_quote: true } : {}) }));
   // Join key linking this report, the run log, and governor dispositions.
   const guidanceSidecar = { written: false, path: null, error: null };
@@ -3789,6 +3839,7 @@ async function main() {
     attempt_accounting: attemptTotals(attemptEvidence),
     ...(options.label ? { label: options.label } : {}),
     governor: options.governor,
+    reviewer_selection: reviewerSelection,
     input_bytes: byteLength,
     // Binds this report to the exact sanitized artifact the reviewers
     // received — byte count alone cannot distinguish same-length inputs.
@@ -3831,6 +3882,8 @@ async function main() {
     reviewers: results.map((result) => ({
       agent: result.agent,
       status: result.status,
+      ...(result.unverified_answer ? { unverified_answer: result.unverified_answer } : {}),
+      ...(options.bumblers?.[result.agent] ? { bumbler: true, credential: "none", model: options.bumblers[result.agent].model, endpoint_sha256: createHash("sha256").update(options.bumblers[result.agent].base_url).digest("hex"), max_tokens: options.bumblers[result.agent].max_tokens, busy_waits: options.bumblerBusy?.get(result.agent) ?? 0, timeout_ms: options.timeoutExplicit === true ? agentTimeoutMs(result.agent, options.timeoutMs, true) : options.bumblers[result.agent].timeout_ms } : {}),
       // Keep the recovery command in the durable/stdout report, including
       // split results and zero-exit error envelopes. Never copy peer text.
       ...(result.status === "authentication_required" ? { login_hint: LOGIN_HINTS[result.agent] ?? null } : {}),
@@ -3960,6 +4013,18 @@ async function main() {
   if (evidence.error && options.stream) {
     emitEvent(true, { event: "evidence_error", stage: evidence.failed_stage, error: evidence.error });
   }
+  // Supplementary workers never inform the independent baseline before its
+  // original reports are sealed. The current closed-policy gate reads no key
+  // or caller hook and performs no remote preflight/inference.
+  let bumble = {schema:'momm-bumble-native-readiness/1',status:'baseline_not_sealed',dispatched:0,credentials_read:false,quorum_votes:0,completion:false};
+  if(evidence.persisted && !evidence.error){
+    try { bumble = await runNativeBumbleStage({project_root:process.cwd(),run_id:runId,baseline_report_sha256:evidence.report_sha256,source_sha256:report.input_sha256,runProcess}); }
+    catch {
+      // Preserve the original baseline and never print raw worker diagnostics.
+      // A throwing future adapter cannot prove zero sends or physical release.
+      bumble = {schema:'momm-bumble-native-readiness/1',status:'supplementary_failed',dispatched:null,credentials_read:null,remote_outcome:'unknown',quorum_votes:0,completion:false};
+    }
+  }
   emitEvent(options.stream, {
     event: "final",
     run_id: runId,
@@ -4024,7 +4089,7 @@ async function main() {
   }
   // dispatcher_version already lives inside the report; update_available is an
   // additive, optional field (unknown-field-safe, so REPORT_SCHEMA is unchanged).
-  process.stdout.write(`${JSON.stringify({ ...report, evidence, update_available: newer || null }, null, options.pretty ? 2 : 0)}\n`);
+  process.stdout.write(`${JSON.stringify({ ...report, evidence, bumble, update_available: newer || null }, null, options.pretty ? 2 : 0)}\n`);
   if (options.strict && strictPolicyFailed(results, options.governor)) process.exitCode = 2;
   if (options.minSuccess && !quorumMet) {
     const failure = quorumFailure(externalSuccesses, options.minSuccess, pieceResults);

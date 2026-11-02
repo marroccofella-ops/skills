@@ -231,7 +231,7 @@ if (isWindows) {
       assert.equal(probe.status, 0, probe.stderr);
       assert.equal(fs.existsSync(sentinel), false, 'the planted interpreter ran code from the checkout');
       const { viaGovernor, viaScope } = JSON.parse(probe.stdout.trim().split('\n').pop());
-      const inside = (p) => p && !path.relative(fs.realpathSync.native(checkout).toLowerCase(), p.toLowerCase()).startsWith('..');
+      const inside = (p) => {if(!p)return false;const relative=path.relative(fs.realpathSync.native(checkout).toLowerCase(),p.toLowerCase());return !path.isAbsolute(relative)&&relative!=='..'&&!relative.startsWith('..'+path.sep);};
       assert.ok(viaGovernor, 'resolveGit found no Git outside the checkout on this runner');
       assert.ok(!inside(viaGovernor) && !inside(viaScope), JSON.stringify({ viaGovernor, viaScope }));
     });

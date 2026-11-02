@@ -307,6 +307,25 @@ export async function manifest(fetcher = fetch) {
   if (!VERSION.test(m.momm)) throw new Error("Invalid manifest version");
   return m;
 }
+// The checkout version may identify unpublished development. Only its explicit,
+// sealed stable fallback is eligible for notices or the signed updater. This is
+// metadata selection, not signature verification; staging still verifies trust.
+export function publishedVersion(m) {
+  if (!Object.hasOwn(m, 'momm_development')) return m.momm;
+  const d = m.momm_development;
+  if (!d || typeof d !== 'object' || Array.isArray(d) ||
+      Object.keys(d).sort().join(',') !== 'notes_path,stable,version' ||
+      d.stable !== m.momm || !VERSION.test(d.version) || !VERSION.test(d.stable) ||
+      !newer(d.version, d.stable) || d.notes_path !== `momm/references/release-${d.version}.md`)
+    throw new Error('Invalid development version metadata');
+  const release = (m.momm_releases || []).find(r => r.version === d.stable);
+  if (!release || release.tag !== `momm-${d.stable}` || !SHA.test(release.sha256 || '') ||
+      release.legacy_unsigned || release.hash_covers !== 'git-tree-blobs-excluding-versions/1' ||
+      (m.momm_releases || []).some(r => r.version === d.version))
+    throw new Error('Development version is not an eligible release target');
+  return d.stable;
+}
+export function checkoutVersion(m) { publishedVersion(m); return m.momm_development?.version??m.momm; }
 export async function dailyCheck(installed, { stream = false, root, env = process.env, fetcher = fetch, now = Date.now() } = {}) {
   if (stream || updateCheckDisabled(env)) return null;
   let claim, fd;
@@ -339,7 +358,8 @@ export async function dailyCheck(installed, { stream = false, root, env = proces
     // Claim the day's check before the request, so concurrent runs do not chatter.
     writeJSON(cache, { checked_at: now, installed });
     const m = await manifest(fetcher);
-    return newer(m.momm, installed) ? m.momm : null;
+    const published = publishedVersion(m);
+    return newer(published, installed) ? published : null;
   } catch { return null; }
   finally { if (fd !== undefined) { fs.closeSync(fd); try { fs.unlinkSync(claim); } catch {} } }
 }
@@ -702,8 +722,9 @@ export function reviewLogFor(dir, env = process.env) {
     const tail = [];
     for (let cursor = p; ;) {
       try { return path.join(realOf(cursor), ...tail); }
-      catch {
-        try { fs.lstatSync(cursor); return null; } catch { /* absent: resolve its parent */ }
+      catch (error) {
+        if(error?.code!=='ENOENT')return null;
+        try { fs.lstatSync(cursor); return null; } catch (inspection) { if(inspection?.code!=='ENOENT')return null; }
         const parent = path.dirname(cursor);
         if (parent === cursor) return null;
         tail.unshift(path.basename(cursor)); cursor = parent;
@@ -714,6 +735,25 @@ export function reviewLogFor(dir, env = process.env) {
   let projectReal; try { projectReal = realOf(project); } catch { return null; }
   const folder = path.join(path.resolve(chosen), createHash("sha256").update(projectReal).digest("hex").slice(0, 32)), folderReal = realLocation(folder);
   if (!folderReal || [project, projectReal].some(p => within(p, folder) || within(p, folderReal))) return null;
+  // Keep this self-contained copy aligned with evidence-location.mjs. POSIX
+  // realpath need not fold case; only inspected directory identities can do so.
+  if(!win){
+    try{
+      const identity=fs.statSync(projectReal,{bigint:true});
+      if(!identity.isDirectory()||typeof identity.dev!=='bigint'||typeof identity.ino!=='bigint'||identity.ino<=0n)return null;
+      let cursor=folderReal;
+      for(let depth=0;;depth++){
+        if(depth>=1024)return null;
+        let stat;
+        try{stat=fs.statSync(cursor,{bigint:true});}catch(error){if(error?.code!=='ENOENT')return null;}
+        if(stat){
+          if(!stat.isDirectory()||typeof stat.dev!=='bigint'||typeof stat.ino!=='bigint'||stat.ino<=0n)return null;
+          if(stat.dev===identity.dev&&stat.ino===identity.ino)return null;
+        }
+        const parent=path.dirname(cursor);if(parent===cursor)break;cursor=parent;
+      }
+    }catch{return null;}
+  }
   return path.join(folder, "review-log.jsonl");
 }
 export function lastSuccessfulReviews(dirs, env = process.env) {
@@ -745,8 +785,8 @@ export async function checkAll(root, lock, dependencies = {}) {
     reviews: lastSuccessfulReviews([...new Set([cwd, root].map(d => path.resolve(d)))], env), clis: [] };
   try {
     const m = await (dependencies.manifest || manifest)(fetcher);
-    report.skill.published = m.momm;
-    report.skill.update_available = SEMVER.test(m.momm || "") && SEMVER.test(report.skill.installed || "") ? newer(m.momm, report.skill.installed) : null;
+    report.skill.published = publishedVersion(m);
+    report.skill.update_available = SEMVER.test(report.skill.published || "") && SEMVER.test(report.skill.installed || "") ? newer(report.skill.published, report.skill.installed) : null;
   }
   catch (e) { report.skill.error = safeText(e.message).slice(0, 200); }
   const npmLatest = async cli => {
@@ -966,8 +1006,9 @@ export async function update(argv, dependencies = {}) {
   if (o.apply || o.dry_run) refuseGitLocks(root, "Then repeat the command that was refused.");
   log(`Network: GET ${MANIFEST_URL} (release information only).`);
   const m = await (dependencies.manifest || manifest)();
-  const version = o.version || m.momm;
-  log(`Installed ${lock.current.version}; published ${m.momm}; channel ${channel}.`);
+  const published = publishedVersion(m), version = o.version || published;
+  if (m.momm_development && version === m.momm_development.version) throw new Error('Unpublished development is not an update target. No code fetched.');
+  log(`Installed ${lock.current.version}; published ${published}; channel ${channel}.`);
   for (const r of (m.momm_releases || []).filter(r => VERSION.test(r.version) && newer(r.version, lock.current.version) && !newer(r.version, version))) {
     log(`${r.version}: ${(r.changes || []).map(safeText).join("\n  ")}`);
   }

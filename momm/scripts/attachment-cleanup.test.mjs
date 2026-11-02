@@ -1,4 +1,5 @@
 // Synthetic files only; no provider calls, personal media, or external network.
+import {BUILT_IN_ROUTES,loadBumblers} from './bumbler-route.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,6 +13,7 @@ import {readMedia} from './media-bytes.mjs';
 import {takeEvidenceHomeOption,evidenceLocation,recordEvidenceProject} from './evidence-location.mjs';
 import {settleCompatibility,rememberedNotice} from './compatibility.mjs';
 import {repeatedStatusNotices,diffInputNotice} from './run-notices.mjs';
+import {assertReviewerSelection} from './reviewer-selection.mjs';
 delete process.env.MOMM_EVIDENCE_HOME; // test isolation: this suite decides where its fixtures' evidence lives
 const dispatcher=fileURLToPath(new URL('./multi-review.mjs',import.meta.url));
 const source=fs.readFileSync(dispatcher,'utf8');
@@ -38,13 +40,14 @@ const leftovers=dir=>{
 };
 async function test(name,fn){try{await fn();checks.push({name,passed:true});}catch(e){checks.push({name,passed:false,error:e.message});}}
 function actual(f,extra,{expectedStatus=1,expectedError=null,json=false}={}){
-  const started=Date.now();
+  // Include cumulative Windows privacy-audit/report startup, while remaining bounded.
+  const timeoutMs=process.platform==='win32'?90000:30000,started=Date.now();
   const result=spawnSync(process.execPath,[dispatcher,'--governor','codex','--reviewers','codex','--input','artifact.js','--no-ui',...extra],{
-    cwd:f.cwd,windowsHide:true,timeout:30000,maxBuffer:500000,
+    cwd:f.cwd,windowsHide:true,timeout:timeoutMs,maxBuffer:500000,
     env:{...process.env,TEMP:f.temporary,TMP:f.temporary,TMPDIR:f.temporary,HOME:path.join(f.cwd,'home'),USERPROFILE:path.join(f.cwd,'home'),
       MULTI_LLM_REVIEW_DEPTH:'0',NO_UPDATE_CHECK:'1',MOMM_NO_UPDATE_CHECK:'1',DO_NOT_TRACK:'1'},
   });
-  const diagnostic={status:result.status,signal:result.signal,error:result.error?.code??null,elapsed_ms:Date.now()-started,timeout_ms:30000,
+  const diagnostic={status:result.status,signal:result.signal,error:result.error?.code??null,elapsed_ms:Date.now()-started,timeout_ms:timeoutMs,
     stdout_bytes:Buffer.byteLength(result.stdout??''),stderr_bytes:Buffer.byteLength(result.stderr??'')};
   // Count the original buffers, then decode privately. Never include raw child
   // output in an assertion or JSON parser error, including ordinary exits.
@@ -157,6 +160,7 @@ try{
     const options={governor:'codex',reviewers:['codex'],timeoutMs:1000,maxBytes:1000,attach:[path.join(f.cwd,'synthetic.gif')]};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
+      BUILT_IN_ROUTES,loadBumblers,applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       preparePrivateEvidence:()=>({verified:true}),resolveDispatchCapabilities:async()=>({capabilities:null,registry:null}),
       // 1.17 A7: the real resolver (default mode here: no MOMM_EVIDENCE_HOME in this stub process).
@@ -181,6 +185,7 @@ try{
     const fail=()=>{throw Error(`synthetic ${boundary} failure`);};
     Object.assign(context,{process:{argv:['node','fixture'],env:{},cwd:()=>f.cwd,stderr:{write(){},isTTY:false}},
       parseArgs:()=>options,parseReviewDepth:()=>0,VALID_GOVERNORS:new Set(['codex']),collectArtifact:async()=> 'export const value=1;',
+      BUILT_IN_ROUTES,loadBumblers,applyReviewerSettings:()=>({applied:false,excluded:[]}),assertReviewerSelection, // retain the real final guard in this staging-ownership VM
       captureSourceSnapshot:()=>({}),inputLimitFor:()=>1000,sanitizeText:s=>({value:s}),applyTier(){},effectiveTimeoutMs:()=>1000,
       // This VM test targets staging ownership; native permission enforcement
       // is exercised independently by evidence-permissions-native.test.mjs.
