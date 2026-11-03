@@ -36,6 +36,7 @@ jobs:
       - run: node tests/browser-owner-check.cjs
       - run: node tests/browser-player-check.cjs
       - run: node tests/browser-queue-check.cjs
+      - run: node tests/browser-history-check.cjs
       - run: node tests/browser-recovery-check.cjs
       - run: node tests/browser-restart-check.cjs
       - run: node tests/browser-screen-check.cjs

@@ -1,10 +1,10 @@
 {
   "schema": "dom-tts-source/1",
-  "version": "0.5.0-dev.3-browser.1",
+  "version": "0.5.0-dev.3-browser.2",
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "1107494936918d19bba41790d8737715da037f5c001c2443548d5d23eb8b2f46"
+      "sha256": "ebfabb144ddc663d44c1135edd931df20b3bf4ce0b537160f11a5e9525845a13"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -24,11 +24,11 @@
     },
     {
       "path": "SKILL.md",
-      "sha256": "5c15d35056666d10c9cc9837823e4a155791abc6294b7633b5c263bcc38ba068"
+      "sha256": "bc5b14ec9c4c37f930ef81e4ddb529adee8aaf560044358365329a7db195db02"
     },
     {
       "path": "assets/browser/browser.html",
-      "sha256": "f56f17f957a7de05b2b068ef7b79da0c027da32ce39475e70284a38894611355"
+      "sha256": "1e7332b6db2470ba7f48de7c8b07e0e48ba74255b3fbce4c83ee78ccbec26a64"
     },
     {
       "path": "assets/browser/player.js",
@@ -52,7 +52,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "bf1ee590787dfbf237cc71f9cafcce56a883cbbccf32974820f25c6cf5113022"
+      "sha256": "5a67c3411e207214b6a62dd8e4fe0426a8f827e25742b07b8b3f818c21ee4b52"
     },
     {
       "path": "references/browser-speech.md",
@@ -80,11 +80,11 @@
     },
     {
       "path": "scripts/experimental/browser-queue.js",
-      "sha256": "6fa1188a6b6fcc6c57d9115951633d9d1bde272546ba995d37a2b6457c91687d"
+      "sha256": "007e9eb41e1d64888685d1efe757d0d2b653ec50c3ae6f2de6585d807e86c147"
     },
     {
       "path": "scripts/experimental/browser-session.js",
-      "sha256": "639fc3ee0226e90883d47bbf7d746df9f91ab5f78ed84407c629a9dac3cf0745"
+      "sha256": "58cd8f2a758b9e139f77a500ddd25fe70fa7bc03dbc6c90bd6057c685973876b"
     },
     {
       "path": "scripts/experimental/delta-narrator.js",
@@ -217,6 +217,10 @@
     {
       "path": "tests/browser-diagnostics-check.cjs",
       "sha256": "c3e8c76c3f0fd3c566b0d326238739d88d216914dab2a84aeb796ab5cf2b9455"
+    },
+    {
+      "path": "tests/browser-history-check.cjs",
+      "sha256": "1ad116b3d5de23d9545f675964ebab5e27b38dfc32298a0f32a01da1009efa5b"
     },
     {
       "path": "tests/browser-http-body-check.cjs",

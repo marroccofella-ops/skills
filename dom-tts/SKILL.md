@@ -62,3 +62,9 @@ not yet been audibly certified on native machines. Inspect COMPATIBILITY.md.
 Runtime state is private and separate from the skill; do not share it.
 `node scripts/support-bundle.js` exports a sanitized diagnostics.json, never
 speech, raw errors, settings or transcript paths. Review it before sharing.
+
+Browser receipts roll over as completed/cancelled messages settle. They are a bounded
+window, not a lifetime message quota. Pending, failed and open messages are never
+evicted to admit new work. Detailed history retains up to 64 messages/128 segments;
+256 additional text-free retired identities refuse delayed retries. Receipts beyond
+those windows are unavailable; do not resubmit old text to infer delivery.

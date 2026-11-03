@@ -61,7 +61,7 @@ function createSession({leaseMs=30000,deadlineMs=45000,now=()=>Date.now(),dir=st
    if(req.url.startsWith('/api/queue/')){if(req.url==='/api/queue/stop')cancelPendingSpeech();return json(res,200,queue.command(req.url.slice('/api/queue/'.length),data));}
    if(req.url==='/api/receipt')return json(res,200,accept(data));
    return json(res,404,{error:'not-found'});
-  }catch(error){if(res.destroyed)return;const known=new Set(['invalid-enable','browser-already-connected','previous-speech-unsettled','browser-not-connected','speech-busy','invalid-text','stale-receipt','invalid-receipt','invalid-id','invalid-json','json-post-required']);return json(res,400,{error:known.has(error.message)?error.message:'request-refused'});}
+  }catch(error){if(res.destroyed)return;const known=new Set(['browser-history-full','reply-history-expired','invalid-enable','browser-already-connected','previous-speech-unsettled','browser-not-connected','speech-busy','invalid-text','stale-receipt','invalid-receipt','invalid-id','invalid-json','json-post-required']);return json(res,400,{error:known.has(error.message)?error.message:'request-refused'});}
  });
  server.requestTimeout=10000;server.headersTimeout=10000;
  return {server,token,status,enable,poll,submit,stop,stopOwned,accept,receipt,disable,getPreferences,queue,close};

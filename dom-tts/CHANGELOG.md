@@ -1,3 +1,7 @@
+# 0.5.0-dev.3-browser.2 — rolling browser delivery history
+
+Fix long-running enabled companions refusing new speech once 64 message histories accumulated, even with an empty healthy queue. Roll out only closed, fully completed/cancelled messages before capacity is exhausted; retain pending/failed/open streams. Clean completed expiry bookkeeping, bound metadata and reject 256 recent retired identities without replay. Receipts are a rolling window and old identities beyond it are not a durable deduplication store. Native security checks, explicit Stop/restart, two-minute text expiry and local-only playback stay intact.
+
 # 0.5.0-dev.3-browser.1 — browser recovery and nonblocking supplied speech
 
 Adds the local browser companion and its required queue/renderer dependencies. Keeps retrying same-document transport health with bounded backoff, preserves cancellation and offline Stop, adds idempotent terminal acknowledgements and typed metadata-only readiness diagnostics. Browser CLI defaults to nonblocking admission. Supplied paragraph/sentence streams can speak before completion; no automatic Desktop subscription or watcher. Saved speed accepts0.5–2. Development only; protocol history remains bounded.
