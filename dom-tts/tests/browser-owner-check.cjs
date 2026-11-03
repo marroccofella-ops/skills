@@ -9,4 +9,4 @@ try{
  fs.writeFileSync(recovery,'interrupted recovery');assert.throws(()=>acquireOwner({dir:root,token:b,isAlive:()=>false}),/inspection/);assert.equal(JSON.parse(fs.readFileSync(lock)).token,a);fs.unlinkSync(recovery);
  fs.writeFileSync(lock,'incomplete');assert.throws(()=>acquireOwner({dir:root,token:b,isAlive:()=>false}),/inspection/);assert.equal(fs.readFileSync(lock,'utf8'),'incomplete');assert(!fs.existsSync(recovery));
  console.log('PASS: browser owner live-lock preservation, serialized stale takeover, competing claimant refusal, token-bound release and interrupted/malformed fail-closed inspection; no PID killed.');
-}finally{const resolved=path.resolve(root);assert.equal(path.dirname(resolved),path.resolve(os.tmpdir()));assert(path.basename(resolved).startsWith('dom-browser-owner-'));fs.rmSync(resolved,{recursive:true,force:true});}
+}finally{const resolved=fs.realpathSync(root);assert.equal(path.dirname(resolved),fs.realpathSync(os.tmpdir()));assert(path.basename(resolved).startsWith('dom-browser-owner-'));fs.rmSync(resolved,{recursive:true,force:true});}

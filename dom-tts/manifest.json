@@ -228,7 +228,7 @@
     },
     {
       "path": "tests/browser-owner-check.cjs",
-      "sha256": "43ce7c4597577731d992321511a945acef8b5e40b8e5e53490989dffd5d34d2e"
+      "sha256": "46928f4be9f480d263ee6214f5e02f94d52078af488e5c5ff0460b3af77e92c9"
     },
     {
       "path": "tests/browser-player-check.cjs",
@@ -244,7 +244,7 @@
     },
     {
       "path": "tests/browser-restart-check.cjs",
-      "sha256": "2f24da968d02eee3f34c25a808514d369be7a768f999dfe5f77a47d769bfaff9"
+      "sha256": "f233cb7371ebf0510c06678c78b20d6ee5f1894225d38ecb5c71f12f953a0c64"
     },
     {
       "path": "tests/browser-screen-check.cjs",
