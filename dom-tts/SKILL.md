@@ -3,6 +3,19 @@ name: dom-tts
 description: Speak selected text or assistant replies locally, stop speech, check speech status, or narrate one consented transcript with Dom TTS. Use for read aloud and spoken replies; excludes transcription and voice cloning.
 ---
 
+## Experimental browser speech and progress
+
+Use the explicitly enabled local browser companion for browser speech. Check
+`node scripts/browser-speak.js --command status` first. See
+[Browser speech](references/browser-speech.md) for setup, precise readiness states,
+Stop/Disable, and the supplied progressive reply interface. Default browser CLI
+admission does not wait for audio; use `--wait true` only for a voice test. For
+requested progress narration, display each completed paragraph and enqueue its
+concise spoken text immediately, then continue work. Do not reread that progress
+at the final answer. A completion notification alone is not a live output stream.
+Read only supplied text; no watcher or chat scan is started by this provider.
+
+
 # Dom TTS 0.5
 
 Use Node 18+ and the scripts in this skill's directory. Prefer a maintained Node

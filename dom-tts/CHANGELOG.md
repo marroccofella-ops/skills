@@ -1,3 +1,7 @@
+# 0.5.0-dev.3-browser.1 — browser recovery and nonblocking supplied speech
+
+Adds the local browser companion and its required queue/renderer dependencies. Keeps retrying same-document transport health with bounded backoff, preserves cancellation and offline Stop, adds idempotent terminal acknowledgements and typed metadata-only readiness diagnostics. Browser CLI defaults to nonblocking admission. Supplied paragraph/sentence streams can speak before completion; no automatic Desktop subscription or watcher. Saved speed accepts0.5–2. Development only; protocol history remains bounded.
+
 # 0.5.0-dev.1 — bug-fix evolution
 
 Based on reviewed 0.4.0-dev.2 (75ba1ce, PR #39). Failure-first terminal summaries,

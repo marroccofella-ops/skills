@@ -1,10 +1,10 @@
 {
   "schema": "dom-tts-source/1",
-  "version": "0.5.0-dev.1",
+  "version": "0.5.0-dev.3-browser.1",
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "a562d8a7d858c7fc31319769f8c5197fe88c7bcd24b7fe12cd8cbefde5a88995"
+      "sha256": "1107494936918d19bba41790d8737715da037f5c001c2443548d5d23eb8b2f46"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -20,11 +20,31 @@
     },
     {
       "path": "README.md",
-      "sha256": "bc6ba7c2ef2bb6845b3eaf44188bd134de0c398851605f299e9be5af7b8fa7ce"
+      "sha256": "a1e5d1c57829ca13c87621c5d2140eeec5a8e99575f7bff1a9bf1ccd6e445ca3"
     },
     {
       "path": "SKILL.md",
-      "sha256": "946225d3dcdbfc0447bfb8596e940004adbc7b07ec1c227dcc08f838765367f5"
+      "sha256": "5c15d35056666d10c9cc9837823e4a155791abc6294b7633b5c263bcc38ba068"
+    },
+    {
+      "path": "assets/browser/browser.html",
+      "sha256": "f56f17f957a7de05b2b068ef7b79da0c027da32ce39475e70284a38894611355"
+    },
+    {
+      "path": "assets/browser/player.js",
+      "sha256": "1d8442104168cf3cf3c4b7c79d71fe96d216b0325b82f2782af5afbaa6731e1f"
+    },
+    {
+      "path": "assets/browser/queue-screen.js",
+      "sha256": "4f109aa117b516fe4837c530169bddfd33df8762d8e300d040e5439f242148c9"
+    },
+    {
+      "path": "assets/browser/screen.js",
+      "sha256": "e324db7e15a1bf30da1cd7a3f4c9c2ebb52c7c251dcbec263856eb745c5a3c78"
+    },
+    {
+      "path": "assets/browser/style.css",
+      "sha256": "cc18cca37dc6e4862a163ec31df7b3764c4b119442bbff3b0fd1e58db71b7c79"
     },
     {
       "path": "assets/voices.json",
@@ -32,15 +52,43 @@
     },
     {
       "path": "package.json",
-      "sha256": "8effe1fe7d2e586210c5b70f8f471a669674a627e5d7288a12364bec6540d362"
+      "sha256": "bf1ee590787dfbf237cc71f9cafcce56a883cbbccf32974820f25c6cf5113022"
+    },
+    {
+      "path": "references/browser-speech.md",
+      "sha256": "7933303fb92c2a1c524dc7b28a315dfbe83c837ba3482f31e982397862386fea"
     },
     {
       "path": "scripts/avatar-state.js",
       "sha256": "91cf17096b93c886d38f5f12b7d322a2d3b8b63a373463723ee55956e086b6ea"
     },
     {
+      "path": "scripts/browser-speak.js",
+      "sha256": "57208958f66edaebb6ce2e2ae6370bab6ba47bb03894d2bdc0edfbb07a964a2e"
+    },
+    {
       "path": "scripts/doctor.js",
-      "sha256": "2b7f2f75329c97aa5eae35be90c4b3fd0ed7fdecfaee9188fe6e644b2e3dda03"
+      "sha256": "b273b7bbbf7c13f57d0c99d8dcb8f9dc8b576188e25260ff6a3de343d4943867"
+    },
+    {
+      "path": "scripts/experimental/browser-owner.js",
+      "sha256": "b0cc53655a1e500cbcb81162640fd671a6a6e09dddaae444302b3dadef66bb8f"
+    },
+    {
+      "path": "scripts/experimental/browser-player.js",
+      "sha256": "47ca65c231df769bd1c27a18e0eb822c58b4fe7d65a066e2a9568964e60b778a"
+    },
+    {
+      "path": "scripts/experimental/browser-queue.js",
+      "sha256": "6fa1188a6b6fcc6c57d9115951633d9d1bde272546ba995d37a2b6457c91687d"
+    },
+    {
+      "path": "scripts/experimental/browser-session.js",
+      "sha256": "639fc3ee0226e90883d47bbf7d746df9f91ab5f78ed84407c629a9dac3cf0745"
+    },
+    {
+      "path": "scripts/experimental/delta-narrator.js",
+      "sha256": "5847529d4a2cf4af10d3098e71922d3ea78a638ff1d43797e69dc697d8d48045"
     },
     {
       "path": "scripts/experimental/event-framer.js",
@@ -83,8 +131,12 @@
       "sha256": "f9916b9f21e17e28414cba38fb837a9c5d5afebdc6881ca5bd961c9f53bc1469"
     },
     {
+      "path": "scripts/migrate-browser-settings.js",
+      "sha256": "0ab42fe73765ad33341e7a074acdbf33d59d6be4d5caa82b170d50608650fa54"
+    },
+    {
       "path": "scripts/package.js",
-      "sha256": "c839206767aee3e08d5a8113b95332eff1441e944db324eb3401223e7541fc01"
+      "sha256": "010dd370144a728639d7c8080847e2e55d2051e105aeed5b40058327cf2d1693"
     },
     {
       "path": "scripts/providers/native-worker.js",
@@ -101,6 +153,10 @@
     {
       "path": "scripts/providers/sapi.ps1",
       "sha256": "6f94d037774b2b78dd16c9a22beb476891aaee8e52b6f2dbfa0cc7dbf365b870"
+    },
+    {
+      "path": "scripts/reply-stream.js",
+      "sha256": "2c47250cec7aa6329ddf41403c9a086761f193b1e8d7bb8eaa4fa5eb20fbcfac"
     },
     {
       "path": "scripts/runtime.js",
@@ -124,7 +180,7 @@
     },
     {
       "path": "scripts/summarize.js",
-      "sha256": "a64ec0253ae5cde1549569cf98fd2b9e4d69a8f781d4b9703b8b3bba26d1229d"
+      "sha256": "e36e3b09c85b03826ce91873957c856c3fe2e99ad04df188a19c11023dabb9d8"
     },
     {
       "path": "scripts/support-bundle.js",
@@ -151,12 +207,68 @@
       "sha256": "2b29e84dfce40baed79c10c01fead028ddeeb76d673be3e6699e45b5a0c9e8da"
     },
     {
+      "path": "tests/browser-build-check.cjs",
+      "sha256": "22401a70f8a85df7ffac81a308ea77a2bc9f1371c91caebe261f8cdd483f06a4"
+    },
+    {
+      "path": "tests/browser-command-check.cjs",
+      "sha256": "de696e1b1abf074115242ffab2027b972ce2f4a4ed1ba0fa8ae7a70cf2b6eb0e"
+    },
+    {
+      "path": "tests/browser-diagnostics-check.cjs",
+      "sha256": "c3e8c76c3f0fd3c566b0d326238739d88d216914dab2a84aeb796ab5cf2b9455"
+    },
+    {
+      "path": "tests/browser-http-body-check.cjs",
+      "sha256": "29e363608166e316410efaa0486c9b617784c74ab3984c725fe8858033aeec57"
+    },
+    {
+      "path": "tests/browser-migration-check.cjs",
+      "sha256": "915c1c0b90bb0fa3a38d2663edd5ac87bc6ba4aef3d0f184e99f1aba04406882"
+    },
+    {
+      "path": "tests/browser-owner-check.cjs",
+      "sha256": "43ce7c4597577731d992321511a945acef8b5e40b8e5e53490989dffd5d34d2e"
+    },
+    {
+      "path": "tests/browser-player-check.cjs",
+      "sha256": "ad3eedf97a79edd883770fb18c08edda9325cfa0f3f99443d7b199c250cf8804"
+    },
+    {
+      "path": "tests/browser-queue-check.cjs",
+      "sha256": "68b25e2cc72531480c8777dd75c0a6aedaf86c152323cd62efc3cc7e2270cd08"
+    },
+    {
+      "path": "tests/browser-recovery-check.cjs",
+      "sha256": "b238517007492a24e119be253c7a21ad0b2c1f161405c34a8787a9d90bbb2b93"
+    },
+    {
+      "path": "tests/browser-restart-check.cjs",
+      "sha256": "2f24da968d02eee3f34c25a808514d369be7a768f999dfe5f77a47d769bfaff9"
+    },
+    {
+      "path": "tests/browser-screen-check.cjs",
+      "sha256": "596dfaa6d20a2132aa684f0065e0b8634e085f791d3934bb77eb2eb1cd06877e"
+    },
+    {
+      "path": "tests/browser-session-check.cjs",
+      "sha256": "91877c339b9e75059fc14fc9d24166e40e76bd84ac2681cdf9f424af0ec81a59"
+    },
+    {
+      "path": "tests/browser-speed-check.cjs",
+      "sha256": "2e35b5941132ef79f3c4d5e77eb64a039106f4dff4b777ba74629909916d9181"
+    },
+    {
       "path": "tests/corpus/golden.json",
       "sha256": "83166a26e4d885d00ba9d17fa3b38f94b4996b2e2233f4cc5e9091d4e1a67d8b"
     },
     {
       "path": "tests/corpus/replies.json",
       "sha256": "d291258e8995b9628ef4b108baec7686d8cd2038845fdc7a3c3deb1642c2d020"
+    },
+    {
+      "path": "tests/delta-narrator-check.cjs",
+      "sha256": "7295d892e70e342824bb296d42aacdd971d97e9405cb1d3cecea520109b52bee"
     },
     {
       "path": "tests/event-framing-checks.cjs",
@@ -167,8 +279,16 @@
       "sha256": "6bb0ab17610a2962ec934140f0ff1e3bf962abbb024aa424d20eb992997001db"
     },
     {
+      "path": "tests/fixtures/browser-service-worker.cjs",
+      "sha256": "5483170d17fb0ca0211190863bcd0b958208ff8342252693bb8d696cd4b87f6e"
+    },
+    {
       "path": "tests/fixtures/isolated-wait-worker.cjs",
       "sha256": "0867e32fb1c0ba8b62cb9fa9a0f800220036f1c57b2e884064b92b31198ba269"
+    },
+    {
+      "path": "tests/fixtures/reply-stream-cli.cjs",
+      "sha256": "89e27cc88eed72663de0d0735b579277bd06dae2cc7b687a9a6879b73fb6ee1d"
     },
     {
       "path": "tests/install-check.cjs",
@@ -189,6 +309,14 @@
     {
       "path": "tests/isolated-wait-check.cjs",
       "sha256": "408d78993a460380cf9fe33b3f773baf88ed0ccb7f943e836c6b8aeb410529e0"
+    },
+    {
+      "path": "tests/markdown-progress-check.cjs",
+      "sha256": "b5185ac843b1ada512ec51163ff908323ad27226e219d081b9f7a5f48f562f5a"
+    },
+    {
+      "path": "tests/markdown-rich-check.cjs",
+      "sha256": "ed82c94192146fab1212ab2b8316ebd2f4b9257367571c04252ad1ae0ff98c5b"
     },
     {
       "path": "tests/native-boundary.cjs",
@@ -237,6 +365,10 @@
     {
       "path": "tests/recovery-checks.cjs",
       "sha256": "20d4d839fed3dcc0a5c31468fbb9e20cafe5cebd18a367aa7da56244133dea75"
+    },
+    {
+      "path": "tests/reply-stream-check.cjs",
+      "sha256": "2b58afb5039f60f5510fc80d32893b90a7f2a0b88e286ce5330f211484a05b75"
     },
     {
       "path": "tests/segment-stream-checks.cjs",

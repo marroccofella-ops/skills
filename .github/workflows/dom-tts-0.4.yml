@@ -28,6 +28,23 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm test
+      - run: node tests/browser-build-check.cjs
+      - run: node tests/browser-command-check.cjs
+      - run: node tests/browser-diagnostics-check.cjs
+      - run: node tests/browser-http-body-check.cjs
+      - run: node tests/browser-migration-check.cjs
+      - run: node tests/browser-owner-check.cjs
+      - run: node tests/browser-player-check.cjs
+      - run: node tests/browser-queue-check.cjs
+      - run: node tests/browser-recovery-check.cjs
+      - run: node tests/browser-restart-check.cjs
+      - run: node tests/browser-screen-check.cjs
+      - run: node tests/browser-session-check.cjs
+      - run: node tests/browser-speed-check.cjs
+      - run: node tests/delta-narrator-check.cjs
+      - run: node tests/markdown-progress-check.cjs
+      - run: node tests/markdown-rich-check.cjs
+      - run: node tests/reply-stream-check.cjs
       - run: node tests/source-reader-checks.cjs
       - run: node tests/segment-stream-checks.cjs
       - run: node tests/native-timeout-check.cjs

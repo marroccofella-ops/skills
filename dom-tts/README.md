@@ -142,3 +142,8 @@ voice text are data, never executable PowerShell fragments.
 See [COMPATIBILITY.md](COMPATIBILITY.md) for tested scope and remaining gates.
 Derived from skills PR #35, commit fd2811ef640b4e6cf29a0d2dc281a55022e1e164;
 original source retains its MIT license.
+
+
+## Experimental browser companion
+
+See [browser speech and progressive replies](references/browser-speech.md) for local browser setup, same-document recovery, nonblocking admission, failure diagnostics and remaining acceptance limits. This is a development candidate; completion notification is not automatic streaming.
