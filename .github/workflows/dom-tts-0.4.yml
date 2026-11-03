@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   offline:
-    timeout-minutes: 10
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: dom-tts

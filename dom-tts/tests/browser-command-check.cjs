@@ -5,7 +5,9 @@ const {ensurePrivate,writeObject}=require('../scripts/runtime');
 const script=path.resolve(__dirname,'../scripts/browser-speak.js');
 const run=(dir,args)=>new Promise((resolve,reject)=>{const child=spawn(process.execPath,[script,...args],{env:{...process.env,DOM_TTS_STATE_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('error',reject);child.on('exit',code=>resolve({code,stdout,stderr}));});
 (async()=>{
- const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'dom-browser-commands-'));const privateDir=path.join(dir,'private');ensurePrivate(privateDir);const client='a'.repeat(32),session=createSession({dir:privateDir,persist:true,leaseMs:60000});
+ // Slow hosted Windows ACL checks are outside this simulated browser's speech clock.
+ // Lease/deadline behavior is covered separately with an injected logical clock.
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'dom-browser-commands-'));const privateDir=path.join(dir,'private');ensurePrivate(privateDir);const client='a'.repeat(32),session=createSession({dir:privateDir,persist:true,leaseMs:600000,deadlineMs:300000});
  await new Promise(resolve=>session.server.listen(0,'127.0.0.1',resolve));writeObject(path.join(privateDir,'browser-session.json'),{schema:'dom-tts-browser/1',pid:process.pid,port:session.server.address().port,token:session.token});
  try{
   session.enable({client,voice:'injected local Zira',rate:1.05});assert.deepEqual(session.getPreferences(),{voice:'injected local Zira',rate:1.05});const fresh=createSession({dir:privateDir,persist:true});assert.deepEqual(fresh.getPreferences(),session.getPreferences());assert.equal(fresh.status().connected,false);fresh.close();
