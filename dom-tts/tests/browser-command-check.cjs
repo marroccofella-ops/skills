@@ -1,13 +1,13 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {spawn}=require('node:child_process');
 const {createSession}=require('../scripts/experimental/browser-session');
-const {ensurePrivate,writeObject}=require('../scripts/runtime');
-const script=path.resolve(__dirname,'../scripts/browser-speak.js');
+const {writeObject}=require('../scripts/runtime');
+const script=path.resolve(__dirname,'fixtures/browser-command-worker.cjs');
 const run=(dir,args)=>new Promise((resolve,reject)=>{const child=spawn(process.execPath,[script,...args],{env:{...process.env,DOM_TTS_STATE_DIR:dir},windowsHide:true,stdio:['ignore','pipe','pipe']});let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);child.on('error',reject);child.on('exit',code=>resolve({code,stdout,stderr}));});
 (async()=>{
- // Slow hosted Windows ACL checks are outside this simulated browser's speech clock.
- // Lease/deadline behavior is covered separately with an injected logical clock.
- const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'dom-browser-commands-'));const privateDir=path.join(dir,'private');ensurePrivate(privateDir);const client='a'.repeat(32),session=createSession({dir:privateDir,persist:true,leaseMs:600000,deadlineMs:300000});
+ // Public synthetic text/tokens only. This protocol fixture injects the ACL boundary;
+ // native real ACL validation remains in windows-privacy.cjs, with no timeout bypass.
+ const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'dom-browser-commands-'));const privateDir=path.join(dir,'private');fs.mkdirSync(privateDir,{mode:0o700});const client='a'.repeat(32),session=createSession({dir:privateDir,persist:true,leaseMs:600000,deadlineMs:300000});
  await new Promise(resolve=>session.server.listen(0,'127.0.0.1',resolve));writeObject(path.join(privateDir,'browser-session.json'),{schema:'dom-tts-browser/1',pid:process.pid,port:session.server.address().port,token:session.token});
  try{
   session.enable({client,voice:'injected local Zira',rate:1.05});assert.deepEqual(session.getPreferences(),{voice:'injected local Zira',rate:1.05});const fresh=createSession({dir:privateDir,persist:true});assert.deepEqual(fresh.getPreferences(),session.getPreferences());assert.equal(fresh.status().connected,false);fresh.close();
@@ -18,5 +18,5 @@ const run=(dir,args)=>new Promise((resolve,reject)=>{const child=spawn(process.e
   const next=await run(privateDir,['--text','Public cancellation test.','--wait','false']);const stopId=JSON.parse(next.stdout).id;const stopped=await run(privateDir,['--command','stop']);assert.equal(stopped.code,0);assert.equal(JSON.parse(stopped.stdout).state,'stop-requested');session.accept({client,id:stopId,state:'cancelled',startObserved:false,elapsedMs:10,localService:true});assert.equal(session.receipt(stopId).state,'cancelled');
   session.disable({client});const disabled=await run(privateDir,['--text','Must not speak.','--wait','false']);assert.equal(disabled.code,1);assert.match(disabled.stderr,/not-connected/);
  }finally{session.close();await new Promise(resolve=>session.server.close(resolve));const target=fs.realpathSync(dir),root=fs.realpathSync(os.tmpdir());if(path.dirname(target)!==root||!path.basename(target).startsWith('dom-browser-commands-')||fs.lstatSync(dir).isSymbolicLink())throw Error('Refused unexpected cleanup path');fs.rmSync(target,{recursive:true,force:true});}
- console.log('PASS: actual CLI returns before unresolved speech, retrieves eventual receipts, validates IDs/wait, preserves stop/disable and persists private preferences without enabling a fresh session (injected browser).');
+ console.log('PASS: actual CLI source in child processes returns before unresolved speech, retrieves receipts, validates IDs/wait, preserves Stop/Disable and preferences without autoplay. Real HTTP; injected ACL boundary and browser. Native privacy is tested separately.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -212,7 +212,7 @@
     },
     {
       "path": "tests/browser-command-check.cjs",
-      "sha256": "02c3e68e52b897b3da375957c3a0fa5170c4b2e6e5bceebeaa0cf351cac0dcb9"
+      "sha256": "a669678ea8bd0f0fa3eb045194f81b85b4c78083bbb84055d58acce743c411a2"
     },
     {
       "path": "tests/browser-diagnostics-check.cjs",
@@ -277,6 +277,10 @@
     {
       "path": "tests/evolution-checks.cjs",
       "sha256": "6bb0ab17610a2962ec934140f0ff1e3bf962abbb024aa424d20eb992997001db"
+    },
+    {
+      "path": "tests/fixtures/browser-command-worker.cjs",
+      "sha256": "e313e5c5068d2117a3c33d392cba81823903143a02844f4e59d2cfe14ecedbb2"
     },
     {
       "path": "tests/fixtures/browser-service-worker.cjs",
