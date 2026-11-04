@@ -1,6 +1,6 @@
 # Experimental local browser speech
 
-Version 0.5.0-rc.2 retains the public browser recovery, queue and paragraph fixes and adds the expanded programme source. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
+Unreleased version 0.5.0-rc.3 retains the public 0.5.0-rc.2 browser recovery, queue, paragraph and expanded programme source; it adds Windows build product/version metadata. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
 
 Start with Node18+: run `node scripts/experimental/browser-session.js`, open its printed private local link, choose a local voice and click Enable spoken replies. Keep the page open. Never publish the access fragment or connection descriptor. The voice uses local browser speech synthesis, no microphone or cloud service. Speed accepts0.5–2; the initial default is0.9. Saved preferences do not enable a fresh page.
 

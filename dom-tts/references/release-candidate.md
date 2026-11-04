@@ -1,6 +1,6 @@
-# Dom TTS 0.5.0-rc.2 — expanded source candidate
+# Dom TTS 0.5.0-rc.3 — unreleased Windows metadata candidate
 
-This prerelease consolidates the public browser/core candidate with the expanded local programme source. It is an unsigned source archive, not a finished stable 0.5 release or trusted Windows installer. The reviewed manifest and SHA256 receipt identify its exact bytes.
+This unreleased candidate adds consistent Windows product/version metadata and compile-only resource regression checks to public 0.5.0-rc.2. Its browser/core, expanded installer and optional studio scope is retained. It is not a finished stable 0.5 release or trusted Windows installer. A reviewed manifest and SHA256 receipt identify packaged source bytes.
 
 ## Included
 
