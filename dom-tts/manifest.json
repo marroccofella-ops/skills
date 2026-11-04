@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "e273f5858d4009c91fe929c4d85580476134d0b30e2dfc4e40c3c362b0c011b9"
+      "sha256": "070db1461589f3c93842d9d38907b5d40ae624ea1b66dd223f17d953d43a74b0"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -88,7 +88,7 @@
     },
     {
       "path": "references/codex-default-speech.md",
-      "sha256": "a97dd5549b9a6bb65f4dc034c67c1d06744e53aa8ec987552963bdfc7747a5b2"
+      "sha256": "b37802f59876aa49e2b116dd729afdc83fd4ee2bbfa1a2f12eb5df6df6a0ac58"
     },
     {
       "path": "references/codex-paragraph-speech.md",
@@ -131,8 +131,12 @@
       "sha256": "c197adc78d9daa4183fb2dc42fa8bd1ebc95f2fbd2fe01eeea9dfbf8125cbd33"
     },
     {
+      "path": "scripts/child-process-diagnostics.js",
+      "sha256": "f1017664b40b5eb8b4df8915ab597ee322edbf95981816f8a497b88bf8347534"
+    },
+    {
       "path": "scripts/codex-default.js",
-      "sha256": "be49ace7a0312b07042cca1bdc4e06d307eec99ff90d208667dce16ad8b18323"
+      "sha256": "0caa8b0d4b37e391ae4908d31819c986b20e977c8b01fc5fb7a2339d3e7eba47"
     },
     {
       "path": "scripts/codex-notify.js",
@@ -431,6 +435,10 @@
       "sha256": "59fb87fec02b924965af93354fabe3fab5e21e69aeb0c523f717fd5b03553bad"
     },
     {
+      "path": "tests/codex-default-diagnostics-check.cjs",
+      "sha256": "b746a108f14c09dbd43bf499145ed77e3c494afabeb9304f004d9e34bad1a7ba"
+    },
+    {
       "path": "tests/codex-notify-check.cjs",
       "sha256": "6200163e6118e4e8246b83f8bcb17016ff2e4cfa02212a4573f3a07b7d9c319c"
     },
@@ -471,6 +479,10 @@
       "sha256": "5483170d17fb0ca0211190863bcd0b958208ff8342252693bb8d696cd4b87f6e"
     },
     {
+      "path": "tests/fixtures/installer-child-budget.cjs",
+      "sha256": "34e969f1c24903d5582eb66923fd559f6061200a4b15eb488339feecf303c8d5"
+    },
+    {
       "path": "tests/fixtures/isolated-wait-worker.cjs",
       "sha256": "0867e32fb1c0ba8b62cb9fa9a0f800220036f1c57b2e884064b92b31198ba269"
     },
@@ -496,11 +508,11 @@
     },
     {
       "path": "tests/install-concurrency-check.cjs",
-      "sha256": "4177dbf32051a556e5faa7c3f205b3631531417a78d7ef499029da731b8c2413"
+      "sha256": "6b5684dd406183ab35a33308d556e232cd41e150f23b6bab4c668b9331860599"
     },
     {
       "path": "tests/install-recovery-check.cjs",
-      "sha256": "c65b1f9018a9adb0353eb03e35af83e9a03f4b435de8fd593489a636ced65645"
+      "sha256": "975bac7cf82299aec77c9fa596e4a3a926c4a31d0d90fdd090ada20564a13087"
     },
     {
       "path": "tests/isolated-check-diagnostic.cjs",

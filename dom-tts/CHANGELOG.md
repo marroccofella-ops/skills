@@ -1,5 +1,7 @@
 # 0.5.0-rc.2 — 4 November 2026
 
+- Report typed metadata for failed, timed-out, signalled and empty speech child launches without automatically retrying uncertain admission. This improves diagnosis; it does not establish the cause or cure of the reported intermittent silent launcher exit.
+- Derive installer crash-test child deadlines from the unchanged production permission-check bound and the exact number of checks. Preserve real Windows ACL checks and give the expanded Windows CI job its measured runtime allowance.
 - Consolidate expanded programme source with public rc.1 without replacing its stronger ZIP integrity checks or browser regression fixtures.
 - Include managed installer recovery, native-settings migration, Windows speech/tray/setup builders, supplied host adapters and consented optional studio. Optional components remain dormant, unsigned native components remain refused and no runtime/settings/credential/evidence files are distributed.
 - Restore the browser speech reference in the expanded package and make current version/scope explicit. All-chat paragraph attachment remains dependent on the owning client; stable native and hardware gates remain open.

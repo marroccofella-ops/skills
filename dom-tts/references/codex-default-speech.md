@@ -43,6 +43,13 @@ Do not treat an inaccessible state directory, unobservable owner or denied
 loopback connection as proof of a dead server. Check from the authorized desktop
 context before recovery. Do not bypass privacy checks or launch a duplicate server.
 
+The helper bounds child output and emits a structured, text-free diagnostic for a
+launch failure, timeout, signal termination or empty result. It reports only safe
+error/signal codes, exit status and output byte counts. Admission remains unknown:
+a failed launcher can have delivered a request before losing its receipt. It
+never automatically retries speech. Check the provider and retained receipt before
+deciding whether a new, explicitly requested test is appropriate.
+
 ## Final replies through Codex notifications
 
 `scripts/codex-notify.js` accepts only a supplied `agent-turn-complete` JSON

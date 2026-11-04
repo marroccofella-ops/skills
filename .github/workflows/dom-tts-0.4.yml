@@ -9,7 +9,9 @@ permissions:
   contents: read
 jobs:
   offline:
-    timeout-minutes: 15
+    # Expanded Windows fixtures retain every uncached ACL query. Recovery alone
+    # performs 40 queries; measured 18-21 s/query is 12-14 min before other checks.
+    timeout-minutes: ${{ startsWith(matrix.os, 'windows') && 40 || 15 }}
     defaults:
       run:
         working-directory: dom-tts
@@ -43,6 +45,7 @@ jobs:
       - run: node tests/codex-paragraph-relay-check.cjs
       - run: node tests/codex-notify-check.cjs
       - run: node tests/codex-default-check.cjs
+      - run: node tests/codex-default-diagnostics-check.cjs
       - run: node tests/build-check.cjs
       - run: node tests/browser-recovery-check.cjs
       - run: node tests/browser-restart-check.cjs
