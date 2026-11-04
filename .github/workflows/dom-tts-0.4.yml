@@ -142,6 +142,7 @@ jobs:
       - run: node tests/windows-setup-check.cjs
       - run: node tests/readiness-check.cjs
       - run: node tests/windows-helper-check.cjs
+      - run: node tests/windows-product-metadata-check.cjs
       - run: node tests/stream-cli-check.cjs
       - run: node tests/control-server-check.cjs
       - run: node tests/source-docs-check.cjs

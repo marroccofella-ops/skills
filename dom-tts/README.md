@@ -2,7 +2,7 @@
 
 Local speech for coding assistants by **Prof Dom Marrocco / 42.uk**.
 
-Version **0.5.0-rc.2** is a portable source release candidate. The common interface is
+Version **0.5.0-rc.3** is an unreleased source candidate adding Windows product/version metadata. The last public release is **0.5.0-rc.2**. The common interface is
 model-independent: any harness that can run a command can pass text through
 stdin, a UTF-8 file, or --text. Agent Skills hosts can discover SKILL.md.
 

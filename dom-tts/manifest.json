@@ -1,18 +1,18 @@
 {
   "schema": "dom-tts-source/1",
-  "version": "0.5.0-rc.2",
+  "version": "0.5.0-rc.3",
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "070db1461589f3c93842d9d38907b5d40ae624ea1b66dd223f17d953d43a74b0"
+      "sha256": "050acbd48e5314c53804de7516513cab1d8396129980a243fb5d11626b8dabac"
     },
     {
       "path": "COMPATIBILITY.md",
-      "sha256": "df144d3c6a61b7230fc11ff5ce96ef8c885f97f0b72afcc0ec2b6cd155d1ac5e"
+      "sha256": "78f4b8fbcae771d8edf592bf3a8b34091b9d1108cd43dd1002ae2b6f5e7810dc"
     },
     {
       "path": "EVOLUTION.md",
-      "sha256": "0d9bbd2cc7b319d5d095e99aa1e44c66e6e8ff2a5420e59ad9b45f744b3a9a98"
+      "sha256": "32784e62846562d9e01ae7a134a0ea824619ffc4d9a1280264ac12a1f9b89d02"
     },
     {
       "path": "LICENSE",
@@ -20,11 +20,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "d4b1a9a9d919c3a2c93e833317b29a5f1b3fa54ad33ba78ef718236d9eed6fac"
+      "sha256": "2a643dc51ec96bcc5c0ed9ed79c57045b682c68346fb578c105df35f206b6b42"
     },
     {
       "path": "SKILL.md",
-      "sha256": "3b6a734641836462c7652d138a51c0c1e4a4b2216520c3a85e938a764d4312e9"
+      "sha256": "c8b797aca556576217e05a0e6b534ec20d910181910e5db8420510a5f11cc993"
     },
     {
       "path": "assets/browser/browser.html",
@@ -80,11 +80,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "99973fa1911fcd9b3c3038e28fa25b67eaf89defe06e0027737aeed6e6c9f849"
+      "sha256": "df6fec4213ec268c278a28aae45605d4109a05e1df5b7bc6d7fa006750f8fea0"
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "5e7ab77dd48baaca7719495aaa7e121e206c15d6ad808e1ca73a43a9c1217956"
+      "sha256": "0c80f0eaf94fbd98df225ee22f89dabb861540b919f57386c6acee39397b7c41"
     },
     {
       "path": "references/codex-default-speech.md",
@@ -108,7 +108,7 @@
     },
     {
       "path": "references/release-candidate.md",
-      "sha256": "803e6df1b1ecbc2d878f7315693f9a923c67e13c23f01ec6686a170ec9a15d78"
+      "sha256": "539632516ca379d994407a896e52cdf13d5ee8b800ff559ce315ea1c0f0ad88f"
     },
     {
       "path": "scripts/avatar-state.js",
@@ -120,11 +120,11 @@
     },
     {
       "path": "scripts/build-native.js",
-      "sha256": "73b4015b80079038f3c5ba3597ff70ac796ff33f6c9391f976333aeecb91b1d4"
+      "sha256": "f97a6eb44b2dd7df7f7b9215b9d9780308ad11759fd07be0d38fbaac297579ce"
     },
     {
       "path": "scripts/build-windows-setup.js",
-      "sha256": "e870246bbb7b29c97704ad79ea487ae5f1d1495cd686128c748e3148cf3a46ca"
+      "sha256": "338d9c3484f0026bba60c934d3062684345d315fb2764e66d23cf6fbb9e4d798"
     },
     {
       "path": "scripts/build.js",
@@ -349,6 +349,10 @@
     {
       "path": "scripts/watch-codex.js",
       "sha256": "811e7701d4ba0189f22c037ca5ed138592a50d0b856d2db58b67b53b1114c3ff"
+    },
+    {
+      "path": "scripts/windows-product-metadata.js",
+      "sha256": "f3bd1a6d9d92e942fcb48eb32ebd51938eb7c147f257737d7a3fbcb030cfe33e"
     },
     {
       "path": "tests/async-queue-checks.cjs",
@@ -637,6 +641,10 @@
     {
       "path": "tests/windows-privacy.cjs",
       "sha256": "3785445e6816f0896846c87ae4c06796d9af96da8bde25aec69c176d7957a1a3"
+    },
+    {
+      "path": "tests/windows-product-metadata-check.cjs",
+      "sha256": "9d073765722017a2894986cc52a7f5dd032af42c1f76952643da3cf2bcd772d1"
     },
     {
       "path": "tests/windows-release-check.cjs",
