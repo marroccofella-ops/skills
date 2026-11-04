@@ -10,6 +10,33 @@ const {sourceFiles, manifest} = require('../scripts/package');
 const {windowsProductMetadata, windowsAssemblySource} = require('../scripts/windows-product-metadata');
 const {buildNative} = require('../scripts/build-native');
 const {buildWindowsSetup} = require('../scripts/build-windows-setup');
+const {describeChildFailure} = require('../scripts/child-process-diagnostics');
+
+function inspectionDiagnostic(result) {
+  const diagnostic = describeChildFailure(result);
+  if (!diagnostic) return null;
+  const {errorCode, signal, exitStatus, stdoutBytes, stderrBytes} = diagnostic;
+  // Reuse only sanitized process facts, without the speech adapter's semantics.
+  return {schema: 'dom-tts-pe-inspection-diagnostic/1', errorCode, signal, exitStatus, stdoutBytes, stderrBytes};
+}
+
+const privateCanary = 'PRIVATE_PE_INSPECTION_CANARY';
+for (const errorCode of ['ENOENT', 'EPERM', 'ETIMEDOUT', 'ENOBUFS']) {
+  const diagnostic = inspectionDiagnostic({error: {code: errorCode, message: privateCanary, path: privateCanary, spawnargs: [privateCanary]}, status: null, signal: null, stdout: '', stderr: ''});
+  assert.equal(diagnostic.errorCode, errorCode);
+  assert(!JSON.stringify(diagnostic).includes(privateCanary));
+  assert.deepEqual(Object.keys(diagnostic), ['schema', 'errorCode', 'signal', 'exitStatus', 'stdoutBytes', 'stderrBytes']);
+}
+const unknownDiagnostic = inspectionDiagnostic({error: {code: privateCanary}, signal: privateCanary, status: privateCanary, stdout: privateCanary, stderr: privateCanary});
+assert.equal(unknownDiagnostic.errorCode, 'UNKNOWN');
+assert.equal(unknownDiagnostic.signal, 'UNKNOWN');
+assert.equal(unknownDiagnostic.exitStatus, null);
+assert.equal(unknownDiagnostic.stdoutBytes, Buffer.byteLength(privateCanary));
+assert.equal(unknownDiagnostic.stderrBytes, Buffer.byteLength(privateCanary));
+assert(!JSON.stringify(unknownDiagnostic).includes(privateCanary));
+assert.equal(inspectionDiagnostic({status: null, signal: 'SIGTERM'}).signal, 'SIGTERM');
+assert.equal(inspectionDiagnostic({status: 3221225477}).exitStatus, 3221225477);
+assert.equal(inspectionDiagnostic({status: 0, stdout: '{}'}), null);
 
 const version = require('../package.json').version;
 for (const component of ['speech', 'tray', 'setup']) {
@@ -63,7 +90,7 @@ try {
   outputs.push({component: 'setup', out, receipt});
   const query = '$ErrorActionPreference="Stop"; @(' + outputs.map(item => psQuote(item.out)).join(',') + ') | ForEach-Object { $v=[Diagnostics.FileVersionInfo]::GetVersionInfo($_); [ordered]@{name=[IO.Path]::GetFileName($_);productName=$v.ProductName;productVersion=$v.ProductVersion;fileVersion=$v.FileVersion;description=$v.FileDescription;assemblyVersion=[Reflection.AssemblyName]::GetAssemblyName($_).Version.ToString()} } | ConvertTo-Json -Compress';
   const inspected = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', query], {windowsHide: true, encoding: 'utf8', timeout: 60000, maxBuffer: 16384, env: safeEnv()});
-  assert(!inspected.error && inspected.status === 0, 'Read-only Windows PE metadata inspection failed');
+  assert(!inspected.error && inspected.status === 0, 'Read-only Windows PE metadata inspection failed: ' + JSON.stringify(inspectionDiagnostic(inspected)));
   const actual = JSON.parse(inspected.stdout);
   assert.equal(actual.length, 3);
   for (const [index, output] of outputs.entries()) {

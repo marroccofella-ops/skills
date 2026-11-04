@@ -644,7 +644,7 @@
     },
     {
       "path": "tests/windows-product-metadata-check.cjs",
-      "sha256": "9d073765722017a2894986cc52a7f5dd032af42c1f76952643da3cf2bcd772d1"
+      "sha256": "fbf1daf59a33e4cec7bd0719fe653b00ee699cbdb1ffd18481a82e4aa6d4b5ed"
     },
     {
       "path": "tests/windows-release-check.cjs",
