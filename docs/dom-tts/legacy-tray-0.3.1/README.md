@@ -41,9 +41,14 @@ The published `codex/dom-tts-standard-baseline` commit
 `fd2811ef640b4e6cf29a0d2dc281a55022e1e164` contains a deliberately smaller
 0.3.2-dev.1 Standard core, not the installed 0.3.1 tray companion. Its committed
 tree has no tray-app.ps1, settings.ps1, control-panel.ps1, global watcher,
-avatar server, Duplex runtime or legacy installer. Current main at
-`f5113f163e9f4f0810512c8663b99bb9098b936f` has no committed dom-tts tree.
-The 0.4/0.5 candidates live on development branches/PRs, not main.
+avatar server, Duplex runtime or legacy installer. At the historical 4 October snapshot, main at
+`f5113f163e9f4f0810512c8663b99bb9098b936f` had no committed dom-tts tree,
+and the 0.4/0.5 candidates lived on development branches/PRs. On 4 November,
+PR #69 integrated portable `0.5.0-rc.1` into main at
+`2772f7eafa4b89827a8d05a8ddab744ba3b42884`; its source is publicly released
+as a prerelease. That newer local browser/native core is separate from this
+archival legacy source. Stable all-chat forwarding, native/platform acceptance
+and trusted expanded Windows signing remain tracked in issue #70.
 
 This establishes missing files on those exact trees, **not** that no other
 branch or repository ever contained them. The original installed companion's
