@@ -1,6 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {fork,spawnSync}=require('node:child_process');
 const {powershell,safeEnv,ROOT}=require('../runtime');
+const {helperInfo}=require('./windows-helper');
 function selectProvider(provider='auto',platform=process.platform){
  const native={win32:'sapi',darwin:'say',linux:'espeak-ng'}[platform];
  if(!native)throw new Error('No native speech adapter for platform '+platform);
@@ -8,7 +9,12 @@ function selectProvider(provider='auto',platform=process.platform){
  return native;
 }
 function commandFor(provider,options,inputFile){
- if(provider==='sapi')return {file:powershell,args:['-NoProfile','-File',path.join(ROOT,'scripts','providers','sapi.ps1'),'-InputFile',inputFile]};
+ if(provider==='sapi'){
+  const helper=helperInfo();
+  if(helper.state==='blocked')throw new Error('Windows native helper was refused ('+helper.code+'); install a reviewed signed build.');
+  if(helper.state==='verified')return {file:helper.file,args:['--input-file',inputFile]};
+  return {file:powershell,args:['-NoProfile','-File',path.join(ROOT,'scripts','providers','sapi.ps1'),'-InputFile',inputFile]};
+ }
  if(provider==='say')return {file:'/usr/bin/say',args:['-r',String(Math.round(175*options.speed)),...(options.voice?['-v',options.voice]:[]),'-f','-']};
  if(provider==='espeak-ng')return {file:findEspeak(),args:['--stdin','-s',String(Math.round(175*options.speed)),...(options.voice?['-v',options.voice]:[])]};
  throw new Error('Unknown native provider');
@@ -29,7 +35,7 @@ function available(provider){try{if(provider==='espeak-ng')findEspeak();else fs.
 function failureMessage(stderr=''){
  stderr=String(stderr).replace(/\s+/g,' ');
  if(/PSSecurityException|running scripts is disabled|execution polic(?:y|ies)/i.test(stderr))
-  return 'Windows speech script was blocked by execution policy; use an administrator-approved speech launch configuration. Dom TTS does not bypass policy.';
+  return 'Windows speech script was blocked by execution policy; use a reviewed signed native-helper package or an administrator-approved script policy. Dom TTS does not bypass policy.';
  return 'Native speech failed'+(stderr.includes('SelectVoice')?': requested voice is unavailable':'; check doctor and your audio device');
 }
 function runChild(command,input,context,onProgress){
@@ -64,7 +70,8 @@ async function play(chunks,options,context){
  return provider;
 }
 function voices(provider){
- const command=provider==='sapi'?{file:powershell,args:['-NoProfile','-Command',"Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name } } finally { $s.Dispose() }"]}:provider==='say'?{file:'/usr/bin/say',args:['-v','?']}:{file:findEspeak(),args:['--voices']};
+ let helper;if(provider==='sapi'){helper=helperInfo();if(helper.state==='blocked')throw new Error('Windows native helper signature or integrity was refused');}
+ const command=provider==='sapi'?(helper.state==='verified'?{file:helper.file,args:['--voices']}:{file:powershell,args:['-NoProfile','-Command',"Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name } } finally { $s.Dispose() }"]}):provider==='say'?{file:'/usr/bin/say',args:['-v','?']}:{file:findEspeak(),args:['--voices']};
  const result=spawnSync(command.file,command.args,{encoding:'utf8',windowsHide:true,timeout:10000,env:safeEnv()});if(result.error||result.status!==0)throw new Error('Voice discovery failed');return result.stdout.trim().split(/\r?\n/).filter(Boolean);
 }
 module.exports={selectProvider,commandFor,available,play,voices,runChild,failureMessage,findEspeak};

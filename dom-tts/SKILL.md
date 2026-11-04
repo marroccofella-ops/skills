@@ -15,6 +15,10 @@ concise spoken text immediately, then continue work. Do not reread that progress
 at the final answer. A completion notification alone is not a live output stream.
 Read only supplied text; no watcher or chat scan is started by this provider.
 
+For portable supplied-paragraph defaults and final-only notification wiring, see
+[Codex default speech](references/codex-default-speech.md). Preserve existing
+notification chains. Live Desktop forwarding remains host-required.
+
 
 # Dom TTS 0.5
 

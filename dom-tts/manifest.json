@@ -1,18 +1,18 @@
 {
   "schema": "dom-tts-source/1",
-  "version": "0.5.0-rc.1",
+  "version": "0.5.0-rc.2",
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "17866b23fc1ad71f77c98cd8c47a0b205da013c3565d102b8e6e04eb59dfe04c"
+      "sha256": "070db1461589f3c93842d9d38907b5d40ae624ea1b66dd223f17d953d43a74b0"
     },
     {
       "path": "COMPATIBILITY.md",
-      "sha256": "435db85f245854de08900a3455d19e3c32a54c06010e035b201a9114a16efd7f"
+      "sha256": "df144d3c6a61b7230fc11ff5ce96ef8c885f97f0b72afcc0ec2b6cd155d1ac5e"
     },
     {
       "path": "EVOLUTION.md",
-      "sha256": "1e7c09655356574bb0adcc1269a638697f696b0cddd4eda89e1330f53f027803"
+      "sha256": "0d9bbd2cc7b319d5d095e99aa1e44c66e6e8ff2a5420e59ad9b45f744b3a9a98"
     },
     {
       "path": "LICENSE",
@@ -20,15 +20,15 @@
     },
     {
       "path": "README.md",
-      "sha256": "309edac2431bd62c6af356d62dba67a9b67a49b9101e1e3a3604ccf520e9af87"
+      "sha256": "d4b1a9a9d919c3a2c93e833317b29a5f1b3fa54ad33ba78ef718236d9eed6fac"
     },
     {
       "path": "SKILL.md",
-      "sha256": "58011adf60003a09ab181a6331d979da4e965bd64a677770780da187c2c2a3c4"
+      "sha256": "3b6a734641836462c7652d138a51c0c1e4a4b2216520c3a85e938a764d4312e9"
     },
     {
       "path": "assets/browser/browser.html",
-      "sha256": "44dc93b3b543327253374e0dd1ca07cef572fa6b549833495efc68147eba8145"
+      "sha256": "72487b654212462041f8d7a990409e3f784483f50f3e7e82de736a86dd6335b1"
     },
     {
       "path": "assets/browser/player.js",
@@ -47,24 +47,68 @@
       "sha256": "cc18cca37dc6e4862a163ec31df7b3764c4b119442bbff3b0fd1e58db71b7c79"
     },
     {
+      "path": "assets/control/control.css",
+      "sha256": "d39d4544a3aa7cf1e20fa672cf282f3f9ef334cbc5f5504fb1730856578691fe"
+    },
+    {
+      "path": "assets/control/control.html",
+      "sha256": "95bb3ed46d6a4cba898cd4fd8ac9b1c9eb514dfc5f6303bae24c1bdbadace822"
+    },
+    {
+      "path": "assets/control/control.js",
+      "sha256": "95146f5ff97da4f05742ba97927e414bbcaef13ea0c91b5f598f9da32343cd48"
+    },
+    {
+      "path": "assets/optional-voice/microphone.js",
+      "sha256": "2f00cc441817286659d685f06d71086cb1637e681555b8f227a54ae90cc17635"
+    },
+    {
+      "path": "assets/optional-voice/optional-screen.js",
+      "sha256": "81f53568b310983a00e8a962c235df503fcb56914fce4dbea33d7c619fc5e973"
+    },
+    {
+      "path": "assets/optional-voice/optional.css",
+      "sha256": "c089c7ff99e4ac64b37aabcfabb1f62b44d2cce01af040b1b9e7ce1a104b1aea"
+    },
+    {
+      "path": "assets/optional-voice/optional.html",
+      "sha256": "7dda4c19108d284d5412562906f18025c3b96fb449274d6391de72ec535b53b5"
+    },
+    {
       "path": "assets/voices.json",
       "sha256": "5e4682bbafb1f9d002c3a65017b3c892d435334c2138a86f0950477762b8596e"
     },
     {
       "path": "package.json",
-      "sha256": "33eb5893e515ccb5cddf991dd9a85063796085475067e9b7253587375edf5a5f"
+      "sha256": "99973fa1911fcd9b3c3038e28fa25b67eaf89defe06e0027737aeed6e6c9f849"
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "7933303fb92c2a1c524dc7b28a315dfbe83c837ba3482f31e982397862386fea"
+      "sha256": "5e7ab77dd48baaca7719495aaa7e121e206c15d6ad808e1ca73a43a9c1217956"
+    },
+    {
+      "path": "references/codex-default-speech.md",
+      "sha256": "b37802f59876aa49e2b116dd729afdc83fd4ee2bbfa1a2f12eb5df6df6a0ac58"
     },
     {
       "path": "references/codex-paragraph-speech.md",
       "sha256": "3f2d60374ee0642594978998cb6b9b14a3f8e9b70c295b26c7755c5f8a7684e1"
     },
     {
+      "path": "references/harness-integrations.md",
+      "sha256": "e98cd0bf6f282af46226e4034b94d2b768196d3b865c1c46ef38cc1370da6dca"
+    },
+    {
+      "path": "references/optional-voice-studio.md",
+      "sha256": "8e934ec0f38b4ae0b7a1353631b752bcb61c05f09c4171fd7bb55f312052dcf6"
+    },
+    {
+      "path": "references/progressive-replies.md",
+      "sha256": "867fd93a817dfb65305ad15f93adc31eaa850c55cc5c10b4cec940c449ea7c30"
+    },
+    {
       "path": "references/release-candidate.md",
-      "sha256": "3edd48794bc45945aafb3e6ab240e959703124856bcfa02515bac621428296a4"
+      "sha256": "803e6df1b1ecbc2d878f7315693f9a923c67e13c23f01ec6686a170ec9a15d78"
     },
     {
       "path": "scripts/avatar-state.js",
@@ -75,8 +119,24 @@
       "sha256": "6f35555b7f9812d0b00d0f978b8436dab33e7b3e8ab1ff0179f9984ba6256917"
     },
     {
+      "path": "scripts/build-native.js",
+      "sha256": "73b4015b80079038f3c5ba3597ff70ac796ff33f6c9391f976333aeecb91b1d4"
+    },
+    {
+      "path": "scripts/build-windows-setup.js",
+      "sha256": "e870246bbb7b29c97704ad79ea487ae5f1d1495cd686128c748e3148cf3a46ca"
+    },
+    {
       "path": "scripts/build.js",
       "sha256": "c197adc78d9daa4183fb2dc42fa8bd1ebc95f2fbd2fe01eeea9dfbf8125cbd33"
+    },
+    {
+      "path": "scripts/child-process-diagnostics.js",
+      "sha256": "f1017664b40b5eb8b4df8915ab597ee322edbf95981816f8a497b88bf8347534"
+    },
+    {
+      "path": "scripts/codex-default.js",
+      "sha256": "0caa8b0d4b37e391ae4908d31819c986b20e977c8b01fc5fb7a2339d3e7eba47"
     },
     {
       "path": "scripts/codex-notify.js",
@@ -107,12 +167,28 @@
       "sha256": "22a4da7fca19aa7e42489eac8e95afbcec41985fe812d1f30e7aa2abba56358b"
     },
     {
+      "path": "scripts/experimental/control-server.js",
+      "sha256": "d831d3854c29386853b5173bbe3687f2f0f1efbcea9e649210f16ea77a7b1976"
+    },
+    {
       "path": "scripts/experimental/delta-narrator.js",
       "sha256": "5ed446d8b39251882d0519832fc45efdd9daa9f33de3fc3ea8d5e828b2244ba6"
     },
     {
       "path": "scripts/experimental/event-framer.js",
       "sha256": "fb7971e2453896100760a60038da15a8e150afbbbae459f4cf5db54213e06cf1"
+    },
+    {
+      "path": "scripts/experimental/harness-adapter.js",
+      "sha256": "8720cf12c1b114e02d8f8f7893bb9918d69c90df8d48a1303b4af404ed785e53"
+    },
+    {
+      "path": "scripts/experimental/harness-hook.js",
+      "sha256": "3c2bb0a04b2f89bf4fa84b959bb0f23d4440516aa8f6fa0b557bea3d0f783ba5"
+    },
+    {
+      "path": "scripts/experimental/harness-observer.js",
+      "sha256": "890b03e8171757b8de168f14d98595ef54e05b9478c067005a6467f6b2e06997"
     },
     {
       "path": "scripts/experimental/isolated-errors.js",
@@ -135,6 +211,18 @@
       "sha256": "9033a802a423e03de7cbb8fab3423e4b66615c6940212ec1c69815ad87ae655b"
     },
     {
+      "path": "scripts/experimental/openclaw-hook.js",
+      "sha256": "db9e9f37d529ed9b0ff30b3fac49b8b98398c031f4c7de01749562fd838da1e5"
+    },
+    {
+      "path": "scripts/experimental/optional-voice-provider.js",
+      "sha256": "71815c7586b9018641552e3915eae85a5f621ac9086f279b2d9b7420dffd3127"
+    },
+    {
+      "path": "scripts/experimental/optional-voice-session.js",
+      "sha256": "6b1981de295822e7112b2b308b6b0f279301194366b981a151f5165c6d86ca14"
+    },
+    {
       "path": "scripts/experimental/segment-stream.js",
       "sha256": "a7c2f1a3555fe388cbbfd135e0a3192336636e443c9c8b888ecb7b3f7a1ca3a5"
     },
@@ -143,8 +231,12 @@
       "sha256": "7658ad378e1bc49648ff4611c5bfe8eab345a4b626e8b29c8d329d7d72c2a1d3"
     },
     {
+      "path": "scripts/harness-hook.js",
+      "sha256": "ac67dee276c5061f625af959aae80d761af20eec6e2c99e3a157de4ef25edd29"
+    },
+    {
       "path": "scripts/install.js",
-      "sha256": "8508fef0bcb8c435497a8016e530c59264c603e06de8408a5fc4d636035d7941"
+      "sha256": "d966d69247f538a94892de8fc19b649b234ebeacbd417dfc363fad3b2042c1ca"
     },
     {
       "path": "scripts/lock.js",
@@ -155,8 +247,16 @@
       "sha256": "0ab42fe73765ad33341e7a074acdbf33d59d6be4d5caa82b170d50608650fa54"
     },
     {
+      "path": "scripts/migrate-native-settings.js",
+      "sha256": "8755faa857e790d57643a7a69fb26df2267be3bf86ce704e53495b8cd4b39e64"
+    },
+    {
       "path": "scripts/package.js",
-      "sha256": "010dd370144a728639d7c8080847e2e55d2051e105aeed5b40058327cf2d1693"
+      "sha256": "557f091308e7171e6e8484af8fd5b4ea19a825b662e9ef3cf93588d419493ef0"
+    },
+    {
+      "path": "scripts/prepare-windows-release.js",
+      "sha256": "baaa0bdc0def8bd8235749124bb56356b2e2cf87549e73ec382a9a483ef8c133"
     },
     {
       "path": "scripts/providers/native-worker.js",
@@ -164,7 +264,11 @@
     },
     {
       "path": "scripts/providers/native.js",
-      "sha256": "3d2150a8ed97fd607296c3d0d796228cad97192b91c5a886097b5b06b58c7b5d"
+      "sha256": "15bd3d8f346453627f8d800f22b4ad46f39fce1fc40c5f0d474b7d3bbd35a957"
+    },
+    {
+      "path": "scripts/providers/readiness.js",
+      "sha256": "6bcddfea8a759b9a38ad7ce17622807fa38abc6b1219da3bef8d558569d652b1"
     },
     {
       "path": "scripts/providers/sapi.js",
@@ -175,12 +279,28 @@
       "sha256": "6f94d037774b2b78dd16c9a22beb476891aaee8e52b6f2dbfa0cc7dbf365b870"
     },
     {
+      "path": "scripts/providers/windows-helper.js",
+      "sha256": "877362d4e5f5b0c7be9f628b41f9b0d04ddce5a0e538122e61267d820838f3e1"
+    },
+    {
+      "path": "scripts/providers/windows/NativeSpeech.cs",
+      "sha256": "be90cad57f5f1d8ba8475e47fb56e86fa8433a4ea9a7310f49f7d7be4244c9ef"
+    },
+    {
+      "path": "scripts/providers/windows/SetupCompanion.cs",
+      "sha256": "782ed803d600dd44dddc5ced4f99e58de2e4b3462593ff8a8149626b3d00a62b"
+    },
+    {
+      "path": "scripts/providers/windows/TrayCompanion.cs",
+      "sha256": "b4d34185eb92e5b376b812697707f9e6fb30dcdfa8ddc53c9f33ea09190b1ae8"
+    },
+    {
       "path": "scripts/reply-stream.js",
       "sha256": "bd209b69b6282d5b414b0527375f1fa5339ef5f4a06ec314c39c9e26e454781f"
     },
     {
       "path": "scripts/runtime.js",
-      "sha256": "556b6fc15a8344b7b9cc905a3169e089116a26b9ceac00d1626e0f21e3b648ca"
+      "sha256": "9503f39e00e7613d24aa81b6a2d00f4744ca418b74b0adcbd4ea66b953b5efc6"
     },
     {
       "path": "scripts/self-test.js",
@@ -197,6 +317,10 @@
     {
       "path": "scripts/stop.js",
       "sha256": "85e2863fe350cfb4009b8ff23574dd4e68eb4fa6a22c90d3eec3d2f9c67a3c16"
+    },
+    {
+      "path": "scripts/stream.js",
+      "sha256": "cf545a3449f2c8248e065cc0184c39620090ab14f55856cc2450fed2ca11e658"
     },
     {
       "path": "scripts/summarize.js",
@@ -217,6 +341,10 @@
     {
       "path": "scripts/telemetry.js",
       "sha256": "81e3eeb3f8732dbed96ace4c2e0eb65d1b10362b025ced80c4b7fe670392e52e"
+    },
+    {
+      "path": "scripts/tray.js",
+      "sha256": "9be5eac6c951a0ecb8ec60a677742608d26736dd14391fc00ec60e068e6c52b3"
     },
     {
       "path": "scripts/watch-codex.js",
@@ -299,12 +427,28 @@
       "sha256": "8f34f9127a16af110b9022428f42198ba3ba6e65f85a427f9ef2575401d9933d"
     },
     {
+      "path": "tests/codex-contract-probe.cjs",
+      "sha256": "cadb6419506d7aa433c7ec880bc3e989366fee1f61ff2cfe1be61466fabc8880"
+    },
+    {
+      "path": "tests/codex-default-check.cjs",
+      "sha256": "59fb87fec02b924965af93354fabe3fab5e21e69aeb0c523f717fd5b03553bad"
+    },
+    {
+      "path": "tests/codex-default-diagnostics-check.cjs",
+      "sha256": "b746a108f14c09dbd43bf499145ed77e3c494afabeb9304f004d9e34bad1a7ba"
+    },
+    {
       "path": "tests/codex-notify-check.cjs",
       "sha256": "6200163e6118e4e8246b83f8bcb17016ff2e4cfa02212a4573f3a07b7d9c319c"
     },
     {
       "path": "tests/codex-paragraph-relay-check.cjs",
       "sha256": "139de09c5ca3da687c48740187b5eae68618aebf2cad7095757da7d526d941ff"
+    },
+    {
+      "path": "tests/control-server-check.cjs",
+      "sha256": "13e92fe91f49c2a171a444acc0d9800c8b907fd532eb3e3a19125e3fab9633bf"
     },
     {
       "path": "tests/corpus/golden.json",
@@ -335,6 +479,10 @@
       "sha256": "5483170d17fb0ca0211190863bcd0b958208ff8342252693bb8d696cd4b87f6e"
     },
     {
+      "path": "tests/fixtures/installer-child-budget.cjs",
+      "sha256": "34e969f1c24903d5582eb66923fd559f6061200a4b15eb488339feecf303c8d5"
+    },
+    {
       "path": "tests/fixtures/isolated-wait-worker.cjs",
       "sha256": "0867e32fb1c0ba8b62cb9fa9a0f800220036f1c57b2e884064b92b31198ba269"
     },
@@ -343,8 +491,28 @@
       "sha256": "89e27cc88eed72663de0d0735b579277bd06dae2cc7b687a9a6879b73fb6ee1d"
     },
     {
+      "path": "tests/harness-adapter-check.cjs",
+      "sha256": "942f716eac599d9c3fa10a52e49117913e3f0f6756f1937fbab515dbfd557a58"
+    },
+    {
+      "path": "tests/harness-hook-check.cjs",
+      "sha256": "2e7550dbfac06e42589e05bfe6a06271c440319369b345e0182ebe662c8d4486"
+    },
+    {
+      "path": "tests/harness-stream-cli-check.cjs",
+      "sha256": "42c82e1405a8768183d9746c4e0da4e5d74aff079a0698c39676cc84ec05f625"
+    },
+    {
       "path": "tests/install-check.cjs",
       "sha256": "6576c35b88dfb9b0eb0c3da41f02415470ea79612b9163e439f560bdd25b4ea2"
+    },
+    {
+      "path": "tests/install-concurrency-check.cjs",
+      "sha256": "6b5684dd406183ab35a33308d556e232cd41e150f23b6bab4c668b9331860599"
+    },
+    {
+      "path": "tests/install-recovery-check.cjs",
+      "sha256": "975bac7cf82299aec77c9fa596e4a3a926c4a31d0d90fdd090ada20564a13087"
     },
     {
       "path": "tests/isolated-check-diagnostic.cjs",
@@ -387,6 +555,10 @@
       "sha256": "54473ca89671b3c54b2510282868821cad33b80eb68685026a4e99a6d73d5ff8"
     },
     {
+      "path": "tests/native-migration-check.cjs",
+      "sha256": "f6242ec4dfebe5bd368b561c97d60773c7ed32b6fef6dcb235dc7e0b8e00702e"
+    },
+    {
       "path": "tests/native-player-check.cjs",
       "sha256": "ee242610d60adb97cf83b299c344e9b7f8a18c3234e3f81c82870646b1520961"
     },
@@ -407,12 +579,20 @@
       "sha256": "f965fe511c86a3e0d80a323552758401e9513f5fd3d35bdadf45cb2a640188ea"
     },
     {
+      "path": "tests/optional-voice-check.cjs",
+      "sha256": "671ff9db4654a9229909b00d5b700697d9930601e3d99a92c27d9df8ae815eb1"
+    },
+    {
       "path": "tests/permission-cache-checks.cjs",
       "sha256": "54c1c817a83c2f1fa412ac884ac33a2e0dcace5e1b8ed080d88c1e9e739b40b9"
     },
     {
       "path": "tests/playback-abort-check.cjs",
       "sha256": "714d1a0578695d93f05dee98511472a75cd0ec6b08a099a856fe1059c08649b3"
+    },
+    {
+      "path": "tests/readiness-check.cjs",
+      "sha256": "b5d185fcc8e456e04d470d2bc6e4bb85083dd173f57efab6c6297846972a7c67"
     },
     {
       "path": "tests/recovery-checks.cjs",
@@ -431,12 +611,24 @@
       "sha256": "4352eaa6a2b6501956511563ac3fdb01874fb1f089efae5e0a5327e9bd605a5c"
     },
     {
+      "path": "tests/source-docs-check.cjs",
+      "sha256": "5ec249cbfd8cca409ce29387b5ec7f870e0d1ec38b730c0195cf79c740915834"
+    },
+    {
       "path": "tests/source-reader-checks.cjs",
       "sha256": "e427f83bb83b918da504a1bd6ceebeb432b56bc76c7c1322458a8aacb1ac397b"
     },
     {
+      "path": "tests/stream-cli-check.cjs",
+      "sha256": "d8bdc741a0f0e99083727234a9e345a5c96b11b90cdbd198b1c3ac78152bb8cf"
+    },
+    {
       "path": "tests/windows-check.cjs",
       "sha256": "a319f2fc343c04536bbf6b75eb8455f6392f7127508518fe5be3b894d14e9930"
+    },
+    {
+      "path": "tests/windows-helper-check.cjs",
+      "sha256": "0d86ebddb22aa46c4ae542fcc118bbd3ae119153e4442849a2ffdd8a21781d08"
     },
     {
       "path": "tests/windows-permission-probe.cjs",
@@ -445,6 +637,14 @@
     {
       "path": "tests/windows-privacy.cjs",
       "sha256": "3785445e6816f0896846c87ae4c06796d9af96da8bde25aec69c176d7957a1a3"
+    },
+    {
+      "path": "tests/windows-release-check.cjs",
+      "sha256": "f7e4762573b645eaa58b49f07dcdef4b3c787d526a81eeec4d756d47ff65f39a"
+    },
+    {
+      "path": "tests/windows-setup-check.cjs",
+      "sha256": "30861f87b6f7784073b5b0623be129367baf93e2d6ba86632253d331f9e9b06f"
     }
   ]
 }

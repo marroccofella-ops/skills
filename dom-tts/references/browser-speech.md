@@ -1,6 +1,6 @@
 # Experimental local browser speech
 
-This development candidate adds browser speech to the public programme baseline. It carries the local hal.8 browser recovery implementation, but it is a separately packaged source tree with its own version and manifest. It does not publish the unrelated optional voice studio, native helper/tray/setup programme or personal notification settings. It is not a stable release.
+Version 0.5.0-rc.2 retains the public browser recovery, queue and paragraph fixes and adds the expanded programme source. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
 
 Start with Node18+: run `node scripts/experimental/browser-session.js`, open its printed private local link, choose a local voice and click Enable spoken replies. Keep the page open. Never publish the access fragment or connection descriptor. The voice uses local browser speech synthesis, no microphone or cloud service. Speed accepts0.5–2; the initial default is0.9. Saved preferences do not enable a fresh page.
 
@@ -26,4 +26,4 @@ Supplied speech is bounded; the CLI accepts1000characters, the manual queue6000c
 
 The status health ring contains at most24state/time records and last-poll age; no speech text, token, path or transcript. It is live metadata, not a retrospective diagnosis of every disconnect.
 
-Windows listening of local hal.8 was human-confirmed at rate1.8. An isolated actual browser recovered after two batches of7 and10 dropped HTTP poll requests and completed a new sentence. Local hal.8 passed9914core assertions plus focused recovery/protocol checks. Those results are separate from validation of this newly packaged public candidate and its hosted CI. OS sleep/resume, real background discard, non-Windows listening, other-context delivery, sustained bounded-history behavior and release review remain open.
+Historical Windows listening of local hal.8 was human-confirmed at rate1.8. An isolated actual browser recovered after two batches of7 and10 dropped HTTP poll requests and completed a new sentence. Local hal.8 passed9914core assertions plus focused recovery/protocol checks. Those results are separate from validation of this newly packaged public candidate and its hosted CI. OS sleep/resume, real background discard, non-Windows listening, other-context delivery, sustained bounded-history behavior and release review remain open.

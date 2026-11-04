@@ -2,11 +2,11 @@
 
 Local speech for coding assistants by **Prof Dom Marrocco / 42.uk**.
 
-Version **0.5.0-rc.1** is a portable source release candidate. The common interface is
+Version **0.5.0-rc.2** is a portable source release candidate. The common interface is
 model-independent: any harness that can run a command can pass text through
 stdin, a UTF-8 file, or --text. Agent Skills hosts can discover SKILL.md.
 
-This candidate includes the local browser companion and supplied live-paragraph integration; it is not a stable release. See [EVOLUTION.md](EVOLUTION.md)
+This source candidate includes the local browser companion, supplied live-paragraph integration, managed installer recovery, and the expanded programme source. It is not a stable release. See [EVOLUTION.md](EVOLUTION.md)
 for accepted fixes, migration scope and the remaining release gates. Saved settings
 apply to direct speech and the watcher; explicit CLI values override them.
 
@@ -78,11 +78,11 @@ microphone, avatar or Duplex mode.
 ## Install, upgrade, rollback and uninstall
 
 ```text
-node scripts/package.js
 node scripts/install.js --target codex --dry-run
 node scripts/install.js --target codex
 node scripts/install.js --target claude
 node scripts/install.js --dir <absolute-documented-skill-parent>
+node scripts/install.js --target codex --action recover --dry-run
 node scripts/install.js --target codex --action rollback
 node scripts/install.js --target codex --action uninstall
 ```
@@ -152,4 +152,19 @@ See [browser speech and progressive replies](references/browser-speech.md) for l
 
 See [live Codex paragraph forwarding](references/codex-paragraph-speech.md) for a display-first owning-client callback. The final-only notifier remains useful across configured chats; automatic Desktop paragraph capture requires host forwarding and is not claimed. Failed supplied chats have separate bounded scheduler sources. Run `node scripts/doctor.js --browser true` to check delivery readiness.
 
+For portable supplied-paragraph defaults and final-only notification wiring, see
+[Codex default speech](references/codex-default-speech.md). Preserve existing
+notification chains; live Desktop forwarding remains host-required.
+
 Build the reviewed source with `node scripts/build.js --out <absolute-new.zip>`. The archive excludes settings, runtime state, recordings and evidence. It is an unsigned portable source candidate, not a trusted Windows setup. Native/setup and platform acceptance gates remain in EVOLUTION.md and COMPATIBILITY.md.
+
+## Expanded programme source
+
+The source archive now includes the managed crash-recovery installer, native Windows speech/tray/setup source, explicit supplied-event adapters and optional voice studio. Installation does not launch these companions, register startup, activate a microphone, enable a cloud service, configure a host hook or change Windows policy.
+
+- [Named supplied-event interfaces](references/harness-integrations.md) remain opt-in. Their fixture coverage does not certify an absent live product or automatic Desktop attachment.
+- [Optional voice studio](references/optional-voice-studio.md) has separate local recording and remote request consent. Its cloud routes require operator-provided credentials and explicit provider/model selection. No cloud credentials or settings are packaged.
+- Windows native speech, tray and setup builders require reviewed trusted signing inputs. This release contains source, not signed executable components. `node scripts/prepare-windows-release.js --check true` reports the missing inputs honestly.
+- Installer `--action recover --dry-run` previews an interrupted managed transaction. It does not terminate a recorded process or overwrite an ambiguous installation.
+
+The preferred browser speech remains local and separate from the dormant optional studio. See [release scope and acceptance](references/release-candidate.md).
