@@ -556,7 +556,7 @@
     },
     {
       "path": "tests/native-migration-check.cjs",
-      "sha256": "68d9d725b972cf35fb6691555c725d0a94aebc4b208943a5cd0d43d62345b660"
+      "sha256": "f6242ec4dfebe5bd368b561c97d60773c7ed32b6fef6dcb235dc7e0b8e00702e"
     },
     {
       "path": "tests/native-player-check.cjs",
