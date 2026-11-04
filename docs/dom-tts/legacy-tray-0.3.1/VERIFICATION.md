@@ -25,3 +25,20 @@ microphone capture, true token streaming, GUI DPI/accessibility, new-core native
 PR41 checks, default-target install, signed executable, stores or local web app.
 The proposed web/ledger and streaming contracts are specifications, not features
 implemented by the source snapshot. Development publication is not stable approval.
+
+## Fresh archival review: 2026-11-04
+
+Hal (H-A-L), isolated checkout of archive head
+`9fedaa449c3071aacc4aa6e7e7f88cc6ffceb756`:
+
+- Packet verifier passes all 53 source/provenance hashes; its JavaScript
+  syntax checks pass. The verifier only invokes `node --check`.
+- All 11 archived PowerShell scripts parse without errors; none was executed.
+- A fresh bounded scan of all 62 packet files found no Windows user-home path,
+  private LAN/Tailscale endpoint, common GitHub/OpenAI/AWS credential pattern,
+  private-key block or email address. This is not a universal secret detector.
+- No installer, watcher, online provider, microphone or archived support
+  collector was started. No GUI/audio/platform functionality is certified.
+- The README now labels the 4 October main/branch inventory as historical and
+  points to merged PR #69 and stable-release gate issue #70. The archived source
+  bytes, original hashes and packet manifest are unchanged.
