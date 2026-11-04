@@ -42,6 +42,7 @@ jobs:
       - run: node tests/browser-delivery-readiness-check.cjs
       - run: node tests/codex-paragraph-relay-check.cjs
       - run: node tests/codex-notify-check.cjs
+      - run: node tests/codex-default-check.cjs
       - run: node tests/build-check.cjs
       - run: node tests/browser-recovery-check.cjs
       - run: node tests/browser-restart-check.cjs
@@ -53,6 +54,20 @@ jobs:
       - run: node tests/markdown-rich-check.cjs
       - run: node tests/reply-stream-check.cjs
       - run: node tests/reply-admission-check.cjs
+      - run: node tests/harness-adapter-check.cjs
+      - run: node tests/harness-hook-check.cjs
+      - run: node tests/harness-stream-cli-check.cjs
+      - run: node tests/optional-voice-check.cjs
+      - run: node tests/install-recovery-check.cjs
+      - run: node tests/install-concurrency-check.cjs
+      - run: node tests/native-migration-check.cjs
+      - run: node tests/windows-release-check.cjs
+      - run: node tests/windows-setup-check.cjs
+      - run: node tests/readiness-check.cjs
+      - run: node tests/windows-helper-check.cjs
+      - run: node tests/stream-cli-check.cjs
+      - run: node tests/control-server-check.cjs
+      - run: node tests/source-docs-check.cjs
       - run: node tests/source-reader-checks.cjs
       - run: node tests/segment-stream-checks.cjs
       - run: node tests/native-timeout-check.cjs
@@ -92,7 +107,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Build verified portable source candidate
+      - name: Build verified expanded source candidate
         working-directory: dom-tts
         run: node scripts/build.js --out '${{ runner.temp }}/dom-tts-source.zip'
       - uses: actions/upload-artifact@v4
@@ -105,7 +120,7 @@ jobs:
           retention-days: 90
   publish-candidate:
     needs: portable-package
-    if: github.event_name == 'push' && github.repository == 'marroccofella/skills' && github.ref == 'refs/heads/codex/dom-tts-0.5-rc1-20261104'
+    if: github.event_name == 'push' && github.repository == 'marroccofella/skills' && github.ref == 'refs/heads/codex/dom-tts-expanded-rc2-20261104'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -119,6 +134,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          node -e "const fs=require('node:fs'),c=require('node:crypto'),p=require('./dom-tts/package.json'),r=require('./candidate/dom-tts-source.zip.sha256.json');if(p.version!=='0.5.0-rc.1'||r.version!==p.version||r.signed!==false||r.sha256!==c.createHash('sha256').update(fs.readFileSync('./candidate/dom-tts-source.zip')).digest('hex'))throw Error('Candidate verification failed')"
-          gh api --method POST repos/marroccofella/skills/git/refs -f ref=refs/tags/dom-tts-0.5.0-rc.1 -f sha="$GITHUB_SHA" > /dev/null
-          gh release create dom-tts-0.5.0-rc.1 candidate/dom-tts-source.zip candidate/dom-tts-source.zip.sha256.json --repo marroccofella/skills --verify-tag --prerelease --latest=false --title 'Dom TTS 0.5.0-rc.1 — portable source candidate' --notes-file dom-tts/references/release-candidate.md
+          node -e "const fs=require('node:fs'),c=require('node:crypto'),p=require('./dom-tts/package.json'),r=require('./candidate/dom-tts-source.zip.sha256.json');if(p.version!=='0.5.0-rc.2'||r.version!==p.version||r.signed!==false||r.sha256!==c.createHash('sha256').update(fs.readFileSync('./candidate/dom-tts-source.zip')).digest('hex'))throw Error('Candidate verification failed')"
+          gh api --method POST repos/marroccofella/skills/git/refs -f ref=refs/tags/dom-tts-0.5.0-rc.2 -f sha="$GITHUB_SHA" > /dev/null
+          gh release create dom-tts-0.5.0-rc.2 candidate/dom-tts-source.zip candidate/dom-tts-source.zip.sha256.json --repo marroccofella/skills --verify-tag --prerelease --latest=false --title 'Dom TTS 0.5.0-rc.2 — portable source candidate' --notes-file dom-tts/references/release-candidate.md

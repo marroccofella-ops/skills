@@ -32,7 +32,7 @@ function ensurePrivate(dir=stateDir,{platform=process.platform,run=spawnSync,tim
 }
 function writeObject(file,value){const tmp=file+'.'+crypto.randomBytes(8).toString('hex')+'.tmp';try{fs.writeFileSync(tmp,JSON.stringify(value,null,2)+'\n',{mode:0o600,flag:'wx'});fs.renameSync(tmp,file);}finally{try{fs.unlinkSync(tmp);}catch{}}}
 function parseCli(argv,defaults={},allowed=[]){
- const result={...defaults},keys=new Set(allowed),booleans=new Set(['dryRun','stdin','includeCodeBlocks','includeCommandBlocks','includeCommentary','recover','once','enqueue']);
+ const result={...defaults},keys=new Set(allowed),booleans=new Set(['dryRun','stdin','includeCodeBlocks','includeCommandBlocks','includeCommentary','recover','once','enqueue','incrementalMarkdown']);
  for(let i=0;i<argv.length;i++){if(!argv[i].startsWith('--'))throw new Error('Expected a named option');const raw=argv[i].slice(2),at=raw.indexOf('='),name=(at<0?raw:raw.slice(0,at)).replace(/-([a-z])/g,(_,c)=>c.toUpperCase());if(!keys.has(name))throw new Error('Unknown option: --'+name);let value=at<0?undefined:raw.slice(at+1);
  if(value===undefined){if(booleans.has(name)&&(!argv[i+1]||argv[i+1].startsWith('--')))value=true;else{if(argv[i+1]===undefined||argv[i+1].startsWith('--'))throw new Error('Missing value for --'+name);value=argv[++i];}}
  if(booleans.has(name)){if(![true,false,'true','false'].includes(value))throw new Error('--'+name+' requires true or false');value=value===true||value==='true';}result[name]=value;

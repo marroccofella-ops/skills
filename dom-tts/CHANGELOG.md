@@ -1,3 +1,9 @@
+# 0.5.0-rc.2 — 4 November 2026
+
+- Consolidate expanded programme source with public rc.1 without replacing its stronger ZIP integrity checks or browser regression fixtures.
+- Include managed installer recovery, native-settings migration, Windows speech/tray/setup builders, supplied host adapters and consented optional studio. Optional components remain dormant, unsigned native components remain refused and no runtime/settings/credential/evidence files are distributed.
+- Restore the browser speech reference in the expanded package and make current version/scope explicit. All-chat paragraph attachment remains dependent on the owning client; stable native and hardware gates remain open.
+
 # 0.5.0-rc.1 — supplied paragraph delivery and queue isolation
 
 Fix stranded unsaid tails under128-segment pressure, nonterminal receipts, shared-identity receipt mixing, dynamic source isolation and Stop revocation. Retire settled sources within a32-source bound while preserving manual, failed and open work. Add a host-owned live paragraph relay, final-only Codex event adapter, queue-aware doctor and reproducible portable source packaging. No Desktop global subscription is installed. Stable/native/setup acceptance remains open.
