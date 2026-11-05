@@ -1,10 +1,10 @@
 # Dom TTS 0.5 evolution and acceptance
 
-Current development candidate: **0.5.0-rc.3**, unreleased. It adds Windows product/version metadata to public **0.5.0-rc.2**. No source archive launches optional components or supplies a trusted signing certificate. Automatic Desktop paragraph attachment and stable hardware acceptance remain unverified. See [release scope](references/release-candidate.md).
+Current development candidate: **0.5.0-rc.4**. Publication is recorded on the [release page](https://github.com/marroccofella/skills/releases). It repairs word boundaries, long-session delivery, native diagnostics and publisher trust checks on top of public **0.5.0-rc.2**. No source archive launches optional components or supplies a trusted signing certificate. Automatic Desktop paragraph attachment and stable hardware acceptance remain unverified. See [release scope](references/release-candidate.md).
 
 ## Historical evidence and decisions
 
-The following ledger is preserved as history. Statements about source staying private, earlier pending publication decisions or old current versions describe their named earlier candidates; publication of this source does not transfer their listening/CI acceptance to 0.5.0-rc.3.
+The following ledger is preserved as history. Statements about source staying private, earlier pending publication decisions or old current versions describe their named earlier candidates; publication of this source does not transfer their listening/CI acceptance to 0.5.0-rc.4.
 
 Current candidate: **0.5.0-rc.1**. Supplied paragraph forwarding, chat source isolation and pressure recovery are implemented; automatic attachment to all existing Desktop chats and stable native/setup acceptance remain unverified. Historical evidence below applies only to its stated versions.
 

@@ -1,0 +1,341 @@
+{
+  "schema": "dom-tts-portable-tests/1",
+  "suites": [
+    {
+      "file": "scripts/self-test.js",
+      "args": []
+    },
+    {
+      "file": "tests/browser-identity-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-rpc-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-duration-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-wait-budget-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/harness-lifetime-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-usability-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/publisher-policy-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/package-boundaries-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/legacy-rollback-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-build-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-command-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-diagnostics-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-http-body-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-migration-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-owner-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-player-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-queue-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-history-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-pressure-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-source-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-delivery-readiness-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/codex-paragraph-relay-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/codex-notify-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/codex-default-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/codex-default-diagnostics-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/build-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-recovery-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-restart-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-screen-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-session-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/browser-speed-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/delta-narrator-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/markdown-progress-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/markdown-rich-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/reply-stream-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/reply-admission-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/harness-adapter-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/harness-hook-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/harness-stream-cli-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/optional-voice-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/install-recovery-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/install-concurrency-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-migration-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/windows-release-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/windows-setup-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/readiness-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/windows-helper-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/windows-product-metadata-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/stream-cli-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/control-server-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/source-docs-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/source-reader-checks.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/segment-stream-checks.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-timeout-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-ipc-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-ipc-check.cjs",
+      "args": [
+        "--synchronous"
+      ]
+    },
+    {
+      "file": "tests/native-ipc-check.cjs",
+      "args": [
+        "--late-progress"
+      ]
+    },
+    {
+      "file": "tests/native-ipc-check.cjs",
+      "args": [
+        "--child-error"
+      ]
+    },
+    {
+      "file": "tests/native-spawn-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-stop-send-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-stop-send-check.cjs",
+      "args": [
+        "--callback"
+      ]
+    },
+    {
+      "file": "tests/native-lease-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-lease-check.cjs",
+      "args": [
+        "--normal"
+      ]
+    },
+    {
+      "file": "tests/native-lease-check.cjs",
+      "args": [
+        "--startup"
+      ]
+    },
+    {
+      "file": "tests/native-policy-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-heartbeat-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-heartbeat-check.cjs",
+      "args": [
+        "--nonzero"
+      ]
+    },
+    {
+      "file": "tests/native-heartbeat-check.cjs",
+      "args": [
+        "--active-failure"
+      ]
+    },
+    {
+      "file": "tests/native-heartbeat-check.cjs",
+      "args": [
+        "--late-progress"
+      ]
+    },
+    {
+      "file": "tests/playback-abort-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-player-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/isolated-check-diagnostic.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/isolated-cleanup-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/isolated-player-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/install-check.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/native-boundary.cjs",
+      "args": []
+    },
+    {
+      "file": "tests/windows-privacy.cjs",
+      "args": [],
+      "platform": "win32"
+    },
+    {
+      "file": "tests/windows-permission-probe.cjs",
+      "args": [],
+      "platform": "win32"
+    }
+  ]
+}

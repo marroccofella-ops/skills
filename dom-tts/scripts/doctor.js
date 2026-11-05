@@ -1,6 +1,11 @@
-const {selectProvider,available,voices}=require('./providers/native');
+const {selectProvider,availability,buildIdentity,voices}=require('./providers/native');
 const {parseCli}=require('./runtime');
-function doctor(){let provider,error;try{provider=selectProvider();}catch(e){error=e.message;}return {version:require('../package.json').version,platform:process.platform,arch:process.arch,node:process.version,provider,available:provider?available(provider):false,error};}
+function doctor({platform=process.platform,select=selectProvider,inspect=availability}={}){
+ let provider,error;try{provider=select('auto',platform);}catch(e){error=e.message;}
+ const engine=provider?inspect(provider):{available:false,code:'native-provider-unavailable',reason:error};
+ // Presence/discovery does not certify output hardware or audible delivery.
+ return {...buildIdentity(),platform,arch:process.arch,node:process.version,provider,...engine,...(error?{error}:{}),outputDevice:{state:'unverified',code:'native-output-device-unverified'},audiblePlaybackVerified:false};
+}
 function browserReadiness(status,{version,sourceManifestSha256},failure){if(!status)return {state:'blocked',code:failure||'browser-companion-unavailable'};if(status.version!==version||status.sourceManifestSha256!==sourceManifestSha256)return {state:'blocked',code:'browser-build-mismatch'};if(!status.connected)return {state:'blocked',code:{'lease-expired':'browser-lease-expired',disabled:'browser-page-disabled','not-enabled':'browser-page-not-enabled'}[status.health?.browserState]||'browser-companion-unavailable'};return {state:'ready',requiresOpenEnabledPage:true};}
 function browserQueueReadiness(queue){
  if(!queue||typeof queue!=='object')return {state:'blocked',code:'browser-queue-unobservable'};
@@ -23,6 +28,6 @@ async function main(){
   if(args.playbackTest==='true'){if(!info.available)info.test={state:'skipped',code:playback.code};else{try{info.test=await require('./experimental/browser-player').createBrowserPlayer()('Dom TTS browser playback test.');}catch{info.test={state:'failed',code:'browser-playback-failed'};}}}
   console.log(JSON.stringify(info,null,2));if(!info.available||info.test&&info.test.state!=='completed')process.exitCode=1;return;
  }
- const info=doctor();if(args.voices==='true')info.voices=voices(info.provider);if(args.playbackTest==='true')throw Error('Use --browser true for this browser playback test');console.log(JSON.stringify(info,null,2));if(!info.available)process.exitCode=1;
+ const info=doctor();if(args.voices==='true'&&info.available){try{info.voices=voices(info.provider);}catch{info.available=false;info.code='native-voice-discovery-failed';info.reason='Voice discovery failed; check the installed engine and native policy before playback.';}}if(args.playbackTest==='true')throw Error('Use --browser true for this browser playback test');console.log(JSON.stringify(info,null,2));if(!info.available)process.exitCode=1;
 }
 if(require.main===module)main().catch(e=>{console.error(e.message);process.exitCode=1;});module.exports={doctor,browserReadiness,browserQueueReadiness};

@@ -32,7 +32,8 @@ admission. Calls to append/finish are sequential. Failure does not authorize
 replay. Cancel the owned reply with `speech.cancel()`; global Stop remains
 `node scripts/browser-speak.js --command stop` and requires explicit restart.
 The raw CLI accepts at most 16,000 UTF-8 input bytes, with 2 KiB event bodies and
-the companion's existing queue/history/two-minute-expiry bounds. Input is retained
+the companion's queue/history/two-minute-inactivity bounds. Healthy bounded
+playback renews waiting speech; blocked or abandoned text still expires. Input is retained
 only in the bounded in-memory narrator until sealed/cancelled/expired. No text is
 written to disk, included in receipts, read from other chats, or sent to a model.
 `reply-receipt` distinguishes an input still open from terminal audio completion.

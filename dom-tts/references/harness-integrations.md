@@ -65,11 +65,15 @@ node ABSOLUTE_SKILL_PATH/scripts/harness-hook.js --source claude-stop --sessions
 ```
 
 The host supplies one JSON object on stdin, including pretty-printed JSON. The
-adapter uses the hook's final text directly and ignores its transcript path. It
-excludes SubagentStop, failed-turn hooks and continued Stop hooks. It returns an
-empty JSON object to Claude; sanitized admission metadata goes to stderr.
-Admission can fail while the written assistant output continues. A queued receipt
-is not completed or heard audio. The helper never emits a blocking hook decision.
+adapter uses the supplied final text and ignores its transcript path. It excludes
+SubagentStop and failed-turn hooks. `stop_hook_active: true` means Claude is already
+continuing because of another Stop hook; its supplied completed response is still
+eligible. This read-aloud hook never asks Claude to continue. A missing Stop state
+or final-text field is an explicit no-op. The helper always exits successfully
+with an empty JSON object; sanitized delivery or error codes go to stderr. Empty
+stdin, unavailable speech and global Stop leave the host's decision unchanged.
+A queued receipt is not completed or heard audio. Transport uncertainty is marked
+`admission: "unknown"` and must not trigger an automatic resend.
 
 No Claude settings file has been changed. Register the hook only for a consenting
 session, follow the host's asynchronous hook support, and test it on that actual
@@ -85,19 +89,39 @@ Supply `selectedSessions` as exact OpenClaw session keys. It filters unrelated
 sources and unsuccessful sends, requires a delivery message ID, and admits the
 supplied outgoing content. The callback receives queue metadata, not text.
 
-The handler keeps at most 64 event fingerprints in memory, suppresses overlapping
-duplicates, refuses conflicting replays, and retains failed/uncertain admission
-fingerprints to prevent automatic replay. Restart loses that history. This is not
+The handler keeps at most 64 detailed event fingerprints and 256 additional
+text-free retired identity fingerprints. It suppresses overlapping duplicates
+and refuses conflicting replays within those windows. Before each new admission
+it inspects prior queued receipts, without waiting for playback or resending text.
+Only confirmed completed/cancelled deliveries or definite no-op outcomes retire;
+pending, failed and uncertain admissions remain retained. If 64 such entries fill
+the window, new events return `hook-history-limit`. No failed event is retried.
+The optional injected `inspect(receipt)` must return a matching terminal delivery
+outcome; the default reads only the local queue receipt for the supplied job ID.
+`handler.status()` reports counts without reply bodies. Restart loses history,
+and deduplication is not guaranteed beyond the retained windows. This is not
 durable delivery or proof that a channel recipient read the message. The helper
 does not install or globally enable itself. Source: [OpenClaw internal event types](https://docs.openclaw.ai/automation/hooks/event-types).
 
 ## Bounds and richer content
 
-Host text is bounded to 64 KiB per retained turn, with 64 turns and 64 messages per
-turn at most; the downstream narrator and queue impose their own stricter bounds.
-Hook replies must fit the companion's 6000-character and HTTP byte bounds. There
-is no automatic retry or truncation. Retained reply text is cleared at settlement
-or source revocation; diagnostic metadata is bounded in-memory history.
+Host text is bounded to 64 KiB per retained turn, with 64 detailed turns and 64
+messages per turn at most. Finished turns roll into a 256-entry text-free identity
+window; this is not a lifetime turn quota. The observer only retires closed input
+after all owned playback is completed/cancelled and no segments remain pending.
+Active, failed and uncertain turns cannot be evicted to admit new work. Delayed
+starts within the retired window are ignored; deduplication beyond both bounded
+windows is not guaranteed. The downstream narrator and queue impose their own
+stricter bounds.
+
+Hook stdin JSON is bounded to 512 KiB so escaped Unicode and supplied host metadata
+can fit; the selected raw final remains bounded to 64 KiB. Informative Markdown
+normalization happens before browser length admission, so long skipped code does
+not discard accompanying prose. Normalized speech fits 6000 UTF-16 code units and
+32 KiB serialized JSON. Longer readable replies get a grapheme-safe prefix labelled
+“Spoken excerpt,” with `summarized: true`; the spoken text says the full reply
+remains in writing. There is no automatic retry. Retained reply text is cleared
+at settlement or source revocation; diagnostic metadata is bounded in memory.
 
 Progressive Markdown handles completed blank-line blocks. Open code fences,
 HTML comments/scripts/styles/preformatted blocks, and reference-link tails wait
