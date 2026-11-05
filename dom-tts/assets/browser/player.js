@@ -1,7 +1,11 @@
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory();else root.DomBrowserSpeech=factory();})(typeof window==='object'?window:null,function(){
  'use strict';
  const codes=new Set(['audio-busy','audio-hardware','network','synthesis-unavailable','synthesis-failed','language-unavailable','voice-unavailable','text-too-long','invalid-argument','not-allowed','interrupted','canceled']);
- function create({synth,Utterance,onState=()=>{},deadlineMs=45000}={}){
+ // A finite utterance budget: 45s startup allowance plus a conservative eight
+ // characters/second at rate 1. Text and rate remain independently bounded.
+ const speechDeadline=(text,rate=0.5)=>Math.min(300000,45000+Math.ceil(text.length*125/rate));
+ function create({synth,Utterance,onState=()=>{},deadlineMs}={}){
+  if(deadlineMs!==undefined&&(!Number.isFinite(deadlineMs)||deadlineMs<=0||deadlineMs>300000))throw Error('invalid-deadline');
   let active=null;
   const emit=value=>{try{onState(value);}catch{}};
   const voices=()=>synth&&typeof synth.getVoices==='function'?synth.getVoices().filter(v=>v.localService===true):[];
@@ -16,15 +20,18 @@
     const began=Date.now();let started=false,timer;
     const current={utterance,finish(value){if(active!==current)return;clearTimeout(timer);active=null;utterance.onstart=utterance.onend=utterance.onerror=null;const receipt={...value,startObserved:started,elapsedMs:Date.now()-began,localService:true,humanHearing:'unconfirmed'};emit(receipt);resolve(receipt);}};
     active=current;
-    utterance.onstart=()=>{if(active!==current)return;started=true;emit({state:'speaking',localService:true,voice:voice.name,rate});};
+    const budget=deadlineMs??speechDeadline(text,rate);
+    const timeout=()=>{if(active!==current)return;current.finish({state:'failed',code:'speech-timeout'});try{synth.cancel();}catch{}};
+    utterance.onstart=()=>{if(active!==current||started)return;started=true;clearTimeout(timer);timer=setTimeout(timeout,Math.max(0,budget-(Date.now()-began)));emit({state:'speaking',localService:true,voice:voice.name,rate});};
     utterance.onend=()=>current.finish({state:'completed'});
     utterance.onerror=event=>current.finish({state:'failed',code:codes.has(event.error)?event.error:'speech-error'});
-    timer=setTimeout(()=>{current.finish({state:'failed',code:'speech-timeout'});try{synth.cancel();}catch{}},deadlineMs);
+    timer=setTimeout(timeout,Math.min(45000,budget));
     emit({state:'queued',localService:true,voice:voice.name,rate});
+    if(active!==current)return;
     try{synth.speak(utterance);}catch{current.finish({state:'failed',code:'speech-launch-failed'});}
    });
   }
   return {voices,speak,stop,busy:()=>!!active};
  }
- return {create};
+ return {create,speechDeadline};
 });

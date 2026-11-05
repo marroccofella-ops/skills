@@ -24,11 +24,19 @@ function markdownBoundary(text){
  return boundary;
 }
 function splitGraphemes(text,limit){
- const segments=[];let current='';
- for(const {segment} of new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(text)){
-  if(byteLength(segment)>limit)throw new Error('grapheme exceeds segment limit');
-  if(byteLength(current)+byteLength(segment)>limit){segments.push(current);current='';}
-  current+=segment;
+ if(!Number.isSafeInteger(limit)||limit<1)throw Error('invalid segment limit');
+ const segments=[];let current='',bytes=0;
+ const append=part=>{const size=byteLength(part);if(bytes+size>limit){segments.push(current);current='';bytes=0;}current+=part;bytes+=size;};
+ // Preserve complete sentences where they fit, then complete word tokens. Only
+ // a token larger than the hard UTF-8 bound is split, at grapheme boundaries.
+ const words=new Intl.Segmenter(undefined,{granularity:'word'}),graphemes=new Intl.Segmenter(undefined,{granularity:'grapheme'});
+ for(const {segment:sentence}of new Intl.Segmenter(undefined,{granularity:'sentence'}).segment(text)){
+  if(byteLength(sentence)<=limit){append(sentence);continue;}
+  if(current){segments.push(current);current='';bytes=0;}
+  for(const {segment:word}of words.segment(sentence)){
+   if(byteLength(word)<=limit){append(word);continue;}
+   for(const {segment}of graphemes.segment(word)){if(byteLength(segment)>limit)throw Error('grapheme exceeds segment limit');append(segment);}
+  }
  }
  if(current)segments.push(current);return segments;
 }

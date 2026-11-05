@@ -1,6 +1,6 @@
 # Experimental local browser speech
 
-Unreleased version 0.5.0-rc.3 retains the public 0.5.0-rc.2 browser recovery, queue, paragraph and expanded programme source; it adds Windows build product/version metadata. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
+Unreleased version 0.5.0-rc.4 repairs word boundaries, healthy long-reply expiry, speech deadlines and long-session adapters on top of public 0.5.0-rc.2. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
 
 Start with Node18+: run `node scripts/experimental/browser-session.js`, open its printed private local link, choose a local voice and click Enable spoken replies. Keep the page open. Never publish the access fragment or connection descriptor. The voice uses local browser speech synthesis, no microphone or cloud service. Speed accepts0.5–2; the initial default is0.9. Saved preferences do not enable a fresh page.
 
@@ -12,6 +12,45 @@ An enabled document keeps retrying transient health requests with backoff capped
 
 Doctor distinguishes state-not-found, state-inaccessible, descriptor-invalid, owner-unobservable, loopback-denied, transport-unreachable/timeout, browser-page-not-enabled/disabled, lease-expired and build mismatch. A restricted caller's owner-unobservable or inaccessible result does not prove the service died. Check the actual authorized context before restarting; never bypass owner/ACL checks or kill a saved PID. DOM_TTS_STATE_DIR explicitly selects one shared private state location for launcher, CLI and notification integration.
 
+## Connection identity and upgrade
+
+Descriptor-driven Node clients require a fresh, port-bound server proof on the exact
+TCP connection before sending the access token or supplied text. A closed proof
+connection cannot reconnect for the authenticated request. An old or unverified
+listener reports `browser-server-identity-unverified`; do not resend, weaken the
+check or start a duplicate server. The tray's older browser transport and stored-link
+opener are refused until they have an equivalent guarded implementation.
+
+Node proof v2 also binds a monotonic tick captured at request entry. Reviving
+controls must be newer than the last Stop barrier, including when the initial
+proof or body upload was delayed. The proof rejects future or over-ten-second-old
+ticks. Use the same Node executable for server and helpers: the CI child-process
+check verifies that runtime's local clock, not every mixed-runtime or VM clock
+origin. Incompatible clocks fail closed without a wall-clock fallback. See
+[Node's clock API](https://nodejs.org/api/process.html#processhrtimebigint) and
+[libuv's platform implementations](https://github.com/libuv/libuv/tree/v1.x/src).
+This ordering begins at request entry, not at an earlier conversation or plan.
+
+An already-loaded trusted companion page uses authenticated encrypted RPC for its
+requests and responses, with bounded replay refusal. Its token remains in memory;
+legacy session storage is cleared. Reload needs the freshly printed private link
+from the trusted running server and explicit Enable. This protects the loaded
+page's transport, not the authenticity of HTML opened from an old saved URL after
+its port has been reused. Do not bookmark or reopen stale private links.
+
+Stop also invalidates older pending Enable/Restart controls. A fresh explicit
+action uses the current Stop generation; an Enable click retains the generation
+from before its asynchronous voice preview. A stale control is refused rather
+than automatically retried. Read-only status can refresh the generation without
+enabling speech.
+
+Upgrade the client, server and page together. Before replacing the installed
+package, stop speech through its existing trusted controls and close its server
+normally. Start one server from the new reviewed package, open its fresh link and
+Enable, then check doctor. Installation alone does not upgrade a running page or
+certify the new voice. No automatic replay, restart or weakening of owner/ACL
+checks is part of this upgrade.
+
 ## Speech during the reply
 
 The final-only notification route cannot receive earlier progress. With only chat tools, display a useful commentary paragraph, submit that supplied paragraph with --wait false, and continue composing. That is agent-driven paragraph delivery, not automatic token capture. Avoid duplicate final narration.
@@ -22,7 +61,13 @@ Codex notify currently exposes agent-turn-complete: https://learn.chatgpt.com/do
 
 ## Bounds and acceptance
 
-Supplied speech is bounded; the CLI accepts1000characters, the manual queue6000characters within the HTTP limit, and reply-stream16000UTF-8 bytes. Text expires after2minutes, including while queued/paused/active. In-memory protocol history remains bounded at64messages/128tracked segments; admission may refuse at those limits and receipts are lost on restart. Do not claim unlimited default delivery. No automatic replay or reset is introduced to conceal that limitation.
+Supplied speech is bounded: the browser CLI accepts 1000 characters, the manual HTTP queue accepts 6000 characters within a 32768-byte request limit, and reply-stream accepts 16000 UTF-8 bytes. The stream splits within its 420-byte segment limit at sentence or word boundaries. A token longer than the limit splits at grapheme boundaries; an individual grapheme larger than the limit is refused transactionally.
+
+The two-minute text lifetime measures inactivity. Healthy active playback renews the active message and its bounded waiting queue; paused, disconnected, failed and abandoned open-tail text still expires. Each segment has a finite startup deadline and a duration budget based on length and saved speech rate, capped at five minutes. This supports healthy long replies without making stalled text permanent. It is not an unlimited-duration guarantee.
+
+Explicit wait=true can wait substantially longer for a bounded queued reply, but the ordinary display path must use wait=false. A wait timeout preserves the admitted job ID and reports an uncertain terminal outcome; it does not stop other callers or authorize resending the text. Stop remains global and authoritative.
+
+In-memory history remains bounded at 64 messages/128 tracked segments, with a further 256 text-free retired identities. Only fully settled records retire. Harness/OpenClaw histories use bounded rolling windows too; pending, failed and uncertain work is not evicted to admit another reply. Admission can refuse at these bounds and receipts are lost on restart. Do not claim unlimited or durable delivery. No automatic replay or reset is introduced to conceal those limits.
 
 The status health ring contains at most24state/time records and last-poll age; no speech text, token, path or transcript. It is live metadata, not a retrospective diagnosis of every disconnect.
 

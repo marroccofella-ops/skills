@@ -13,12 +13,12 @@ let clock=0;
  s.enable({client,voice:'local David',rate:0.9});const lost=s.submit({text:'disconnect'});clock+=30;assert.equal(s.status().connected,false);assert.equal(s.receipt(lost.id).code,'browser-disconnected');assert.throws(()=>s.submit({text:'lost'}),/not-connected/);assert.equal(s.poll({client}).action,'cancel');s.accept({client,id:lost.id,state:'cancelled',startObserved:false,elapsedMs:30,localService:true});s.enable({client,voice:'local David',rate:0.9});s.disable({client});assert.equal(s.status().connected,false);
  assert.equal(s.poll({client}).action,'disconnect');assert.throws(()=>s.submit({text:'no reenable'}),/not-connected/);s.enable({client:other,voice:'local Zira',rate:1.1});assert.equal(s.poll({client}).action,'disconnect');assert.deepEqual(s.getPreferences(),{voice:'local Zira',rate:1.1});s.disable({client:other});
  await new Promise(resolve=>s.server.listen(0,'127.0.0.1',resolve));const conn={port:s.server.address().port,token:s.token};try{
-  await assert.rejects(request({...conn,token:'0'.repeat(64)},'/api/status'),/authentication-required/);
+  await assert.rejects(request({...conn,token:'0'.repeat(64)},'/api/status'),/browser-server-identity-unverified/);
   assert.equal((await request(conn,'/api/status')).provider,'browser-local');await request(conn,'/api/enable',{client,voice:'David',rate:0.9});const live=await request(conn,'/api/speak',{text:'HTTP test'});await request(conn,'/api/receipt',{client,id:live.id,state:'completed',startObserved:true,elapsedMs:5,localService:true});assert.equal((await request(conn,'/api/receipt/'+live.id)).state,'completed');
   assert.deepEqual(await request(conn,'/api/preferences'),{voice:'David',rate:0.9});
   await assert.rejects(request(conn,'/api/speak',{text:'x'.repeat(1001)}),/invalid-text/);
   const foreign=await fetch('http://127.0.0.1:'+conn.port+'/api/status',{headers:{Origin:'https://evil.invalid','x-dom-tts-token':conn.token}});assert.equal(foreign.status,403);
-  const html=await fetch('http://127.0.0.1:'+conn.port+'/');assert.match(html.headers.get('content-security-policy'),/connect-src 'self'/);assert.match(await html.text(),/Enable spoken replies/);
+  const html=await fetch('http://127.0.0.1:'+conn.port+'/');assert.match(html.headers.get('content-security-policy'),/connect-src 'self'/);const page=await html.text();assert.match(page,/Enable spoken replies/);assert(page.includes('Dom TTS '+require('../package.json').version));assert(!page.includes('{{DOM_TTS_VERSION}}'));
  }finally{s.close();await new Promise(resolve=>s.server.close(resolve));}
  console.log('PASS: browser companion admission, ownership, receipts, stop, timeout, disconnect, authentication and origin checks (injected events; no audio claim).');
 })().catch(error=>{console.error(error);process.exitCode=1;});

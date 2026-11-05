@@ -18,5 +18,5 @@ process.on('message',message=>{
  child=spawn(message.command.file,message.command.args,{windowsHide:true,stdio:['pipe','pipe','pipe'],env:safeEnv(),shell:false});
  child.stdin.on('error',()=>{});child.stdin.end(message.input||'');
  child.stdout.pipe(process.stdout);child.stderr.pipe(process.stderr);
- child.on('error',()=>process.exit(1));child.on('exit',code=>process.exit(code===0?0:1));
+ child.on('error',()=>process.exit(1));child.on('close',code=>process.exit(code===0?0:1));
 });

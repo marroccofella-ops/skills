@@ -31,13 +31,37 @@ function findEspeak(){
  }
  throw new Error('espeak-ng was not found on trusted absolute PATH entries outside this project. Install it through your OS package manager, then run doctor again.');
 }
-function available(provider){try{if(provider==='espeak-ng')findEspeak();else fs.accessSync(provider==='sapi'?powershell:'/usr/bin/say',fs.constants.F_OK);return true;}catch{return false;}}
-function failureMessage(stderr=''){
- stderr=String(stderr).replace(/\s+/g,' ');
- if(/PSSecurityException|running scripts is disabled|execution polic(?:y|ies)/i.test(stderr))
-  return 'Windows speech script was blocked by execution policy; use a reviewed signed native-helper package or an administrator-approved script policy. Dom TTS does not bypass policy.';
- return 'Native speech failed'+(stderr.includes('SelectVoice')?': requested voice is unavailable':'; check doctor and your audio device');
+function readBuildIdentity(){
+ let sourceManifestSha256=null;try{sourceManifestSha256=crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT,'manifest.json'))).digest('hex');}catch{}
+ return {version:require('../../package.json').version,sourceManifestSha256};
 }
+const loadedBuildIdentity=Object.freeze(readBuildIdentity());
+function buildIdentity(){return {...loadedBuildIdentity};}
+function availability(provider,{find=findEspeak,access=fs.accessSync,helper=helperInfo}={}){
+ if(!['sapi','say','espeak-ng'].includes(provider))return {available:false,code:'native-provider-unavailable',reason:'No supported native speech provider was selected.'};
+ try{
+  if(provider==='espeak-ng')find();else{
+   if(provider==='sapi'){const info=helper();if(info.state==='blocked')return {available:false,code:info.code,reason:'Windows native helper signature or integrity was refused.'};if(info.state==='verified')return {available:true,code:'native-engine-present'};}
+   access(provider==='sapi'?powershell:'/usr/bin/say',fs.constants.F_OK);
+  }
+  return {available:true,code:'native-engine-present'};
+ }catch{return {available:false,code:'native-engine-missing',reason:provider==='espeak-ng'?'espeak-ng was not found on trusted absolute PATH entries outside this project. Install it through your OS package manager, then run doctor again.':provider==='say'?'The macOS say engine was not found. Run doctor on a supported macOS installation.':'Windows PowerShell was not found; run doctor on a supported Windows installation.'};}
+}
+function available(provider){return availability(provider).available;}
+function failureFact(stderr=''){
+ // Classify only known engine facts, never echo arbitrary stderr or supplied speech.
+ stderr=String(stderr).slice(-8192).replace(/\s+/g,' ');
+ if(/PSSecurityException|running scripts is disabled|execution polic(?:y|ies)/i.test(stderr))
+  return {code:'native-execution-policy-blocked',message:'Windows speech script was blocked by execution policy; use a reviewed signed native-helper package or an administrator-approved script policy. Dom TTS does not bypass policy.'};
+ if(/SelectVoice|\bFailed to read voice\b|\bVoice\s+[`'"].*?[`'"]\s+(?:was )?not found\b/i.test(stderr))
+  return {code:'native-voice-unavailable',message:'Native speech failed: requested voice is unavailable'};
+ // A zero exit is not proof of playback: eSpeak can swallow a PortAudio open error.
+ // Do not reject incidental ALSA warnings or generic mentions of audio/voice failure.
+ if(/\bPa_OpenStream\b\s*:?\s*(?:err\s*=\s*-\d+|[^;]*?(?:invalid device|error|failed))|\b(?:cannot|could not|failed to) open (?:the )?(?:audio|sound) (?:device|output)|\baudio_open\s*:\s*(?:error|failed)/i.test(stderr))
+  return {code:'native-audio-output-unavailable',message:'Native speech failed: audio output is unavailable; check doctor and your audio device'};
+ return null;
+}
+function failureMessage(stderr=''){return failureFact(stderr)?.message||'Native speech failed; check doctor and your audio device';}
 function runChild(command,input,context,onProgress){
  return new Promise((resolve,reject)=>{
   if(context.stopped())return resolve();
@@ -45,14 +69,33 @@ function runChild(command,input,context,onProgress){
   let cancelling=false,heartbeat;
   const disconnect=()=>{try{if(child.connected)child.disconnect();}catch{}};
   const cancel=()=>{cancelling=true;clearInterval(heartbeat);if(!child.connected)return;try{child.send({action:'stop'},error=>{if(error)disconnect();});}catch{disconnect();}};context.setChild({kill:cancel});
-  let done=false,timedOut=false,ipcError=null,heartbeatError=null,stderr='',buffer='';
+  let done=false,timedOut=false,ipcError=null,heartbeatError=null,stderr='',engineFailure=null,buffer='',discardingStdout=false;
   const timeout=()=>{if(done)return;timedOut=true;cancel();};
   let timer=setTimeout(timeout,120000);
   function finish(error){if(done)return;done=true;clearTimeout(timer);clearInterval(heartbeat);context.setChild(null);error&&!context.stopped()?reject(error):resolve();}
-  child.stderr.on('data',data=>{stderr=(stderr+data).slice(-4096);});
-  child.stdout.on('data',data=>{buffer+=data;let at;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at).trim();buffer=buffer.slice(at+1);const match=line.match(/^CHUNK (\d+)$/);if(match&&!done&&!timedOut&&!ipcError&&!heartbeatError){clearTimeout(timer);timer=setTimeout(timeout,120000);onProgress(Number(match[1]));}}});
+  child.stderr.on('data',data=>{
+   // Retain a fixed safe fact even when later diagnostics fill the bounded text window.
+   const text=String(data),priority={'native-execution-policy-blocked':3,'native-voice-unavailable':2,'native-audio-output-unavailable':1};
+   for(let i=0;i<text.length;i+=4096){stderr=(stderr+text.slice(i,i+4096)).slice(-8192);const fact=failureFact(stderr);if(fact&&(!engineFailure||priority[fact.code]>priority[engineFailure.code]))engineFailure=fact;}
+  });
+  child.stdout.on('data',data=>{
+   // Only short newline-delimited CHUNK messages are protocol. Discard oversized
+   // lines through their delimiter so arbitrary engine stdout cannot grow memory.
+   const text=String(data);let at=0;
+   while(at<text.length){const newline=text.indexOf('\n',at),end=newline<0?text.length:newline;
+    if(!discardingStdout){if(buffer.length+end-at>128){buffer='';discardingStdout=true;}else buffer+=text.slice(at,end);}
+    if(newline<0)break;
+    if(!discardingStdout){const match=buffer.trim().match(/^CHUNK (\d+)$/);if(match&&!done&&!timedOut&&!ipcError&&!heartbeatError&&Number.isSafeInteger(Number(match[1]))){clearTimeout(timer);timer=setTimeout(timeout,120000);onProgress(Number(match[1]));}}
+    buffer='';discardingStdout=false;at=newline+1;
+   }
+  });
   child.on('error',error=>{const failure=new Error(error.code==='ENOENT'?'Native speech executable is missing':'Native speech could not start');if(!child.pid)return finish(failure);ipcError=failure;cancel();});
-  child.on('exit',code=>finish(ipcError|| (timedOut?new Error('Native speech chunk exceeded 120 seconds'):code===0?null:heartbeatError||new Error(failureMessage(stderr)))));
+  // Wait for pipes to drain as well as worker exit so a final diagnostic is retained.
+  // An IPC child disconnected before start may emit exit and pipe closes without close.
+  let exited=false,exitCode,stdoutClosed=false,stderrClosed=false;
+  const settle=()=>{if(!exited||!stdoutClosed||!stderrClosed)return;const fact=engineFailure;finish(ipcError|| (timedOut?new Error('Native speech chunk exceeded 120 seconds'):exitCode===0&&!fact?null:heartbeatError||Object.assign(new Error(fact?.message||failureMessage(stderr)),{code:fact?.code||'native-playback-failed'})));};
+  child.stdout.on('close',()=>{stdoutClosed=true;settle();});child.stderr.on('close',()=>{stderrClosed=true;settle();});
+  child.on('exit',code=>{exited=true;exitCode=code;settle();});
   // A heartbeat callback can fail as a successful worker exits; its exit result is authoritative.
   heartbeat=setInterval(()=>{if(done||cancelling)return;try{child.send({action:'heartbeat'},error=>{if(error&&!done){heartbeatError=new Error('Native speech IPC failed');cancel();}});}catch{heartbeatError=new Error('Native speech IPC failed');cancel();}},1000);
   try{child.send({action:'start',command,input:input||''},error=>{if(error){ipcError=new Error('Native speech IPC failed');cancel();}});}catch{ipcError=new Error('Native speech IPC failed');cancel();}
@@ -72,6 +115,20 @@ async function play(chunks,options,context){
 function voices(provider){
  let helper;if(provider==='sapi'){helper=helperInfo();if(helper.state==='blocked')throw new Error('Windows native helper signature or integrity was refused');}
  const command=provider==='sapi'?(helper.state==='verified'?{file:helper.file,args:['--voices']}:{file:powershell,args:['-NoProfile','-Command',"Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $s.GetInstalledVoices() | ForEach-Object { $_.VoiceInfo.Name } } finally { $s.Dispose() }"]}):provider==='say'?{file:'/usr/bin/say',args:['-v','?']}:{file:findEspeak(),args:['--voices']};
- const result=spawnSync(command.file,command.args,{encoding:'utf8',windowsHide:true,timeout:10000,env:safeEnv()});if(result.error||result.status!==0)throw new Error('Voice discovery failed');return result.stdout.trim().split(/\r?\n/).filter(Boolean);
+ const result=spawnSync(command.file,command.args,{encoding:'utf8',windowsHide:true,timeout:10000,maxBuffer:262144,env:safeEnv()});if(result.error||result.status!==0)throw new Error('Voice discovery failed');return parseVoices(provider,result.stdout);
 }
-module.exports={selectProvider,commandFor,available,play,voices,runChild,failureMessage,findEspeak};
+function parseVoices(provider,stdout=''){
+ const names=[];
+ for(const line of String(stdout).slice(0,262144).split(/\r?\n/)){
+  let name;
+  if(provider==='espeak-ng'){
+   // eSpeak's File column is its selectable voice identifier, not the padded display row.
+   const match=line.trim().match(/^\d+\s+\S+\s+\S+\s+\S+\s+([a-z0-9_+./-]+)(?:\s|$)/i);name=match?.[1];
+  }else if(provider==='say')name=line.match(/^(.+?)\s+[a-z]{2,3}_(?:[a-z]{2}|\d{3})(?:\s|$)/i)?.[1].trim();
+  else if(provider==='sapi')name=line.trim();
+  if(name&&!names.includes(name))names.push(name);
+  if(names.length>=2048)break;
+ }
+ return names;
+}
+module.exports={selectProvider,commandFor,available,availability,buildIdentity,play,voices,parseVoices,runChild,failureMessage,failureFact,findEspeak};

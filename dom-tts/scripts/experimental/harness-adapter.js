@@ -4,18 +4,21 @@ const sourceId=value=>typeof value==='string'&&value.length>0&&value.length<=256
 const stableId=value=>/^[\w.-]{1,128}$/.test(value)?value:'host-'+createHash('sha256').update(value).digest('hex');
 const SOURCES=['codex-exec','codex-app-server','claude-stop','openclaw-message-sent'];
 class HarnessAdapter{
- constructor({source,selectedSessions,emit,maxBytes=65536,maxTurns=64}={}){
+ constructor({source,selectedSessions,emit,maxBytes=65536,maxTurns=64,canRetire=()=>true}={}){
   if(!SOURCES.includes(source)||!Array.isArray(selectedSessions)||!selectedSessions.length||selectedSessions.length>32||selectedSessions.some(id=>!sourceId(id))||typeof emit!=='function')throw Error('explicit host and selected sources required');
   if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>1048576||!Number.isSafeInteger(maxTurns)||maxTurns<1||maxTurns>128)throw Error('invalid host bounds');
-  Object.assign(this,{source,maxBytes,maxTurns,emit});this.sessions=new Set(selectedSessions);this.selectedSessionIds=selectedSessions.map(stableId);this.turns=new Map();this.execSession=null;this.execCount=0;this.hooks=new Map();
+  if(typeof canRetire!=='function')throw Error('invalid retirement callback');
+  Object.assign(this,{source,maxBytes,maxTurns,emit,canRetire});this.sessions=new Set(selectedSessions);this.selectedSessionIds=selectedSessions.map(stableId);this.turns=new Map();this.retired=new Map();this.execSession=null;this.execCount=0;this.hooks=new Map();
  }
  text(value){if(typeof value!=='string'||Buffer.byteLength(value,'utf8')>this.maxBytes)throw Error('host text refused');return value;}
- turn(session,id){if(!sourceId(id))throw Error('invalid host turn');const key=JSON.stringify([session,id]);let turn=this.turns.get(key);if(!turn){if(this.turns.size>=this.maxTurns)throw Error('host history limit');turn={session,id,messages:new Map(),state:'active',bytes:0};this.turns.set(key,turn);}return turn;}
+ historyKey(key){return createHash('sha256').update(key).digest('hex');}
+ trimHistory(){for(const [key,turn]of this.turns){if(this.turns.size<this.maxTurns)break;if(!['complete','cancelled'].includes(turn.state))continue;let safe=false;try{safe=this.canRetire(turn)===true;}catch{}if(!safe)continue;this.retired.set(this.historyKey(key),this.hooks.get(key)||null);while(this.retired.size>256)this.retired.delete(this.retired.keys().next().value);this.hooks.delete(key);this.turns.delete(key);}}
+ turn(session,id){if(!sourceId(id))throw Error('invalid host turn');const key=JSON.stringify([session,id]);let turn=this.turns.get(key);if(!turn){if(this.retired.has(this.historyKey(key)))throw Error('host history expired');this.trimHistory();if(this.turns.size>=this.maxTurns)throw Error('host history limit');turn={session,id,messages:new Map(),state:'active',bytes:0};this.turns.set(key,turn);}return turn;}
  message(turn,id){if(!sourceId(id))throw Error('invalid host item');let message=turn.messages.get(id);if(!message){if(turn.messages.size>=64)throw Error('host message limit');message={id,sequence:0,started:false,text:'',final:null};turn.messages.set(id,message);}return message;}
  event(turn,message,kind,text){const event={schema:'dom-tts-text/1',role:'assistant',phase:'final_answer',format:'markdown',sessionId:stableId(turn.session),turnId:stableId(turn.id),generationId:stableId(turn.id),messageId:stableId(message.id),kind,sequence:message.sequence++,...(text===undefined?{}:{text})};return this.emit(event);}
  start(turn,message){if(!message.started){message.started=true;this.event(turn,message,'start');}}
  retain(turn,message,text){text=this.text(text);const bytes=turn.bytes-Buffer.byteLength(message.text,'utf8')+Buffer.byteLength(text,'utf8');if(bytes>this.maxBytes)throw Error('host retained-text limit');turn.bytes=bytes;message.text=text;}
- completeTurn(turn,success){if(turn.state!=='active')throw Error('host turn already settled');turn.state=success?'complete':'cancelled';for(const message of turn.messages.values()){if(success&&message.final!==null){this.start(turn,message);this.event(turn,message,'complete',message.final);}else if(message.started)this.event(turn,message,'cancel');message.text='';message.final=null;}turn.bytes=0;}
+ completeTurn(turn,success){if(turn.state!=='active')throw Error('host turn already settled');turn.state='settling';try{for(const message of turn.messages.values()){if(success&&message.final!==null){this.start(turn,message);this.event(turn,message,'complete',message.final);}else if(message.started)this.event(turn,message,'cancel');}turn.state=success?'complete':'cancelled';}catch(error){turn.state='failed';throw error;}finally{for(const message of turn.messages.values()){message.text='';message.final=null;}turn.bytes=0;}}
  accept(record){if(!record||typeof record!=='object'||Array.isArray(record))throw Error('host event required');if(this.source==='codex-exec')return this.codexExec(record);if(this.source==='codex-app-server')return this.codexServer(record);return this.hook(record);}
  codexExec(record){
   if(record.type==='thread.started'){if(!sourceId(record.thread_id)||!this.sessions.has(record.thread_id)||this.execSession)throw Error('selected exec thread required');this.execSession=record.thread_id;return {state:'selected'};}
@@ -36,7 +39,7 @@ class HarnessAdapter{
  codexServer(record){
   if(typeof record.method!=='string'||!record.params||typeof record.params!=='object')return {state:'ignored'};
   const p=record.params;if(!sourceId(p.threadId)||!this.sessions.has(p.threadId))return {state:'ignored'};
-  if(record.method==='turn/started'){if(!sourceId(p.turn?.id))throw Error('host turn identity required');this.turn(p.threadId,p.turn.id);return {state:'started'};}
+  if(record.method==='turn/started'){if(!sourceId(p.turn?.id))throw Error('host turn identity required');const key=JSON.stringify([p.threadId,p.turn.id]),previous=this.turns.get(key);if(previous)return {state:'duplicate'};if(this.retired.has(this.historyKey(key)))return {state:'ignored',code:'host-history-retired'};this.turn(p.threadId,p.turn.id);return {state:'started'};}
   const turnId=p.turnId||p.turn?.id;if(!sourceId(turnId))return {state:'ignored'};
   const turn=this.turns.get(JSON.stringify([p.threadId,turnId]));if(!turn||turn.state!=='active')return {state:'ignored'};
   if(record.method==='turn/completed'){if(!['completed','failed','interrupted'].includes(p.turn?.status))throw Error('unsupported turn outcome');this.completeTurn(turn,p.turn.status==='completed');return {state:turn.state};}
@@ -55,9 +58,10 @@ class HarnessAdapter{
  hook(record){
   let session,messageId,text;
   if(this.source==='claude-stop'){
-   if(record.hook_event_name!=='Stop'||record.stop_hook_active===true)return {state:'ignored'};
+   if(record.hook_event_name!=='Stop')return {state:'ignored',code:'hook-event-not-selected'};
    session=record.session_id;if(!this.sessions.has(session))return {state:'ignored'};
-   if(record.stop_hook_active!==false)throw Error('explicit Stop state required');text=this.text(record.last_assistant_message);
+   if(typeof record.stop_hook_active!=='boolean')return {state:'ignored',code:'hook-stop-state-missing'};
+   if(typeof record.last_assistant_message!=='string')return {state:'ignored',code:'hook-final-text-missing'};text=this.text(record.last_assistant_message);
    // Claude Stop does not expose a turn/message id. One invocation is one event;
    // no durable exactly-once claim across separately invoked hook processes.
    messageId='stop-'+(++this.execCount);
@@ -67,13 +71,17 @@ class HarnessAdapter{
    messageId=record.context.messageId;if(!sourceId(messageId))throw Error('delivery message identity required');text=this.text(record.context.content);
    const key=JSON.stringify([session,messageId]),hash=createHash('sha256').update(text).digest('hex');
    if(this.hooks.has(key)){if(this.hooks.get(key)!==hash)throw Error('conflicting hook replay');return {state:'duplicate'};}
-   if(this.hooks.size>=this.maxTurns)throw Error('hook history limit');this.hooks.set(key,hash);
+   if(this.retired.has(this.historyKey(key))){if(this.retired.get(this.historyKey(key))!==hash)throw Error('conflicting hook replay');return {state:'duplicate',code:'hook-history-retired'};}
+   if(!text.trim())return {state:'ignored',code:'hook-final-text-empty'};
+   // Reserve a live turn before recording its fingerprint. Failed emissions stay
+   // retained and cannot be evicted to admit a later event.
+   this.turn(session,messageId);this.hooks.set(key,hash);
   }
-  if(!text.trim())return {state:'ignored'};
+  if(!text.trim())return {state:'ignored',code:'hook-final-text-empty'};
   const turn=this.turn(session,messageId),message=this.message(turn,messageId);message.final=text;this.completeTurn(turn,true);return {state:'admitted'};
  }
  finish(){return this.status();}
  revoke(){for(const turn of this.turns.values())if(turn.state==='active')this.completeTurn(turn,false);}
- status(){return {source:this.source,turns:this.turns.size,unfinished:[...this.turns.values()].filter(t=>t.state==='active').length,cancelledTurns:[...this.turns.values()].filter(t=>t.state==='cancelled').length,retainedBytes:[...this.turns.values()].reduce((n,t)=>n+t.bytes,0)};}
+ status(){return {source:this.source,turns:this.turns.size,retiredTurns:this.retired.size,unfinished:[...this.turns.values()].filter(t=>['active','settling','failed'].includes(t.state)).length,cancelledTurns:[...this.turns.values()].filter(t=>t.state==='cancelled').length,retainedBytes:[...this.turns.values()].reduce((n,t)=>n+t.bytes,0)};}
 }
 module.exports={HarnessAdapter,SOURCES,stableId};

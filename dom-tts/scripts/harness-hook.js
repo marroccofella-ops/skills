@@ -1,13 +1,19 @@
 // One explicitly selected host hook payload on stdin; never a transcript watcher.
-const {parseCli}=require('./runtime');const {admitHook}=require('./experimental/harness-hook');
-async function main(){
- const args=parseCli(process.argv.slice(2),{},['source','sessions','dryRun']);if(!['claude-stop','openclaw-message-sent'].includes(args.source)||!args.sessions)throw Error('explicit supported hook source and sessions required');
- let bytes=0,chunks=[];for await(const chunk of process.stdin){bytes+=chunk.length;if(bytes>65536)throw Error('hook payload too large');chunks.push(chunk);}
- const raw=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks));const record=JSON.parse(raw);
- const result=await admitHook(record,{source:args.source,selectedSessions:args.sessions.split(','),dryRun:args.dryRun===undefined?false:args.dryRun});
- // Claude consumes stdout as hook protocol. An empty object leaves its decision
- // unchanged; sanitized delivery metadata goes to stderr for the operator.
- process.stdout.write('{}\n');process.stderr.write(JSON.stringify(result)+'\n');
+const {parseCli}=require('./runtime');const {admitHook,HOOK_PAYLOAD_BYTES}=require('./experimental/harness-hook');
+async function main({argv=process.argv.slice(2),stdin=process.stdin,stdout=process.stdout,stderr=process.stderr,admit=admitHook}={}){
+ let result;
+ try{
+  let args;try{args=parseCli(argv,{},['source','sessions','dryRun']);if(!['claude-stop','openclaw-message-sent'].includes(args.source)||!args.sessions)throw Error();}catch{throw Error('hook-options-invalid');}
+  let bytes=0,chunks=[];for await(const chunk of stdin){const value=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);bytes+=value.length;if(bytes>HOOK_PAYLOAD_BYTES)throw Error('hook-payload-too-large');chunks.push(value);}
+  let raw;try{raw=new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks));}catch{throw Error('hook-payload-invalid-utf8');}chunks=[];
+  if(!raw.trim())result={state:'skipped',code:'hook-empty-input',audio:false};
+  else{let record;try{record=JSON.parse(raw);}catch{throw Error('hook-payload-invalid-json');}
+   result=await admit(record,{source:args.source,selectedSessions:args.sessions.split(','),dryRun:args.dryRun===undefined?false:args.dryRun});
+  }
+ }catch(error){const known=new Set(['hook-options-invalid','hook-payload-too-large','hook-payload-invalid-utf8','hook-payload-invalid-json']);result={state:'failed',code:known.has(error?.message)?error.message:'hook-admission-refused',audio:false};}
+ // Always leave the host's decision unchanged, including unavailable speech.
+ // Failures are typed metadata, never a blocking decision or raw exception.
+ stdout.write('{}\n');stderr.write(JSON.stringify(result)+'\n');return result;
 }
-if(require.main===module)main().catch(()=>{process.stdout.write('{}\n');console.error('Selected speech hook was refused. Written assistant output remains available.');process.exitCode=1;});
+if(require.main===module)main();
 module.exports={main};

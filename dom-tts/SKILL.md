@@ -68,7 +68,9 @@ Commentary additionally requires `--phase all --include-commentary true`.
 No global session scan. Ctrl+C ends watching. Stop suppresses new watcher batches
 until an explicit watcher restart. Do not claim microphone, barge-in or Duplex.
 
-Speech uses local engines; no cloud TTS or model calls. macOS/Linux playback has
+This read-aloud route uses local engines; no cloud TTS or model calls. The separately
+opted-in voice studio has its own recording and remote-request consent requirements;
+this skill's read-aloud instructions do not authorize those activities. macOS/Linux playback has
 not yet been audibly certified on native machines. Inspect COMPATIBILITY.md.
 Runtime state is private and separate from the skill; do not share it.
 `node scripts/support-bundle.js` exports a sanitized diagnostics.json, never

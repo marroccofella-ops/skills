@@ -36,7 +36,8 @@ async function playback(options,{dir=stateDir,play=native.play,privacy=ensurePri
  if(abortSignal?.aborted)throw new Error('Playback cancelled before start');
  privacy(dir);const lock=path.join(dir,'playback.lock'),status=path.join(dir,'status.json'),token=crypto.randomBytes(16).toString('hex');
  const previousStop=stopValue(dir),start=Date.now();let acquired=false,child=null,stopped=false,server;
- const setStatus=patch=>writeObject(status,{...patch,updatedAt:new Date().toISOString()});
+ const playbackBuild=native.buildIdentity();
+ const setStatus=patch=>writeObject(status,{...patch,playbackBuild,updatedAt:new Date().toISOString()});
  while(!acquired){if(abortSignal?.aborted)throw new Error('Playback cancelled before start');try{const fd=fs.openSync(lock,'wx',0o600);try{fs.writeFileSync(fd,JSON.stringify({pid:process.pid,token}));}finally{fs.closeSync(fd);}acquired=true;}catch(error){if(error.code!=='EEXIST')throw error;const seen=inspectLock(dir);if(seen.state==='stale'){recoverStale(dir);continue;}if(seen.state==='malformed')throw new Error('Malformed playback lock needs manual inspection; run status.js');if(Date.now()-start>=options.waitMs)throw new Error('Another playback owns the lock; retry or use --wait-ms');if(stopValue(dir)!==previousStop)throw new Error('Playback stopped while waiting');await new Promise(r=>setTimeout(r,100));}}
  const requestStop=()=>{stopped=true;if(child)child.kill();};
  const signal=()=>requestStop();process.on('SIGINT',signal);process.on('SIGTERM',signal);

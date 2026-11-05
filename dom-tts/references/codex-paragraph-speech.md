@@ -106,6 +106,13 @@ The documented [lifecycle hooks](https://learn.chatgpt.com/docs/hooks) also do n
 provide an assistant-message paragraph/delta hook. These sources do not establish
 a supported way for a skill to attach to all existing Codex Desktop chat streams.
 
+The 5 November 2026 documentation recheck also found manually installed
+[plugin lifecycle hooks](https://developers.openai.com/plugins/build/plugins),
+but no documented Desktop-wide assistant paragraph/delta event. `Stop` supplies
+`last_assistant_message`; model-request hooks supply diagnostic outcomes rather
+than response deltas. This is a limit of the verified integration routes, not a
+claim that future host support is impossible.
+
 Accordingly this machine's existing final notifier can remain active, and supplied
 progress paragraphs can continue. Automatic paragraph forwarding across every
 Desktop chat requires the host to expose or install the live callback above. Do

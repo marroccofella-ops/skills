@@ -2,7 +2,7 @@
 
 Local speech for coding assistants by **Prof Dom Marrocco / 42.uk**.
 
-Version **0.5.0-rc.3** is an unreleased source candidate adding Windows product/version metadata. The last public release is **0.5.0-rc.2**. The common interface is
+Version **0.5.0-rc.4** is an unreleased source candidate repairing speech boundaries, long-session delivery and publisher checks. The last public release is **0.5.0-rc.2**. The common interface is
 model-independent: any harness that can run a command can pass text through
 stdin, a UTF-8 file, or --text. Agent Skills hosts can discover SKILL.md.
 
@@ -27,12 +27,22 @@ node scripts/speak.js --dry-run --text=--verbose
 node scripts/stop.js
 node scripts/status.js
 npm test
+npm run test:all
 ```
+
+`npm test` runs the core corpus and smoke checks. `npm run test:all` first verifies
+the committed source manifest, then runs the complete portable CI regression plan,
+including Windows-only boundary checks on Windows. The permission probe is also
+run locally as a diagnostic. It does not perform audible certification, launch the
+tray/setup UI, configure signing or use the microphone. Windows checks can take
+many minutes because permission checks are deliberately uncached.
 
 The speech provider is selected from the operating system:
 Windows SAPI, macOS /usr/bin/say (Intel or Apple Silicon), Linux espeak-ng.
-Linux requires the native engine to be installed separately. No hidden downloads,
-cloud providers or API keys. Use --voice with an installed voice from doctor.
+Linux requires the native engine to be installed separately. These native and
+browser speech routes use local engines with no hidden downloads or API keys.
+The separately enabled optional studio can use cloud services; see its consent
+requirements below. Use --voice with an installed voice from doctor.
 An invalid voice fails visibly. WSL is treated as Linux; it needs a working Linux
 audio route. Other operating systems receive an unsupported-platform error.
 
@@ -88,7 +98,9 @@ node scripts/install.js --target codex --action uninstall
 ```
 
 The source manifest contains SHA-256 hashes and excludes runtime state, settings,
-reviews and recordings. The installer validates it, stages source in a private
+reviews and recordings. Packaging uses the reviewed `source-files.json` list and
+refuses unexpected files in its source roots before reading their contents. The
+manifest is an integrity receipt, not a publisher signature. The installer validates it, stages source in a private
 directory and replaces only its own managed dom-tts directory. An existing
 unmanaged directory is refused. Upgrades retain a previous snapshot and preserve
 valid per-machine settings. Uninstall moves the installed snapshot to the private
@@ -165,6 +177,7 @@ The source archive now includes the managed crash-recovery installer, native Win
 - [Named supplied-event interfaces](references/harness-integrations.md) remain opt-in. Their fixture coverage does not certify an absent live product or automatic Desktop attachment.
 - [Optional voice studio](references/optional-voice-studio.md) has separate local recording and remote request consent. Its cloud routes require operator-provided credentials and explicit provider/model selection. No cloud credentials or settings are packaged.
 - Windows native speech, tray and setup builders require reviewed trusted signing inputs. This release contains source, not signed executable components. `node scripts/prepare-windows-release.js --check true` reports the missing inputs honestly.
+- Publisher pins are reviewed source policy, not adjacent receipt or environment settings. The policy is currently empty, so compiled components remain refused. Actual PE product name and exact informational version must also match. New tray login registration is disabled until a managed startup trust design is implemented; a reviewed trusted tray retains commands to inspect or remove its owned entry.
 - Installer `--action recover --dry-run` previews an interrupted managed transaction. It does not terminate a recorded process or overwrite an ambiguous installation.
 
 The preferred browser speech remains local and separate from the dormant optional studio. See [release scope and acceptance](references/release-candidate.md).

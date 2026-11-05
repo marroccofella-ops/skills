@@ -1,5 +1,6 @@
 const assert=require('node:assert/strict'),http=require('node:http');
 const {createSession}=require('../scripts/experimental/browser-session'),{request}=require('../scripts/browser-speak');
+const {proofMac,PROOF_ROUTE,PROOF_SCHEMA}=require('../scripts/experimental/browser-client');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 async function main(){
  const session=createSession(),client='e'.repeat(32);session.enable({client,voice:'Hélène',rate:.9});await new Promise(r=>session.server.listen(0,'127.0.0.1',r));const conn={port:session.server.address().port,token:session.token};
@@ -12,8 +13,8 @@ async function main(){
   const fresh=await request(conn,'/api/speak',{text:'Fresh explicit request.'});assert.equal(session.poll({client}).text,'Fresh explicit request.');session.accept({client,id:fresh.id,state:'completed',startObserved:true,elapsedMs:1,localService:true});
  }finally{session.close();session.server.closeAllConnections?.();await new Promise(r=>session.server.close(r));}
  // The CLI response reader also preserves split UTF-8 and refuses malformed UTF-8.
- let invalid=false;const responseServer=http.createServer((req,res)=>{const body=invalid?Buffer.from([0x7b,0x22,0xc3,0x28,0x22,0x7d]):Buffer.from(JSON.stringify({voice:'Hélène'}));const at=invalid?3:body.indexOf(Buffer.from('é'))+1;res.writeHead(200,{'Content-Type':'application/json'});res.write(body.subarray(0,at));setTimeout(()=>res.end(body.subarray(at)),20);});await new Promise(r=>responseServer.listen(0,'127.0.0.1',r));
- try{const connection={port:responseServer.address().port,token:'fixture'};assert.equal((await request(connection,'/api/status')).voice,'Hélène');invalid=true;await assert.rejects(request(connection,'/api/status'));}finally{await new Promise(r=>responseServer.close(r));}
+ let invalid=false;const responseToken='f'.repeat(64);const responseServer=http.createServer(async(req,res)=>{if(req.url===PROOF_ROUTE){let text='';for await(const part of req)text+=part;const {nonce,intentTick}=JSON.parse(text),port=responseServer.address().port;res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({schema:PROOF_SCHEMA,nonce,intentTick,port,mac:proofMac(responseToken,nonce,port,intentTick)}));return;}const body=invalid?Buffer.from([0x7b,0x22,0xc3,0x28,0x22,0x7d]):Buffer.from(JSON.stringify({voice:'Hélène'}));const at=invalid?3:body.indexOf(Buffer.from('é'))+1;res.writeHead(200,{'Content-Type':'application/json'});res.write(body.subarray(0,at));setTimeout(()=>res.end(body.subarray(at)),20);});await new Promise(r=>responseServer.listen(0,'127.0.0.1',r));
+ try{const connection={port:responseServer.address().port,token:responseToken};assert.equal((await request(connection,'/api/status')).voice,'Hélène');invalid=true;await assert.rejects(request(connection,'/api/status'));}finally{await new Promise(r=>responseServer.close(r));}
  console.log('PASS: actual loopback split UTF-8 in both directions, malformed UTF-8 refusal, Stop cancels incomplete upload, fresh explicit request; injected receipts, no audio claim.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

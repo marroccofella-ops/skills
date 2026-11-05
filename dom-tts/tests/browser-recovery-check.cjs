@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {createSession}=require('../scripts/experimental/browser-session');
 const source=fs.readFileSync(path.resolve(__dirname,'../assets/browser/screen.js'),'utf8');
-const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
+const {attach,flush}=require('./fixtures/browser-rpc-transport.cjs');
 function fixture(){
  let clock=0,current=null,plays=0;const session=createSession({leaseMs:30,now:()=>clock}),calls=[],timers=[],events={},faults={poll:0,terminalAfterAccept:0,network:false,auth:false};
  const nodes=new Map(['voice','rate','enable','stop','disable','status','receipt'].map(id=>[id,{value:id==='rate'?'1.8':'',disabled:false,textContent:'',listeners:{},addEventListener(k,fn){this.listeners[k]=fn;},replaceChildren(){this.value='';},append(v){this.value||=v.value;}}]));
@@ -12,12 +12,12 @@ function fixture(){
   if(route==='/api/preferences')value={voice:'David',rate:1.8};
   else if(route==='/api/enable')value=session.enable(data);
   else if(route==='/api/disable')value=session.disable(data);
-  else if(route==='/api/stop'){session.queue.command('stop');value=session.stop();}
+  else if(route==='/api/stop'){value=session.globalStop();}
   else if(route==='/api/poll'){if(faults.poll>0){faults.poll--;timeout();}value=session.poll(data);}
   else if(route==='/api/receipt'){value=session.accept(data);if(data.state!=='speaking'&&faults.terminalAfterAccept>0){faults.terminalAfterAccept--;timeout();}}
   else throw Error('Unexpected fixture route');return {ok:true,json:async()=>value};
  }};
- vm.runInNewContext(source,context);
+ attach(context,context.fetch,{getEpoch:()=>session.status().stopEpoch});vm.runInContext(source,context);
  return {session,calls,timers,events,faults,nodes,engine,advance:ms=>clock+=ms,plays:()=>plays,async enable(){await flush();const pending=nodes.get('enable').listeners.click();engine.finish();await pending;await flush();},async tick(){const t=timers.shift();assert(t);assert(t.ms<=10000);await t.fn();await flush();},close:()=>session.close()};
 }
 (async()=>{

@@ -1,0 +1,24 @@
+# Local settings, runtime state, test outputs and captured audio never belong in source.
+state/
+.local-test/
+assets/settings.json
+node_modules/
+.env
+.env.*
+*.log
+*.tmp
+*.zip
+*.wav
+*.mp3
+*.ogg
+*.webm
+*.exe
+*.dll
+*.pdb
+*.pem
+*.key
+*.pfx
+*.p12
+**/release.json
+__pycache__/
+*.pyc

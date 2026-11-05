@@ -1,18 +1,22 @@
 {
   "schema": "dom-tts-source/1",
-  "version": "0.5.0-rc.3",
+  "version": "0.5.0-rc.4",
   "files": [
     {
+      "path": ".gitignore",
+      "sha256": "5cb9d6bdb8abc0f7551844c4f6516ba02f683c141c2540a47f19fa449a49181e"
+    },
+    {
       "path": "CHANGELOG.md",
-      "sha256": "f7e92c6f9bc28a6ce6014c5a6d4a1da754cfb32206c4e0e12544a886b7238722"
+      "sha256": "0710ed63888dd5c9a084957fe0be08424c4932e73f8de7dd6806f7fcf19a17ad"
     },
     {
       "path": "COMPATIBILITY.md",
-      "sha256": "78f4b8fbcae771d8edf592bf3a8b34091b9d1108cd43dd1002ae2b6f5e7810dc"
+      "sha256": "e940f394fa9871847869e2573e18fe7a76273d9419262f4e07833db32bf2fd9a"
     },
     {
       "path": "EVOLUTION.md",
-      "sha256": "32784e62846562d9e01ae7a134a0ea824619ffc4d9a1280264ac12a1f9b89d02"
+      "sha256": "050684ab32bc94a041c9046da387c18aeddf01fd44765c7ddbf09ef38828e404"
     },
     {
       "path": "LICENSE",
@@ -20,27 +24,31 @@
     },
     {
       "path": "README.md",
-      "sha256": "2a643dc51ec96bcc5c0ed9ed79c57045b682c68346fb578c105df35f206b6b42"
+      "sha256": "b4cffea4fdc05d0b042c35c67a2c253401b8e222d1edb7b0259a924fd5909fd1"
     },
     {
       "path": "SKILL.md",
-      "sha256": "f050a149f3cb6bf6688c61e7f0b550e34e491880a594c2d2388e0adb9463a7b4"
+      "sha256": "32dc3b32e17683fdb00bcc81fb1a7223a6cb2199a1ef4cf11d999520e4b17c0e"
     },
     {
       "path": "assets/browser/browser.html",
-      "sha256": "72487b654212462041f8d7a990409e3f784483f50f3e7e82de736a86dd6335b1"
+      "sha256": "2e2a13ca8d3164d323b64c7d7795e3525eadaf414c37942daa688c1595ca1b3a"
     },
     {
       "path": "assets/browser/player.js",
-      "sha256": "1d8442104168cf3cf3c4b7c79d71fe96d216b0325b82f2782af5afbaa6731e1f"
+      "sha256": "b141fee556b77a89b8be2390ae8789192ce770100fc51fa7bf6739a842954c57"
     },
     {
       "path": "assets/browser/queue-screen.js",
       "sha256": "4f109aa117b516fe4837c530169bddfd33df8762d8e300d040e5439f242148c9"
     },
     {
+      "path": "assets/browser/rpc.js",
+      "sha256": "56f8ef23c27b7289d56999b994749bbf8d63285bebc0ec6e728a27d662c95297"
+    },
+    {
       "path": "assets/browser/screen.js",
-      "sha256": "e324db7e15a1bf30da1cd7a3f4c9c2ebb52c7c251dcbec263856eb745c5a3c78"
+      "sha256": "18ae38538bee03e1bbee7e09164905895b70209658b82fedc05e9d5b43f51284"
     },
     {
       "path": "assets/browser/style.css",
@@ -80,11 +88,11 @@
     },
     {
       "path": "package.json",
-      "sha256": "df6fec4213ec268c278a28aae45605d4109a05e1df5b7bc6d7fa006750f8fea0"
+      "sha256": "c08339b0345cba23da7dd1a0d857d2bbf27ca7198707cf2add3e9743334e04ac"
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "0c80f0eaf94fbd98df225ee22f89dabb861540b919f57386c6acee39397b7c41"
+      "sha256": "c6ba7b57f990a660607e750e63ef2f71fa072b7526b7fd17daadee5e595b425d"
     },
     {
       "path": "references/codex-default-speech.md",
@@ -92,11 +100,11 @@
     },
     {
       "path": "references/codex-paragraph-speech.md",
-      "sha256": "3f2d60374ee0642594978998cb6b9b14a3f8e9b70c295b26c7755c5f8a7684e1"
+      "sha256": "0ce27b370ba63f04a6af36ac1e43d4bac68494ba2e83e6f57ecc9ad4d71fc840"
     },
     {
       "path": "references/harness-integrations.md",
-      "sha256": "e98cd0bf6f282af46226e4034b94d2b768196d3b865c1c46ef38cc1370da6dca"
+      "sha256": "ec2349c893044d152a4dfc307b2d249f61d97c5f10775d91166328aaa2f9e6b4"
     },
     {
       "path": "references/optional-voice-studio.md",
@@ -104,11 +112,11 @@
     },
     {
       "path": "references/progressive-replies.md",
-      "sha256": "867fd93a817dfb65305ad15f93adc31eaa850c55cc5c10b4cec940c449ea7c30"
+      "sha256": "aa518921affc8ee044f857368036b088272e26a97213d946d882213c96fae16f"
     },
     {
       "path": "references/release-candidate.md",
-      "sha256": "539632516ca379d994407a896e52cdf13d5ee8b800ff559ce315ea1c0f0ad88f"
+      "sha256": "cfc223cba6b151769d1895051a7f875237a95a06c36d0aa645adaf81b8411a56"
     },
     {
       "path": "scripts/avatar-state.js",
@@ -116,19 +124,23 @@
     },
     {
       "path": "scripts/browser-speak.js",
-      "sha256": "6f35555b7f9812d0b00d0f978b8436dab33e7b3e8ab1ff0179f9984ba6256917"
+      "sha256": "d2880bcd6e386c6e69114658654beb8bb410c839d04b56721f95a80b19a74c26"
     },
     {
       "path": "scripts/build-native.js",
-      "sha256": "f97a6eb44b2dd7df7f7b9215b9d9780308ad11759fd07be0d38fbaac297579ce"
+      "sha256": "3052d06b229759ca36e09a2c47c95e8c7509977754c62aa8d11d7e7ec64d6169"
     },
     {
       "path": "scripts/build-windows-setup.js",
-      "sha256": "338d9c3484f0026bba60c934d3062684345d315fb2764e66d23cf6fbb9e4d798"
+      "sha256": "bd2fe0e526b36304cab8fbbe633dbb2d5e74fbcf942563edaff859ea2658b4f3"
     },
     {
       "path": "scripts/build.js",
       "sha256": "c197adc78d9daa4183fb2dc42fa8bd1ebc95f2fbd2fe01eeea9dfbf8125cbd33"
+    },
+    {
+      "path": "scripts/check-all.js",
+      "sha256": "37be5966200c1aedd6e2b8d74f00da6d4d6c36fcf4523b5dd4568e4880f25ed8"
     },
     {
       "path": "scripts/child-process-diagnostics.js",
@@ -148,7 +160,11 @@
     },
     {
       "path": "scripts/doctor.js",
-      "sha256": "d64580bbe9262571f7a8e951bfdbdff7d81e0bc9db8a85355538968bc3ef7ee4"
+      "sha256": "75d026bcb104413eda81169f17fe9538eaef2e3c4a1a34c95fff0f4258bc75a0"
+    },
+    {
+      "path": "scripts/experimental/browser-client.js",
+      "sha256": "d77077655b2ffb8c0584a8df813592e2276ad5608bc0bb337b2ba549bf48c187"
     },
     {
       "path": "scripts/experimental/browser-owner.js",
@@ -156,15 +172,19 @@
     },
     {
       "path": "scripts/experimental/browser-player.js",
-      "sha256": "47ca65c231df769bd1c27a18e0eb822c58b4fe7d65a066e2a9568964e60b778a"
+      "sha256": "671087ec2e70c1682471d4c159d186c6a5492af85889e17dcf9402d0b8052bbf"
     },
     {
       "path": "scripts/experimental/browser-queue.js",
-      "sha256": "b38729239c916c836283e2bb7141a2a78d8ac8ff9a603683a58063dbc6604897"
+      "sha256": "0f7dae9101685d2f656fa808186fce476c811dcb15f6154ff8d48c449b141eff"
+    },
+    {
+      "path": "scripts/experimental/browser-rpc.js",
+      "sha256": "401240c2b0c610942a0afd0231b795c127cf572a4c8548b1c729505eab86259d"
     },
     {
       "path": "scripts/experimental/browser-session.js",
-      "sha256": "22a4da7fca19aa7e42489eac8e95afbcec41985fe812d1f30e7aa2abba56358b"
+      "sha256": "e9a71a453562a668289ba3ebd15af3b29215ce24cbe13a47dc02252b38abe3ff"
     },
     {
       "path": "scripts/experimental/control-server.js",
@@ -172,7 +192,7 @@
     },
     {
       "path": "scripts/experimental/delta-narrator.js",
-      "sha256": "5ed446d8b39251882d0519832fc45efdd9daa9f33de3fc3ea8d5e828b2244ba6"
+      "sha256": "313b96a2bfd78840a8f24f4945a4c842b7d5f950b648b0709a6005fb2502c882"
     },
     {
       "path": "scripts/experimental/event-framer.js",
@@ -180,15 +200,15 @@
     },
     {
       "path": "scripts/experimental/harness-adapter.js",
-      "sha256": "8720cf12c1b114e02d8f8f7893bb9918d69c90df8d48a1303b4af404ed785e53"
+      "sha256": "5fa82a5fef46f39b50c409e34d2a55268df03d154bb7ccdd45a5710d926405eb"
     },
     {
       "path": "scripts/experimental/harness-hook.js",
-      "sha256": "3c2bb0a04b2f89bf4fa84b959bb0f23d4440516aa8f6fa0b557bea3d0f783ba5"
+      "sha256": "34a02def3cc7804970cd11402b69192ace3dc5b4395ea63afe9c247e6b261dc3"
     },
     {
       "path": "scripts/experimental/harness-observer.js",
-      "sha256": "890b03e8171757b8de168f14d98595ef54e05b9478c067005a6467f6b2e06997"
+      "sha256": "c8e80305a43e86d85aece58e49b54db7826afd9c8ed884f831ee1f8d22bbbd2c"
     },
     {
       "path": "scripts/experimental/isolated-errors.js",
@@ -212,7 +232,7 @@
     },
     {
       "path": "scripts/experimental/openclaw-hook.js",
-      "sha256": "db9e9f37d529ed9b0ff30b3fac49b8b98398c031f4c7de01749562fd838da1e5"
+      "sha256": "c6c599ee7d3b2a6c803185f25f7c1ed36a8fa59dc712233a790ba3cf353b1a83"
     },
     {
       "path": "scripts/experimental/optional-voice-provider.js",
@@ -232,7 +252,7 @@
     },
     {
       "path": "scripts/harness-hook.js",
-      "sha256": "ac67dee276c5061f625af959aae80d761af20eec6e2c99e3a157de4ef25edd29"
+      "sha256": "b84f6b9df8864ffca0b3de2750bb92f7491606671f9988f91b57a7d883cb3272"
     },
     {
       "path": "scripts/install.js",
@@ -252,19 +272,23 @@
     },
     {
       "path": "scripts/package.js",
-      "sha256": "557f091308e7171e6e8484af8fd5b4ea19a825b662e9ef3cf93588d419493ef0"
+      "sha256": "56b1442b9fe1f2fa107052ee8226fc9d62b33c3241210c4167c5d88cfe21affa"
     },
     {
       "path": "scripts/prepare-windows-release.js",
-      "sha256": "baaa0bdc0def8bd8235749124bb56356b2e2cf87549e73ec382a9a483ef8c133"
+      "sha256": "5da1c4de8700d01e77c89d70433f4a6151a97813821c0b0ecbc232018340c65f"
     },
     {
       "path": "scripts/providers/native-worker.js",
-      "sha256": "c447deec5ffcba3a11b5feb878d676a22fcb06dbf7eb78dd90d90a1c30729406"
+      "sha256": "a2733208c3289a9c610396b2c75b7e1f574fccaac0bde86ca5b4641e86277edb"
     },
     {
       "path": "scripts/providers/native.js",
-      "sha256": "15bd3d8f346453627f8d800f22b4ad46f39fce1fc40c5f0d474b7d3bbd35a957"
+      "sha256": "33ad42e724d986dc767541ec363de1b135090932b36a2e289b391d4833253f94"
+    },
+    {
+      "path": "scripts/providers/publisher-policy.js",
+      "sha256": "a0c2a0eb19a0f4d785ecd881f11a281948b02094b3ad510995a3e52cc43cfb64"
     },
     {
       "path": "scripts/providers/readiness.js",
@@ -280,7 +304,7 @@
     },
     {
       "path": "scripts/providers/windows-helper.js",
-      "sha256": "877362d4e5f5b0c7be9f628b41f9b0d04ddce5a0e538122e61267d820838f3e1"
+      "sha256": "68006ef1520d6a96832980376f53a9be0051c93e1ae2c028eb179f4bdc01ef80"
     },
     {
       "path": "scripts/providers/windows/NativeSpeech.cs",
@@ -288,11 +312,11 @@
     },
     {
       "path": "scripts/providers/windows/SetupCompanion.cs",
-      "sha256": "782ed803d600dd44dddc5ced4f99e58de2e4b3462593ff8a8149626b3d00a62b"
+      "sha256": "63a027ba2fb206899afbab70d5206263b175f1c724246de32cf215c0b8fdd4ce"
     },
     {
       "path": "scripts/providers/windows/TrayCompanion.cs",
-      "sha256": "b4d34185eb92e5b376b812697707f9e6fb30dcdfa8ddc53c9f33ea09190b1ae8"
+      "sha256": "00fd7020ef820c4362316626272f24604e82fc7a1f08bc92efefe2dd63161726"
     },
     {
       "path": "scripts/reply-stream.js",
@@ -308,11 +332,11 @@
     },
     {
       "path": "scripts/speak.js",
-      "sha256": "90c2ee039da89cf17af0b780f11fc58404719e95a014c52ba92ef556bd597981"
+      "sha256": "14f389a6d9bb701f789db28f16475cbd27988c4d67790df9093806c5ceea4920"
     },
     {
       "path": "scripts/status.js",
-      "sha256": "08d9dc3b61cb13656d5bf4494028d7630b1c4c74074898175aa17f0adf7383f0"
+      "sha256": "5de1de305f6cf5765a33a8ed1252228a82de0b58758553a85764934cfa8ae869"
     },
     {
       "path": "scripts/stop.js",
@@ -343,8 +367,12 @@
       "sha256": "81e3eeb3f8732dbed96ace4c2e0eb65d1b10362b025ced80c4b7fe670392e52e"
     },
     {
+      "path": "scripts/test-suites.json",
+      "sha256": "62b1d60b6ca87fa60493016dcd794474ba796f86bb1830c7bb38bbd99d554b55"
+    },
+    {
       "path": "scripts/tray.js",
-      "sha256": "9be5eac6c951a0ecb8ec60a677742608d26736dd14391fc00ec60e068e6c52b3"
+      "sha256": "5e42db180f7f6872990c87175a8db0f581d562fd2b35827b4dc627339301cb78"
     },
     {
       "path": "scripts/watch-codex.js",
@@ -353,6 +381,10 @@
     {
       "path": "scripts/windows-product-metadata.js",
       "sha256": "f3bd1a6d9d92e942fcb48eb32ebd51938eb7c147f257737d7a3fbcb030cfe33e"
+    },
+    {
+      "path": "source-files.json",
+      "sha256": "7b99cc3756e156c4ed424c45a3d4a4cd6d8b4d9058cfb984f7061e87c5e4f2d7"
     },
     {
       "path": "tests/async-queue-checks.cjs",
@@ -372,7 +404,11 @@
     },
     {
       "path": "tests/browser-diagnostics-check.cjs",
-      "sha256": "c3e8c76c3f0fd3c566b0d326238739d88d216914dab2a84aeb796ab5cf2b9455"
+      "sha256": "66c3dd22dc9f05772a54b46ce7e3ba6c00fe21d3a9ac582831722a46c409f7c4"
+    },
+    {
+      "path": "tests/browser-duration-check.cjs",
+      "sha256": "9af8b9376b39c7d5857faba371ebb9223289e9495ef15363e418d9d711bfff99"
     },
     {
       "path": "tests/browser-history-check.cjs",
@@ -380,7 +416,11 @@
     },
     {
       "path": "tests/browser-http-body-check.cjs",
-      "sha256": "29e363608166e316410efaa0486c9b617784c74ab3984c725fe8858033aeec57"
+      "sha256": "18ff5b6d8bc167723750c1b13b3e9181ccc72dd3455471d878d456cd59f4d359"
+    },
+    {
+      "path": "tests/browser-identity-check.cjs",
+      "sha256": "4deba37c01a446714d26abed40c00eb59e1c571e0f93ee30f1b8c820a0f570fb"
     },
     {
       "path": "tests/browser-migration-check.cjs",
@@ -404,27 +444,35 @@
     },
     {
       "path": "tests/browser-recovery-check.cjs",
-      "sha256": "b238517007492a24e119be253c7a21ad0b2c1f161405c34a8787a9d90bbb2b93"
+      "sha256": "a439ab7e080b4a160defd7686f05080c3b26036ea6ecf8cb1798597c82b95f25"
     },
     {
       "path": "tests/browser-restart-check.cjs",
-      "sha256": "4c2b5b49519c4442705cc5206ce7258ea26d4b53d3c80928738f0e77619d7b2c"
+      "sha256": "cfb44ae19fce8727810118ba3f0bac766ed2f529d54447ee3cb8a1101240d92f"
+    },
+    {
+      "path": "tests/browser-rpc-check.cjs",
+      "sha256": "77992092be7889c0228bfd7b39c84f889de2a09e039619c6e602503a65f53031"
     },
     {
       "path": "tests/browser-screen-check.cjs",
-      "sha256": "596dfaa6d20a2132aa684f0065e0b8634e085f791d3934bb77eb2eb1cd06877e"
+      "sha256": "d2f41a6143096703725c5ba11631a4a6fed11b909a3aaaf52dd9e99a322daec1"
     },
     {
       "path": "tests/browser-session-check.cjs",
-      "sha256": "91877c339b9e75059fc14fc9d24166e40e76bd84ac2681cdf9f424af0ec81a59"
+      "sha256": "7cd0e2142f88c16e7a4609dd000f992bd4b3230cb14a32a8d43fab263b462c78"
     },
     {
       "path": "tests/browser-source-check.cjs",
-      "sha256": "b05810d8647295b6a358473688fb97d2e2674d1211ce10ef16ce202c99286b6f"
+      "sha256": "8772c072cd6ca2c61774ce71dfdfee609c2743840e540e054ba945640b5eb2bd"
     },
     {
       "path": "tests/browser-speed-check.cjs",
       "sha256": "2e35b5941132ef79f3c4d5e77eb64a039106f4dff4b777ba74629909916d9181"
+    },
+    {
+      "path": "tests/browser-wait-budget-check.cjs",
+      "sha256": "a8777becca719a9bf25e7c38e861a9124eb6568e953c6b1dc8ab6dd2a54904d6"
     },
     {
       "path": "tests/build-check.cjs",
@@ -479,6 +527,10 @@
       "sha256": "e313e5c5068d2117a3c33d392cba81823903143a02844f4e59d2cfe14ecedbb2"
     },
     {
+      "path": "tests/fixtures/browser-rpc-transport.cjs",
+      "sha256": "621cefcf62870bcc6d8bf56f0404480033715bcbfb9a23ce1d1b8aefdbd065a3"
+    },
+    {
       "path": "tests/fixtures/browser-service-worker.cjs",
       "sha256": "5483170d17fb0ca0211190863bcd0b958208ff8342252693bb8d696cd4b87f6e"
     },
@@ -491,16 +543,28 @@
       "sha256": "0867e32fb1c0ba8b62cb9fa9a0f800220036f1c57b2e884064b92b31198ba269"
     },
     {
+      "path": "tests/fixtures/pe-assembly-fixtures.cjs",
+      "sha256": "990e2077844830d34ae8ddf7a1061d230a57424b6582b2922a717ac2895cb668"
+    },
+    {
+      "path": "tests/fixtures/pe-assembly-version.cjs",
+      "sha256": "65951d804d1c5e824ad76e7c9b747a6b52c3c6f73d0da152134dfa6e60e23f91"
+    },
+    {
       "path": "tests/fixtures/reply-stream-cli.cjs",
       "sha256": "89e27cc88eed72663de0d0735b579277bd06dae2cc7b687a9a6879b73fb6ee1d"
     },
     {
       "path": "tests/harness-adapter-check.cjs",
-      "sha256": "942f716eac599d9c3fa10a52e49117913e3f0f6756f1937fbab515dbfd557a58"
+      "sha256": "52988d7e01fbe38a0bb9c18bb20f008175546b2cab164c94b32edcfb07e4c3ca"
     },
     {
       "path": "tests/harness-hook-check.cjs",
-      "sha256": "2e7550dbfac06e42589e05bfe6a06271c440319369b345e0182ebe662c8d4486"
+      "sha256": "f13abbcfa2c0bd66b5015e4faec17366618594745d6ad56989e79de11e2d0e99"
+    },
+    {
+      "path": "tests/harness-lifetime-check.cjs",
+      "sha256": "154d5ad98387201d7a2fb54b80ba0e236e79b3755cacb7889f3c4f912dd284e2"
     },
     {
       "path": "tests/harness-stream-cli-check.cjs",
@@ -583,8 +647,16 @@
       "sha256": "f965fe511c86a3e0d80a323552758401e9513f5fd3d35bdadf45cb2a640188ea"
     },
     {
+      "path": "tests/native-usability-check.cjs",
+      "sha256": "835805c4a4d530377ab90dd44404f0292e7c20b53188606d4de8bee49192516f"
+    },
+    {
       "path": "tests/optional-voice-check.cjs",
       "sha256": "671ff9db4654a9229909b00d5b700697d9930601e3d99a92c27d9df8ae815eb1"
+    },
+    {
+      "path": "tests/package-boundaries-check.cjs",
+      "sha256": "df03deb7d3d6e521a1a54b10ed2b1522c94c64a2da4a456e0fc46114fbf0f951"
     },
     {
       "path": "tests/permission-cache-checks.cjs",
@@ -593,6 +665,10 @@
     {
       "path": "tests/playback-abort-check.cjs",
       "sha256": "714d1a0578695d93f05dee98511472a75cd0ec6b08a099a856fe1059c08649b3"
+    },
+    {
+      "path": "tests/publisher-policy-check.cjs",
+      "sha256": "e22a54a70ad2f82cd90479e298548a0429162d164c61bdb16104624ec2d42f3e"
     },
     {
       "path": "tests/readiness-check.cjs",
@@ -608,7 +684,7 @@
     },
     {
       "path": "tests/reply-stream-check.cjs",
-      "sha256": "2b58afb5039f60f5510fc80d32893b90a7f2a0b88e286ce5330f211484a05b75"
+      "sha256": "e817ea2c20097d20c411bea57c9757fdf2ad92dc070d6f19acbae535ed2aa8d1"
     },
     {
       "path": "tests/segment-stream-checks.cjs",
@@ -632,7 +708,7 @@
     },
     {
       "path": "tests/windows-helper-check.cjs",
-      "sha256": "0d86ebddb22aa46c4ae542fcc118bbd3ae119153e4442849a2ffdd8a21781d08"
+      "sha256": "9a6e6083aba10b98b1e9b52c99caa1da11fd9d0e542b5347869376dce845ad6c"
     },
     {
       "path": "tests/windows-permission-probe.cjs",
@@ -644,15 +720,15 @@
     },
     {
       "path": "tests/windows-product-metadata-check.cjs",
-      "sha256": "fbf1daf59a33e4cec7bd0719fe653b00ee699cbdb1ffd18481a82e4aa6d4b5ed"
+      "sha256": "4c6b0880f9750ecd91e52104e1d351a0c5a86059336365701bd37f504cbe92f7"
     },
     {
       "path": "tests/windows-release-check.cjs",
-      "sha256": "f7e4762573b645eaa58b49f07dcdef4b3c787d526a81eeec4d756d47ff65f39a"
+      "sha256": "e20b34a865c3f667de1941728c415f368c557c9f79f454932389f888c270ac99"
     },
     {
       "path": "tests/windows-setup-check.cjs",
-      "sha256": "30861f87b6f7784073b5b0623be129367baf93e2d6ba86632253d331f9e9b06f"
+      "sha256": "38eff6eb78859ff04bc93e9325c1f157caf9425e05de8c69583c18c3f2323491"
     }
   ]
 }
