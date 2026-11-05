@@ -3,9 +3,38 @@ const {spawn}=require('node:child_process');
 const {createSession}=require('../scripts/experimental/browser-session');
 const {createReplyRelay}=require('../scripts/reply-stream');
 const {request}=require('../scripts/browser-speak');
+const vm=require('node:vm'),{createRequire}=require('node:module'),{Readable}=require('node:stream'),{EventEmitter}=require('node:events');
 const root=path.resolve(__dirname,'..'),tick=()=>new Promise(r=>setTimeout(r,70));
 async function until(test){const deadline=Date.now()+5000;while(Date.now()<deadline){if(test())return;await tick();}throw Error('test-timeout');}
+async function observeMain({wait='true',signal,signalAtSleep=1,signalOnReceipt=false,receiptError=false,admissionError=false,terminal}={}){
+ // Execute the actual CLI main with only public metadata, a supplied input and
+ // injected transport/clock. No manifest rewrite, browser or playback is needed.
+ const filename=path.join(root,'scripts/reply-stream.js'),load=createRequire(filename),source=fs.readFileSync(filename,'utf8'),manifest=Buffer.from('public reply-stream main fixture');
+ const sourceHash=crypto.createHash('sha256').update(manifest).digest('hex'),calls=[],output=[],processFixture=new EventEmitter();let clock=0,reads=0,sleeps=0,owned;
+ processFixture.argv=['node',filename,'--format','plain','--wait',wait];processFixture.stdin=Readable.from([Buffer.from('Healthy supplied prose. '.repeat(100))]);processFixture.stdout={write:value=>output.push(JSON.parse(value))};
+ const send=async(conn,route,data)=>{
+  calls.push({route,data});if(route==='/api/status')return {connected:true,version:'fixture',sourceManifestSha256:sourceHash};
+  if(route==='/api/queue/event'){owned??=data.messageId;if(admissionError&&data.kind==='delta')throw Error('reply-admission-refused');return {state:data.kind==='start'?'streaming':'queued'};}
+  if(route==='/api/queue/seal')return {inputSealed:true,inputState:'sealed',state:'speaking',terminal:false};
+  if(route==='/api/queue/reply-receipt'){if(signalOnReceipt&&signal)processFixture.emit(signal);if(receiptError)throw Error('browser-transport-unreachable');reads++;return {state:terminal||'speaking',inputState:'sealed',inputSealed:true,pendingSegments:0,terminal:!!terminal,segments:20,completedSegments:reads-1};}
+  if(route==='/api/queue/cancel-reply')return {state:'cancelling'};throw Error('unexpected-route');
+ };
+ const injected=name=>name==='./browser-speak'?{connection:()=>({}),request:send}:name==='./package'?{verify:()=>({version:'fixture'})}:name==='node:fs'?{readFileSync:file=>{assert.equal(file,path.join(root,'manifest.json'));return manifest;}}:load(name);
+ const module={exports:{}};vm.runInNewContext(source,{require:injected,module,process:processFixture,Buffer,TextDecoder,performance:{now:()=>clock},Date:{now:()=>clock},setTimeout:fn=>setImmediate(()=>{clock+=25000;if(signal&&++sleeps===signalAtSleep)processFixture.emit(signal);fn();})},{filename});
+ await module.exports.main();assert.equal(processFixture.listenerCount('SIGINT'),0);assert.equal(processFixture.listenerCount('SIGTERM'),0);
+ const cancellations=calls.filter(call=>call.route==='/api/queue/cancel-reply');for(const call of cancellations)assert.equal(call.data.messageId,owned);
+ return {clock,reads,calls,output,owned,cancellations,exitCode:processFixture.exitCode||0};
+}
+async function checkObservationWait(){
+ const timed=await observeMain();assert.equal(timed.clock,125000);assert.equal(timed.reads,5);assert.equal(timed.cancellations.length,0,'a receipt observation deadline must not cancel healthy admitted speech');assert.equal(timed.exitCode,1);const timeout=timed.output.at(-1);assert.equal(timeout.id,timed.owned);assert.equal(timeout.state,'receipt-timeout');assert.equal(timeout.code,'reply-receipt-timeout');assert.equal(timeout.terminal,false);assert.equal(timeout.cancellation,'not-requested');assert.equal(timed.calls.filter(call=>call.route==='/api/queue/event'&&call.data.kind==='start').length,1);
+ const admitted=await observeMain({wait:'false'});assert.equal(admitted.clock,0);assert.equal(admitted.reads,0);assert.equal(admitted.cancellations.length,0);assert.equal(admitted.exitCode,0);assert.equal(admitted.output.at(-1).state,'sealed');
+ const unavailable=await observeMain({receiptError:true});assert.equal(unavailable.cancellations.length,0);assert.equal(unavailable.exitCode,1);assert.equal(unavailable.calls.filter(call=>call.route==='/api/queue/reply-receipt').length,1);assert.equal(unavailable.calls.filter(call=>call.route==='/api/queue/event'&&call.data.kind==='start').length,1);const uncertain=unavailable.output.at(-1);assert.equal(uncertain.id,unavailable.owned);assert.equal(uncertain.state,'receipt-unavailable');assert.equal(uncertain.code,'reply-receipt-unavailable');assert.equal(uncertain.terminal,false);assert.equal(uncertain.cancellation,'not-requested');
+ for(const terminal of ['completed','failed','cancelled']){const result=await observeMain({terminal});assert.equal(result.cancellations.length,0);assert.equal(result.exitCode,terminal==='completed'?0:1);assert.equal(result.output.at(-1).id,result.owned);assert.equal(result.output.at(-1).state,terminal);assert.equal(result.output.at(-1).terminal,true);}
+ for(const options of [{signal:'SIGINT',signalAtSleep:5},{signal:'SIGTERM'},{signal:'SIGINT',signalOnReceipt:true,receiptError:true},{admissionError:true}]){const result=await observeMain(options);assert.equal(result.cancellations.length,1);assert.equal(result.exitCode,options.signal?0:1);assert.equal(result.output.at(-1).state,options.signal?'cancelled':'failed');assert(!result.output.some(value=>['receipt-timeout','receipt-unavailable'].includes(value.state)));}
+ console.log('PASS: production reply-stream main bounds observation at125s, retains the original ID without cancellation/resubmission on timeout or receipt transport uncertainty, preserves known terminal outcomes, seals wait=false without terminal polling, and retains owned signal/admission-error cancellation; injected healthy progress/clock, no audio.');
+}
 (async()=>{
+ await checkObservationWait();if(process.argv.includes('--wait-observation-only'))return;
  const hash=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'manifest.json'))).digest('hex');
  const session=createSession({sourceManifestSha256:hash});await new Promise(r=>session.server.listen(0,'127.0.0.1',r));const conn={port:session.server.address().port,token:session.token},client='b'.repeat(32);
  session.enable({client,voice:'local fixture',rate:0.9});const options={format:'plain',connect:()=>conn};
