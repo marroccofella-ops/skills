@@ -19,7 +19,7 @@
    if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='ciphertext,nonce,schema'||value.schema!==SCHEMA)throw fail();
    let result;try{const decrypted=new Uint8Array(await engine.subtle.decrypt({name:'AES-GCM',iv:decode(value.nonce,12,12),additionalData:aad('response',nonceText),tagLength:128},await key,decode(value.ciphertext,16,MAX_RESPONSE+16)));if(decrypted.byteLength>MAX_RESPONSE)throw fail();result=JSON.parse(decoder.decode(decrypted));}catch{throw fail();}
    if(!result||typeof result!=='object'||Array.isArray(result)||Object.keys(result).sort().join(',')!=='data,epoch,status'||!Number.isSafeInteger(result.status)||result.status<200||result.status>599||!Number.isSafeInteger(result.epoch)||result.epoch<0)throw fail();stopEpoch=Math.max(stopEpoch,result.epoch);
-   if(result.status>=400)throw Error(typeof result.data?.error==='string'?result.data.error:'request-refused');return result.data;
+   if(result.status>=400)throw Error(typeof result.data?.error==='string'?result.data.error:'request-refused');return route==='/api/poll'&&result.data&&typeof result.data==='object'&&!Array.isArray(result.data)?{...result.data,controlEpoch:result.epoch}:result.data;
   }
   return {request,epoch:()=>stopEpoch};
  }

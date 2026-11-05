@@ -1,6 +1,6 @@
 # Experimental local browser speech
 
-Unreleased version 0.5.0-rc.4 repairs word boundaries, healthy long-reply expiry, speech deadlines and long-session adapters on top of public 0.5.0-rc.2. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
+Source candidate 0.5.0-rc.4 repairs word boundaries, healthy long-reply expiry, speech deadlines and long-session adapters on top of public 0.5.0-rc.2. Personal notification settings, runtime state, credentials, recordings and native binaries are excluded. Optional companions are dormant until explicitly invoked. It is not a stable release.
 
 Start with Node18+: run `node scripts/experimental/browser-session.js`, open its printed private local link, choose a local voice and click Enable spoken replies. Keep the page open. Never publish the access fragment or connection descriptor. The voice uses local browser speech synthesis, no microphone or cloud service. Speed accepts0.5–2; the initial default is0.9. Saved preferences do not enable a fresh page.
 
@@ -44,6 +44,12 @@ action uses the current Stop generation; an Enable click retains the generation
 from before its asynchronous voice preview. A stale control is refused rather
 than automatically retried. Read-only status can refresh the generation without
 enabling speech.
+
+The page checks each authenticated poll response's generation again before using
+it. Once it learns a newer Stop generation, it discards older commands and stops
+an older active job or Enable preview while retaining cancellation acknowledgement. A late Enable
+success cannot commit older UI state. These checks use the barrier the page has
+observed; submitting a network Stop is not a completed playback acknowledgement.
 
 Upgrade the client, server and page together. Before replacing the installed
 package, stop speech through its existing trusted controls and close its server

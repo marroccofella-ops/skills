@@ -1,6 +1,6 @@
 # Compatibility evidence
 
-Current development candidate: **0.5.0-rc.4**, unreleased. It repairs word boundaries, long-session delivery, native diagnostics and publisher trust checks on top of public **0.5.0-rc.2**. No source archive launches optional components or supplies a trusted signing certificate. Automatic Desktop paragraph attachment and stable hardware acceptance remain unverified. See [release scope](references/release-candidate.md).
+Current development candidate: **0.5.0-rc.4**. Publication is recorded on the [release page](https://github.com/marroccofella/skills/releases). It repairs word boundaries, long-session delivery, native diagnostics and publisher trust checks on top of public **0.5.0-rc.2**. No source archive launches optional components or supplies a trusted signing certificate. Automatic Desktop paragraph attachment and stable hardware acceptance remain unverified. See [release scope](references/release-candidate.md).
 
 ## Historical evidence and decisions
 

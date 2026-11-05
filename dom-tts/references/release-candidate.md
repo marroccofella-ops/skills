@@ -1,6 +1,6 @@
-# Dom TTS 0.5.0-rc.4 — unreleased reliability candidate
+# Dom TTS 0.5.0-rc.4 — reliability source candidate
 
-This unreleased candidate repairs word boundaries, long-reply expiry/deadlines, rolling harness delivery, native failure reporting and publisher trust checks on top of public 0.5.0-rc.2. Its browser/core, expanded installer and optional studio scope is retained. It is not a finished stable 0.5 release or trusted Windows installer. A reviewed source-file recipe, manifest and SHA256 receipt identify packaged source bytes.
+This source candidate repairs word boundaries, long-reply expiry/deadlines, rolling harness delivery, native failure reporting and publisher trust checks on top of public 0.5.0-rc.2. Its browser/core, expanded installer and optional studio scope is retained. It is not a finished stable 0.5 release or trusted Windows installer. A reviewed source-file recipe, manifest and SHA256 receipt identify packaged source bytes.
 
 ## Included
 

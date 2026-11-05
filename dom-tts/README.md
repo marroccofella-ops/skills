@@ -2,7 +2,7 @@
 
 Local speech for coding assistants by **Prof Dom Marrocco / 42.uk**.
 
-Version **0.5.0-rc.4** is an unreleased source candidate repairing speech boundaries, long-session delivery and publisher checks. The last public release is **0.5.0-rc.2**. The common interface is
+Version **0.5.0-rc.4** is a source candidate repairing speech boundaries, long-session delivery and publisher checks, based on public **0.5.0-rc.2**. Consult the [release page](https://github.com/marroccofella/skills/releases) for published artifacts. The common interface is
 model-independent: any harness that can run a command can pass text through
 stdin, a UTF-8 file, or --text. Agent Skills hosts can discover SKILL.md.
 

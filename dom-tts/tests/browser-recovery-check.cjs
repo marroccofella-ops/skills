@@ -13,12 +13,13 @@ function fixture(){
   else if(route==='/api/enable')value=session.enable(data);
   else if(route==='/api/disable')value=session.disable(data);
   else if(route==='/api/stop'){value=session.globalStop();}
+  else if(route==='/api/queue/status')value=session.queue.status();
   else if(route==='/api/poll'){if(faults.poll>0){faults.poll--;timeout();}value=session.poll(data);}
   else if(route==='/api/receipt'){value=session.accept(data);if(data.state!=='speaking'&&faults.terminalAfterAccept>0){faults.terminalAfterAccept--;timeout();}}
   else throw Error('Unexpected fixture route');return {ok:true,json:async()=>value};
  }};
- attach(context,context.fetch,{getEpoch:()=>session.status().stopEpoch});vm.runInContext(source,context);
- return {session,calls,timers,events,faults,nodes,engine,advance:ms=>clock+=ms,plays:()=>plays,async enable(){await flush();const pending=nodes.get('enable').listeners.click();engine.finish();await pending;await flush();},async tick(){const t=timers.shift();assert(t);assert(t.ms<=10000);await t.fn();await flush();},close:()=>session.close()};
+ const rpcControl=attach(context,context.fetch,{getEpoch:()=>session.status().stopEpoch});vm.runInContext(source,context);
+ return {holdPoll:()=>rpcControl.holdResponse('/api/poll'),observeEpoch:()=>vm.runInContext("api('/api/queue/status')",context),session,calls,timers,events,faults,nodes,engine,advance:ms=>clock+=ms,plays:()=>plays,async enable(){await flush();const pending=nodes.get('enable').listeners.click();engine.finish();await pending;await flush();},async tick(){const t=timers.shift();assert(t);assert(t.ms<=10000);await t.fn();await flush();},close:()=>session.close()};
 }
 (async()=>{
  const f=fixture();try{
@@ -30,5 +31,11 @@ function fixture(){
  }finally{f.close();}
  const denied=fixture();try{await denied.enable();denied.faults.auth=true;await denied.tick();const n=denied.calls.length;denied.events.online();await denied.tick();assert.equal(denied.calls.length,n);assert.match(denied.nodes.get('status').textContent,/Enable again/);}finally{denied.close();}
  const wake=fixture();try{await wake.enable();wake.faults.poll=6;for(let i=0;i<6;i++)await wake.tick();wake.faults.poll=0;wake.events.visibilitychange();await flush();assert.equal(wake.session.status().connected,true);assert.equal(wake.timers.length,1,'wake must not duplicate polling loops');wake.events.pagehide();await flush();const n=wake.calls.length;wake.events.pageshow();wake.events.online();await wake.tick();assert.equal(wake.calls.length,n);}finally{wake.close();}
+ const stale=fixture();try{
+  await stale.enable();const old=stale.session.submit({text:'Old held speech must not start.'}),held=stale.holdPoll(),pending=stale.tick();await held.started;stale.session.globalStop();await stale.observeEpoch();held.release();await pending;assert.equal(stale.plays(),1,'stale Speak response must not start after a learned Stop');for(let i=0;i<4&&stale.session.status().active;i++)await stale.tick();assert.equal(stale.session.status().active,null,'current cancellation must be acknowledged');assert.equal(stale.session.receipt(old.id).state,'cancelled');
+  stale.session.queue.command('restart');stale.session.submit({text:'Fresh speech after held response.'});await stale.tick();assert.equal(stale.plays(),2);stale.engine.finish();await flush();await stale.tick();
+  const active=stale.session.submit({text:'Active speech stopped at epoch observation.'});await stale.tick();assert.equal(stale.engine.busy(),true);stale.session.globalStop();await stale.observeEpoch();await flush();assert.equal(stale.engine.busy(),false,'learning a newer epoch must stop an older active job');for(let i=0;i<4&&stale.session.status().active;i++)await stale.tick();assert.equal(stale.session.status().active,null);assert.equal(stale.session.receipt(active.id).state,'cancelled');
+  stale.session.queue.command('restart');stale.session.submit({text:'Fresh speech after active cancellation.'});await stale.tick();assert.equal(stale.plays(),4);assert.equal(stale.engine.busy(),true);
+ }finally{stale.close();}
  console.log('PASS: actual screen survives12 transient failures, renews same-document lease, cancels interrupted audio without replay after lost acknowledgement, reconciles offline Stop before polling, honors Disable/auth/pagehide, and wakes without duplicate loops. Injected browser events; no sleep/audio certification.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

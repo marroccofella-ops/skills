@@ -8,15 +8,15 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "cf09d1e4d8096e3ad3693202b1706c573a9ab5c65739d3e8c3ef0d3aad08dc3f"
+      "sha256": "1cfa582e07c5225a17d46482783a9de832543d3d561cc761a4df3e4b21796401"
     },
     {
       "path": "COMPATIBILITY.md",
-      "sha256": "e940f394fa9871847869e2573e18fe7a76273d9419262f4e07833db32bf2fd9a"
+      "sha256": "0b0db967ab18471b65fc8efa31b95ba919407dda7d7fb8d03b178ff00d2fb464"
     },
     {
       "path": "EVOLUTION.md",
-      "sha256": "050684ab32bc94a041c9046da387c18aeddf01fd44765c7ddbf09ef38828e404"
+      "sha256": "25f6686cf9eec5639f31e0fbf2e3d83a55434b0117336254c987d65c3e1e1034"
     },
     {
       "path": "LICENSE",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "b4cffea4fdc05d0b042c35c67a2c253401b8e222d1edb7b0259a924fd5909fd1"
+      "sha256": "1632597f35d9a2a4a556558d81956d18278df14dc16925f3fd5cec8a50b5b67c"
     },
     {
       "path": "SKILL.md",
@@ -44,11 +44,11 @@
     },
     {
       "path": "assets/browser/rpc.js",
-      "sha256": "56f8ef23c27b7289d56999b994749bbf8d63285bebc0ec6e728a27d662c95297"
+      "sha256": "fe37ba945cbfa3bcfb463ea5f5d84faf353465fe291ddbf4255b8d386c7715d0"
     },
     {
       "path": "assets/browser/screen.js",
-      "sha256": "18ae38538bee03e1bbee7e09164905895b70209658b82fedc05e9d5b43f51284"
+      "sha256": "63b352dc97f2548a5754b34e662a855986217d8a2010bad9568f770fc7e9c5bc"
     },
     {
       "path": "assets/browser/style.css",
@@ -92,7 +92,7 @@
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "d8b884aff46784749909a109e8b492864fbc66e4217a1daef433ce4364f9b426"
+      "sha256": "82d61a02dbb775a36ec8e55ff9feb941d679c1956f59db638474002a90c426e8"
     },
     {
       "path": "references/codex-default-speech.md",
@@ -116,7 +116,7 @@
     },
     {
       "path": "references/release-candidate.md",
-      "sha256": "cfc223cba6b151769d1895051a7f875237a95a06c36d0aa645adaf81b8411a56"
+      "sha256": "9feb0d9ad23573e45e3b4370f814f9b8f7d850d19ce54cb72dc604ca38a55977"
     },
     {
       "path": "scripts/avatar-state.js",
@@ -444,7 +444,7 @@
     },
     {
       "path": "tests/browser-recovery-check.cjs",
-      "sha256": "a439ab7e080b4a160defd7686f05080c3b26036ea6ecf8cb1798597c82b95f25"
+      "sha256": "769a3050d4b703c6fbf2e189c47234e1a3fac8ca6a827973ce0e24710643ceb5"
     },
     {
       "path": "tests/browser-restart-check.cjs",
@@ -452,11 +452,11 @@
     },
     {
       "path": "tests/browser-rpc-check.cjs",
-      "sha256": "47b9d34456928650a7ccba477fea35162e60ff5b32e34298c56dc7ee7da24e1e"
+      "sha256": "c696527d71f91f94495e8fb4cdbcefd683440531e952abdc35f0f66ec79eae7f"
     },
     {
       "path": "tests/browser-screen-check.cjs",
-      "sha256": "d2f41a6143096703725c5ba11631a4a6fed11b909a3aaaf52dd9e99a322daec1"
+      "sha256": "3a82475dbaea25fefcf9cd9088e3e884aa8fad8ee292ca8737651b805ca5b5bb"
     },
     {
       "path": "tests/browser-session-check.cjs",
@@ -528,7 +528,7 @@
     },
     {
       "path": "tests/fixtures/browser-rpc-transport.cjs",
-      "sha256": "621cefcf62870bcc6d8bf56f0404480033715bcbfb9a23ce1d1b8aefdbd065a3"
+      "sha256": "e230f3cfa5e5c377a0a06cacdd441245942d577b27f605c9712bd9607b7107d5"
     },
     {
       "path": "tests/fixtures/browser-service-worker.cjs",
