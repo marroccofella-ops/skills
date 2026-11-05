@@ -38,7 +38,8 @@ from the trusted running server and explicit Enable. This protects the loaded
 page's transport, not the authenticity of HTML opened from an old saved URL after
 its port has been reused. Do not bookmark or reopen stale private links.
 
-Stop also invalidates older pending Enable/Restart controls. A fresh explicit
+Stop also invalidates older pending speech admissions and queue controls,
+including Enable/Restart. A fresh explicit
 action uses the current Stop generation; an Enable click retains the generation
 from before its asynchronous voice preview. A stale control is refused rather
 than automatically retried. Read-only status can refresh the generation without

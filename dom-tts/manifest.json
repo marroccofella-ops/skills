@@ -8,7 +8,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "0710ed63888dd5c9a084957fe0be08424c4932e73f8de7dd6806f7fcf19a17ad"
+      "sha256": "cf09d1e4d8096e3ad3693202b1706c573a9ab5c65739d3e8c3ef0d3aad08dc3f"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -92,7 +92,7 @@
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "c6ba7b57f990a660607e750e63ef2f71fa072b7526b7fd17daadee5e595b425d"
+      "sha256": "d8b884aff46784749909a109e8b492864fbc66e4217a1daef433ce4364f9b426"
     },
     {
       "path": "references/codex-default-speech.md",
@@ -180,11 +180,11 @@
     },
     {
       "path": "scripts/experimental/browser-rpc.js",
-      "sha256": "401240c2b0c610942a0afd0231b795c127cf572a4c8548b1c729505eab86259d"
+      "sha256": "f89182a873a2f420901906e77380ed1ef0de49cacb577228f1483d056779061d"
     },
     {
       "path": "scripts/experimental/browser-session.js",
-      "sha256": "e9a71a453562a668289ba3ebd15af3b29215ce24cbe13a47dc02252b38abe3ff"
+      "sha256": "9b5784d0342920582a95ba030f5e604a7920cfe36bdf644d5e560d25023aa701"
     },
     {
       "path": "scripts/experimental/control-server.js",
@@ -416,11 +416,11 @@
     },
     {
       "path": "tests/browser-http-body-check.cjs",
-      "sha256": "18ff5b6d8bc167723750c1b13b3e9181ccc72dd3455471d878d456cd59f4d359"
+      "sha256": "5b500fa4fca91dbd04acf9c4c67c35625cd6d78a43436b3d65e394ffc525f13a"
     },
     {
       "path": "tests/browser-identity-check.cjs",
-      "sha256": "4deba37c01a446714d26abed40c00eb59e1c571e0f93ee30f1b8c820a0f570fb"
+      "sha256": "94662fbb323811c0df21be684bff3f6a9fa5cfb1340ccd6e5bb70088511548fe"
     },
     {
       "path": "tests/browser-migration-check.cjs",
@@ -452,7 +452,7 @@
     },
     {
       "path": "tests/browser-rpc-check.cjs",
-      "sha256": "77992092be7889c0228bfd7b39c84f889de2a09e039619c6e602503a65f53031"
+      "sha256": "47b9d34456928650a7ccba477fea35162e60ff5b32e34298c56dc7ee7da24e1e"
     },
     {
       "path": "tests/browser-screen-check.cjs",

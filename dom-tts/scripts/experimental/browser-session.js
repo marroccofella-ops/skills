@@ -4,7 +4,7 @@ const {ROOT,stateDir,ensurePrivate,readObject,writeObject,alive}=require('../run
 const {createBrowserQueue}=require('./browser-queue');
 const {speechDeadline}=require('../../assets/browser/player');
 const {proofMac,validateIntentTick,PROOF_SCHEMA,PROOF_ROUTE}=require('./browser-client');
-const {createBrowserRpc,assertControlEpoch,ROUTE:RPC_ROUTE}=require('./browser-rpc');
+const {createBrowserRpc,requiresControlEpoch,assertControlEpoch,ROUTE:RPC_ROUTE}=require('./browser-rpc');
 const terminal=new Set(['completed','cancelled','failed']);
 function createSession({leaseMs=30000,deadlineMs,now=()=>Date.now(),dir=stateDir,persist=false,sessions=['manual'],sourceManifestSha256}={}){
  if(deadlineMs!==undefined&&(!Number.isFinite(deadlineMs)||deadlineMs<=0||deadlineMs>300000))throw Error('invalid-deadline');
@@ -79,7 +79,7 @@ function createSession({leaseMs=30000,deadlineMs,now=()=>Date.now(),dir=stateDir
    if(method!=='POST'||req.headers['content-type']!=='application/json')throw Error('json-post-required');
    const controller=['/api/speak','/api/queue/enqueue','/api/queue/event'].includes(route)?new AbortController():null;if(controller)pendingSpeech.add(controller);
    let data;try{data=rpc?rpc.data:await read(req,controller?.signal);}finally{if(controller)pendingSpeech.delete(controller);}if(!data||typeof data!=='object'||Array.isArray(data))throw Error('invalid-json');
-   if(closed)throw Error('browser-control-epoch-stale');assertControlEpoch(route,rpc?rpc.epoch:proofEpoch,stopEpoch);if(!rpc&&['/api/enable','/api/queue/restart'].includes(route)&&(typeof proofIntentTick!=='bigint'||proofIntentTick<=lastStopTick))throw Error('browser-control-epoch-stale');
+   if(closed)throw Error('browser-control-epoch-stale');assertControlEpoch(route,rpc?rpc.epoch:proofEpoch,stopEpoch);if(!rpc&&requiresControlEpoch(route)&&(typeof proofIntentTick!=='bigint'||proofIntentTick<=lastStopTick))throw Error('browser-control-epoch-stale');
    if(route==='/api/enable')return reply(200,enable(data));
    if(route==='/api/disable')return reply(200,disable(data));
    if(route==='/api/poll')return reply(200,poll(data));

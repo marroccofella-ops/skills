@@ -2,7 +2,9 @@
 const crypto=require('node:crypto');
 const SCHEMA='dom-tts-browser-rpc/2',ROUTE='/api/browser-rpc',TTL_MS=10000,MAX_DATA=32768,MAX_PLAIN=33280,MAX_RESPONSE=8192;
 const refused=()=>Error('browser-rpc-refused');
-function assertControlEpoch(route,epoch,current){if(['/api/enable','/api/queue/restart'].includes(route)&&(!Number.isSafeInteger(epoch)||epoch!==current))throw Error('browser-control-epoch-stale');}
+const fencedRoutes=new Set(['/api/enable','/api/speak','/api/queue/restart','/api/queue/enqueue','/api/queue/event','/api/queue/flush','/api/queue/seal','/api/queue/select-source','/api/queue/pause','/api/queue/resume','/api/queue/skip']);
+function requiresControlEpoch(route){return fencedRoutes.has(route);}
+function assertControlEpoch(route,epoch,current){if(requiresControlEpoch(route)&&(!Number.isSafeInteger(epoch)||epoch!==current))throw Error('browser-control-epoch-stale');}
 function aad(port,direction,requestNonce=''){return Buffer.from(SCHEMA+'\0'+port+'\0'+direction+(direction==='response'?'\0'+requestNonce:''),'utf8');}
 function base64(value,min,max){if(typeof value!=='string'||value.length>Math.ceil(max/3)*4||value.length%4||!/^[A-Za-z0-9+/]+={0,2}$/.test(value))throw refused();const bytes=Buffer.from(value,'base64');if(bytes.length<min||bytes.length>max||bytes.toString('base64')!==value)throw refused();return bytes;}
 function envelope(value,max){if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join(',')!=='ciphertext,nonce,schema'||value.schema!==SCHEMA)throw refused();return {nonce:base64(value.nonce,12,12),ciphertext:base64(value.ciphertext,16,max+16)};}
@@ -27,4 +29,4 @@ function createBrowserRpc({token,port,now=()=>Date.now(),maxNonces=256}){
  }
  return {open,seal};
 }
-module.exports={createBrowserRpc,assertControlEpoch,aad,SCHEMA,ROUTE,TTL_MS,MAX_DATA,MAX_PLAIN,MAX_RESPONSE};
+module.exports={createBrowserRpc,requiresControlEpoch,assertControlEpoch,aad,SCHEMA,ROUTE,TTL_MS,MAX_DATA,MAX_PLAIN,MAX_RESPONSE};
