@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "CHANGELOG.md",
-      "sha256": "050acbd48e5314c53804de7516513cab1d8396129980a243fb5d11626b8dabac"
+      "sha256": "f7e92c6f9bc28a6ce6014c5a6d4a1da754cfb32206c4e0e12544a886b7238722"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -24,7 +24,7 @@
     },
     {
       "path": "SKILL.md",
-      "sha256": "c8b797aca556576217e05a0e6b534ec20d910181910e5db8420510a5f11cc993"
+      "sha256": "f050a149f3cb6bf6688c61e7f0b550e34e491880a594c2d2388e0adb9463a7b4"
     },
     {
       "path": "assets/browser/browser.html",
