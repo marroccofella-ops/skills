@@ -8,7 +8,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9e61ce2258e47c4e0820d6e794a882fe6ddc08b00df50faa1f53918d67166b6e"
+      "sha256": "3f5ea5ece7137a94f66a75cdefa134c60f1d4f28eaf83fe8ad26efaf8c749585"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -92,7 +92,7 @@
     },
     {
       "path": "references/browser-speech.md",
-      "sha256": "82d61a02dbb775a36ec8e55ff9feb941d679c1956f59db638474002a90c426e8"
+      "sha256": "2ccb9c2781a69bebe6de1c57ccba3fa5ee979f71fa32507c832d4dae4cd9cec1"
     },
     {
       "path": "references/codex-default-speech.md",
@@ -324,7 +324,7 @@
     },
     {
       "path": "scripts/reply-stream.js",
-      "sha256": "bd209b69b6282d5b414b0527375f1fa5339ef5f4a06ec314c39c9e26e454781f"
+      "sha256": "95ba2f0e5d95e765c786beaeda4d7b240db468a0659ea810f89330a1a178b996"
     },
     {
       "path": "scripts/runtime.js",
@@ -692,7 +692,7 @@
     },
     {
       "path": "tests/reply-stream-check.cjs",
-      "sha256": "e817ea2c20097d20c411bea57c9757fdf2ad92dc070d6f19acbae535ed2aa8d1"
+      "sha256": "8aad81e295e7cb837e1168a5985e646f53d3fd5d0bfc96e40268b35b651ffb3a"
     },
     {
       "path": "tests/segment-stream-checks.cjs",

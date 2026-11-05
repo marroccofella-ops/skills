@@ -39,7 +39,21 @@ async function main(){
   for await(const chunk of process.stdin){if(stopped)break;const text=decoder.decode(chunk,{stream:true});if(text)await relay.append(text);}
   if(stopped){await relay.cancel();emit({id:relay.id,state:'cancelled'});return;}
   const tail=decoder.decode();if(tail)await relay.append(tail);await relay.finish();
-  if(args.wait==='true'){const until=Date.now()+125000;while(Date.now()<until){if(stopped){await relay.cancel();return;}const receipt=await relay.receipt();if(receipt.terminal){emit({...receipt,humanHearing:'unconfirmed'});if(receipt.state!=='completed')process.exitCode=1;return;}if(receipt.inputState==='cancelled')throw Error('reply-cancelled');await new Promise(r=>setTimeout(r,100));}throw Error('reply-receipt-timeout');}
+  if(args.wait==='true'){
+   const until=Date.now()+125000;
+   while(Date.now()<until){
+    if(stopped){await relay.cancel();return;}
+    let receipt;try{receipt=await relay.receipt();}catch{
+     if(stopped){await relay.cancel();return;}
+     emit({id:relay.id,state:'receipt-unavailable',terminal:false,code:'reply-receipt-unavailable',cancellation:'not-requested',humanHearing:'unconfirmed'});process.exitCode=1;return;
+    }
+    if(receipt.terminal){emit({...receipt,humanHearing:'unconfirmed'});if(receipt.state!=='completed')process.exitCode=1;return;}if(receipt.inputState==='cancelled')throw Error('reply-cancelled');await new Promise(r=>setTimeout(r,100));
+   }
+   // Stop may arrive during the final sleep. Otherwise only observation ended:
+   // admitted speech can continue and its existing ID remains queryable.
+   if(stopped){await relay.cancel();return;}
+   emit({id:relay.id,state:'receipt-timeout',terminal:false,code:'reply-receipt-timeout',cancellation:'not-requested',humanHearing:'unconfirmed'});process.exitCode=1;return;
+  }
  }catch(error){let cancellation='unconfirmed';try{await relay.cancel();cancellation='requested';}catch{}emit({id:relay.id,state:'failed',code:error.message&&/^[a-z-]+$/.test(error.message)?error.message:'reply-stream-refused',cancellation});process.exitCode=1;
  }finally{process.off('SIGINT',stop);process.off('SIGTERM',stop);}
 }
