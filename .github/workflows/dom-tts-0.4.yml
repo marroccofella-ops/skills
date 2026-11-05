@@ -41,6 +41,7 @@ jobs:
       - run: node tests/native-usability-check.cjs
       - run: node tests/publisher-policy-check.cjs
       - run: node tests/package-boundaries-check.cjs
+      - run: node tests/legacy-rollback-check.cjs
       - run: node tests/browser-build-check.cjs
       - run: node tests/browser-command-check.cjs
       - run: node tests/browser-diagnostics-check.cjs

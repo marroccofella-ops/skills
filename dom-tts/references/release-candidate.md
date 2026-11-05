@@ -7,6 +7,7 @@ This source candidate repairs word boundaries, long-reply expiry/deadlines, roll
 - Local browser speech with same-document connection recovery, bounded per-chat scheduler sources, queue-pressure draining and provider-specific Stop.
 - Display-first supplied live-paragraph relay and supplied completion notifier. Both use identities explicitly provided by their owning caller; neither discovers chats or reads transcripts.
 - Managed installer transaction recovery, explicit native-settings migration and supplied Codex/Claude/OpenClaw event adapters.
+- Historical rollback to the source-pinned published RC2 snapshot, verified without running backup scripts. Use this candidate's external installer for rollback and rollforward; unknown legacy snapshots are refused.
 - Windows native speech, tray, setup and signing/readiness source; no compiled executable or certificate.
 - Optional local voice-studio source with separate recording/remote-request consent and opt-in provider selection; no microphone, cloud request or credential is activated by install.
 - Word/sentence-aware supplied speech, activity-based queue expiry, duration-aware deadlines and bounded rolling host histories. Controlled regressions cover long sessions; they do not certify human hearing or every Desktop chat.

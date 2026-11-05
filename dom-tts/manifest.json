@@ -8,7 +8,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1cfa582e07c5225a17d46482783a9de832543d3d561cc761a4df3e4b21796401"
+      "sha256": "9e61ce2258e47c4e0820d6e794a882fe6ddc08b00df50faa1f53918d67166b6e"
     },
     {
       "path": "COMPATIBILITY.md",
@@ -24,7 +24,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "1632597f35d9a2a4a556558d81956d18278df14dc16925f3fd5cec8a50b5b67c"
+      "sha256": "e9144bbb8b189c4c304f719136273de5b43442bf8622562bb1c7619af24e125b"
     },
     {
       "path": "SKILL.md",
@@ -116,7 +116,7 @@
     },
     {
       "path": "references/release-candidate.md",
-      "sha256": "9feb0d9ad23573e45e3b4370f814f9b8f7d850d19ce54cb72dc604ca38a55977"
+      "sha256": "e4364f08624dafc12ff471f3184dcb0603ca06b9612c456fba72b47ce19ffdc7"
     },
     {
       "path": "scripts/avatar-state.js",
@@ -256,7 +256,11 @@
     },
     {
       "path": "scripts/install.js",
-      "sha256": "d966d69247f538a94892de8fc19b649b234ebeacbd417dfc363fad3b2042c1ca"
+      "sha256": "0441f0a6211cd73f7ac15aad7f1a7da017d21a283db6496ad270c14069fa296c"
+    },
+    {
+      "path": "scripts/legacy-rollback.js",
+      "sha256": "94b49b08cd2db4c233a2ce329611f606d1db8056989affe72bfa82cece78eeed"
     },
     {
       "path": "scripts/lock.js",
@@ -272,7 +276,7 @@
     },
     {
       "path": "scripts/package.js",
-      "sha256": "56b1442b9fe1f2fa107052ee8226fc9d62b33c3241210c4167c5d88cfe21affa"
+      "sha256": "4c448e9a681aebc6cc11a754e986c6132a789d9635a7b5864849ebf3b825e5eb"
     },
     {
       "path": "scripts/prepare-windows-release.js",
@@ -368,7 +372,7 @@
     },
     {
       "path": "scripts/test-suites.json",
-      "sha256": "62b1d60b6ca87fa60493016dcd794474ba796f86bb1830c7bb38bbd99d554b55"
+      "sha256": "883f3575a80bb5c07136b1dac790c8b75b5aa5e918c1f9acb133088574c43152"
     },
     {
       "path": "scripts/tray.js",
@@ -384,7 +388,7 @@
     },
     {
       "path": "source-files.json",
-      "sha256": "7b99cc3756e156c4ed424c45a3d4a4cd6d8b4d9058cfb984f7061e87c5e4f2d7"
+      "sha256": "b12b9e12440c8427900d2f9402b89105b46fc8054e944226e27bbff83541dbd7"
     },
     {
       "path": "tests/async-queue-checks.cjs",
@@ -599,6 +603,10 @@
       "sha256": "408d78993a460380cf9fe33b3f773baf88ed0ccb7f943e836c6b8aeb410529e0"
     },
     {
+      "path": "tests/legacy-rollback-check.cjs",
+      "sha256": "f97cec6387448179298082738e70fcc1e92aaf2c648651dc67f0b465a6a7414b"
+    },
+    {
       "path": "tests/markdown-progress-check.cjs",
       "sha256": "b5185ac843b1ada512ec51163ff908323ad27226e219d081b9f7a5f48f562f5a"
     },
@@ -656,7 +664,7 @@
     },
     {
       "path": "tests/package-boundaries-check.cjs",
-      "sha256": "df03deb7d3d6e521a1a54b10ed2b1522c94c64a2da4a456e0fc46114fbf0f951"
+      "sha256": "fcbfbeef7d3d43b7865284bf90a3fc1576ff9c739480167b27b5dfcacc05c80c"
     },
     {
       "path": "tests/permission-cache-checks.cjs",

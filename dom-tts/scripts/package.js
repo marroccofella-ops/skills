@@ -9,10 +9,15 @@ function safeSourcePath(file){
  const parts=file.toLowerCase().split('/'),name=parts.at(-1);
  return !parts.some(p=>['state','.local-test','node_modules','__pycache__','.git','recordings'].includes(p))&&!['settings.json','status.json','browser-session.json','control-session.json','release.json'].includes(name)&&!/^\.env(?:\.|$)/.test(name)&&!/[.](?:exe|dll|pdb|zip|wav|mp3|ogg|webm|pem|key|pfx|p12|log|pyc|tmp)$/i.test(name);
 }
+function sourceStat(root,relative){
+ let current=path.resolve(root),stat=fs.lstatSync(current);if(!stat.isDirectory()||stat.isSymbolicLink())throw Error('Source package contains a link or invalid root');
+ const parts=relative.split('/');for(let i=0;i<parts.length;i++){current=path.join(current,parts[i]);stat=fs.lstatSync(current);if(stat.isSymbolicLink()||stat.isFile()&&stat.nlink!==1)throw Error('Source package contains a link');if(i<parts.length-1&&!stat.isDirectory())throw Error('Invalid source ancestor');}
+ return stat;
+}
 function sourceJson(root,name,limit,label){
  const file=path.join(root,name);let descriptor;
  try{
-  const stat=fs.lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>limit)throw Error();
+  const stat=sourceStat(root,name);if(!stat.isFile()||stat.size>limit)throw Error();
   descriptor=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0));const opened=fs.fstatSync(descriptor);
   if(!opened.isFile()||opened.dev!==stat.dev||opened.ino!==stat.ino||opened.size!==stat.size)throw Error();
   const bytes=fs.readFileSync(descriptor),after=fs.fstatSync(descriptor);
@@ -30,7 +35,7 @@ function sourceFiles(root=ROOT){
  // Unknown local files are refused before their contents can be hashed/copied.
  const expected=new Set(recipe(root)),seen=new Set();let totalBytes=0;
  function visit(relative){
-  const stat=fs.lstatSync(path.join(root,relative));
+  const stat=sourceStat(root,relative);
   if(stat.isSymbolicLink())throw Error('Source package contains a link');
   if(stat.isDirectory()){
    if(![...expected].some(file=>file.startsWith(relative+'/')))throw Error('Unreviewed local artifact in source tree');

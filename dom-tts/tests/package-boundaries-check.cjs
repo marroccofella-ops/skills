@@ -9,6 +9,21 @@ try{
  }
  const baseline=manifest(area);assert(baseline.files.some(item=>item.path==='.gitignore'));assert(baseline.files.some(item=>item.path==='source-files.json'));
  writeObject(path.join(area,'manifest.json'),baseline);
+ // Fixed roots such as assets/browser must not traverse an unchecked assets link.
+ {
+  const assets=path.join(area,'assets'),saved=path.join(area,'linked-assets-target'),original=fs.readFileSync;let read=false;
+  for(const target of [assets,saved])assert.equal(path.dirname(path.resolve(target)),path.resolve(area));
+  fs.renameSync(assets,saved);fs.symlinkSync(saved,assets,process.platform==='win32'?'junction':'dir');
+  fs.readFileSync=function(file,...args){if(typeof file!=='number'&&path.resolve(String(file)).startsWith(path.resolve(assets)+path.sep))read=true;return original.call(this,file,...args);};
+  try{assert.throws(()=>manifest(area),/link/);assert.equal(read,false);}finally{fs.readFileSync=original;assert(fs.lstatSync(assets).isSymbolicLink());fs.unlinkSync(assets);fs.renameSync(saved,assets);}
+ }
+ for(const name of ['scripts/speak.js','source-files.json']){
+  const target=path.join(area,name),alias=path.join(area,'linked-file-target'),originalRead=fs.readFileSync,originalOpen=fs.openSync;let opened=false,read=false;
+  assert.equal(path.dirname(path.resolve(alias)),path.resolve(area));fs.linkSync(target,alias);
+  fs.openSync=function(file,...args){if(typeof file!=='number'&&path.resolve(String(file))===path.resolve(target))opened=true;return originalOpen.call(this,file,...args);};
+  fs.readFileSync=function(file,...args){if(typeof file!=='number'&&path.resolve(String(file))===path.resolve(target))read=true;return originalRead.call(this,file,...args);};
+  try{assert.throws(()=>manifest(area),/link|refused/);assert.equal(opened,false);assert.equal(read,false);}finally{fs.openSync=originalOpen;fs.readFileSync=originalRead;fs.unlinkSync(alias);}
+ }
  for(const name of ['package.json','manifest.json']){
   const target=path.join(area,name),originalStat=fs.lstatSync,originalRead=fs.readFileSync;let read=false;
   fs.lstatSync=function(file,...args){const stat=originalStat.call(this,file,...args);return path.resolve(String(file))===path.resolve(target)?Object.assign(Object.create(Object.getPrototypeOf(stat)),stat,{isSymbolicLink:()=>true}):stat;};

@@ -38,6 +38,10 @@
       "args": []
     },
     {
+      "file": "tests/legacy-rollback-check.cjs",
+      "args": []
+    },
+    {
       "file": "tests/browser-build-check.cjs",
       "args": []
     },

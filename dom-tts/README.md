@@ -99,12 +99,19 @@ node scripts/install.js --target codex --action uninstall
 
 The source manifest contains SHA-256 hashes and excludes runtime state, settings,
 reviews and recordings. Packaging uses the reviewed `source-files.json` list and
-refuses unexpected files in its source roots before reading their contents. The
+refuses unexpected files, linked ancestors and hardlinked source files before reading their contents. The
 manifest is an integrity receipt, not a publisher signature. The installer validates it, stages source in a private
 directory and replaces only its own managed dom-tts directory. An existing
 unmanaged directory is refused. Upgrades retain a previous snapshot and preserve
 valid per-machine settings. Uninstall moves the installed snapshot to the private
 backup directory; it leaves runtime state and other skills alone.
+
+Use the installer from the new reviewed archive for rollback and subsequent
+upgrades. Historical restoration also accepts the exact published RC2 snapshot,
+identified by a source-pinned manifest hash; unknown legacy packages are refused.
+It verifies backup bytes without executing backup scripts. New source packages
+still require the reviewed file recipe. Rollback restores the settings snapshot
+taken at upgrade, so export later settings changes privately first.
 
 Codex uses ~/.agents/skills, Claude Code uses ~/.claude/skills. For other Agent
 Skills hosts use their documented skill parent explicitly. For hosts without
