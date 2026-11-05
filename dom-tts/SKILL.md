@@ -1,6 +1,6 @@
 ---
 name: dom-tts
-description: Read supplied text or assistant replies aloud with local speech, control playback, check speech status, or narrate one explicitly selected transcript. Use for read-aloud and spoken replies. Do not use for recording, transcription or voice cloning.
+description: Output-only local read-aloud from supplied text or one selected transcript, plus playback controls and status. Use for spoken replies; not for microphone listening/recording, speech recognition, transcription, voice creation or imitation.
 ---
 
 ## Experimental browser speech and progress

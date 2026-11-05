@@ -3,6 +3,7 @@
 - Embed a consistent Dom TTS product name, exact informational package version, numeric file/assembly version and component description in Windows speech, tray and setup builds. Validate version input before generating compiler metadata and remove temporary source files after compilation.
 - Add portable version validation and actual Windows compile-only PE resource checks to the hosted matrix. Product metadata prepares trusted signing; outputs remain unsigned until a trusted signing provider is configured. Desktop live attachment and stable native/platform acceptance remain open.
 - Clarify the skill's recording/transcription/cloning exclusion and distinguish an explicit voice-test instruction from test/control words inside supplied readout text, preserving nonwaiting speech admission for ordinary replies.
+- Make the discovery description explicitly about speech output and exclude microphone listening, recognition and creating or imitating voices before the skill is loaded.
 
 # 0.5.0-rc.2 — 4 November 2026
 
